@@ -1,0 +1,3745 @@
+/* style.css */
+:root {
+    --table-bg-color: #ffffff;
+    --header-bg-color: #2c3e50;
+    --header-text-color: #ffffff;
+    --border-color: #bbb;
+    --font-size: 14px;
+    --font-family: 'Noto Sans KR', sans-serif;
+    --row-height: 50px;
+    --cell-padding: 12px;
+    --border-width: 1px;
+    --hover-effect: background;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-family);
+    background: #f5f7fa;
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 20px;
+    overflow-x: auto;
+}
+
+h1 {
+    font-size: 2.5rem;
+    color: #2c3e50;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+/* 헤더 섹션 */
+.header-section {
+    margin-bottom: 30px;
+}
+
+.header-content {
+    display: flex;
+    justify-content: flex-start;
+    align-items: left;
+    flex-wrap: wrap;
+    gap: 20px;
+    position: relative;
+}
+
+.header-section h1 {
+    margin-bottom: 0;
+    text-align: left;
+    flex: 1;
+    min-width: 300px;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.version-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.version-info-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #f8f9fa;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+    font-size: 6px;
+}
+
+.version-buttons-line {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+
+
+.version-nav-buttons {
+    display: flex;
+    gap: 2px;
+}
+
+.version-nav-btn {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 0px 1px;
+    border-radius: 1px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 4px;
+    min-width: 6px;
+    height: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    font-weight: bold;
+}
+
+.version-nav-btn:hover {
+    background: #5a6268;
+    transform: translateY(-1px);
+}
+
+.version-nav-btn:disabled {
+    background: #adb5bd;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.version-nav-btn-small {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 1px 3px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 8px;
+    min-width: 16px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    font-weight: bold;
+}
+
+.version-nav-btn-small:hover {
+    background: #5a6268;
+    transform: translateY(-1px);
+}
+
+.version-nav-btn-small:disabled {
+    background: #adb5bd;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.version-info {
+    font-size: 12px;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.current-version-display {
+    font-size: 14px;
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+/* 버전 관리 모달 스타일 */
+.version-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    background: white;
+    transition: all 0.2s ease;
+}
+
+.version-item:hover {
+    border-color: #4a90e2;
+    box-shadow: 0 2px 8px rgba(74, 144, 226, 0.1);
+}
+
+.version-item-info {
+    flex: 1;
+}
+
+.version-item-name {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 5px;
+}
+
+.version-item-description {
+    font-size: 13px;
+    color: #6c757d;
+    margin-bottom: 5px;
+}
+
+.version-item-date {
+    font-size: 12px;
+    color: #adb5bd;
+}
+
+.version-item-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.version-item-actions .btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+/* 수정모드 토글 버튼 */
+.edit-mode-toggle {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.btn-edit-mode {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    outline: none;
+}
+
+.btn-edit-mode:hover {
+    background: #218838;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    border: none;
+    outline: none;
+}
+
+.btn-edit-mode.active {
+    background: #dc3545;
+    border: none;
+    outline: none;
+}
+
+.btn-edit-mode.active:hover {
+    background: #c82333;
+    border: none;
+    outline: none;
+}
+
+/* 디자인 설정 패널 */
+.design-panel {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+    padding: 20px;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.design-panel h3 {
+    margin-bottom: 20px;
+    color: #2c3e50;
+    font-size: 1.5rem;
+}
+
+.design-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.design-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.design-group label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #6c757d;
+}
+
+.design-group input[type="color"] {
+    width: 100%;
+    height: 40px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.design-group input[type="range"] {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #dee2e6;
+    outline: none;
+    cursor: pointer;
+}
+
+.design-group input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #4a90e2;
+    cursor: pointer;
+}
+
+.design-group select {
+    padding: 8px 12px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 14px;
+    background: white;
+    cursor: pointer;
+}
+
+.design-group span {
+    font-size: 12px;
+    color: #6c757d;
+    text-align: center;
+}
+
+.design-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.design-actions .btn {
+    min-width: 120px;
+}
+
+/* 수정모드 활성화 시 테이블 스타일 */
+.edit-mode-active table {
+    border: 2px dashed #4a90e2;
+}
+
+.edit-mode-active th,
+.edit-mode-active td {
+    position: relative;
+}
+
+.edit-mode-active th:hover,
+.edit-mode-active td:hover {
+    background: rgba(74, 144, 226, 0.1);
+    cursor: pointer;
+}
+
+.edit-mode-active th::after,
+.edit-mode-active td::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border: 1px solid transparent;
+    pointer-events: none;
+}
+
+.edit-mode-active th:hover::after,
+.edit-mode-active td:hover::after {
+    border-color: #4a90e2;
+}
+
+/* 편집 가능한 셀 스타일 */
+.editable-cell {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.editable-cell:hover {
+    background: rgba(74, 144, 226, 0.15) !important;
+    box-shadow: inset 0 0 0 2px #4a90e2;
+}
+
+/* 매트릭스 셀 편집 스타일 */
+#matrixTable .editable-cell {
+    position: relative;
+}
+
+#matrixTable .editable-cell:hover {
+    background: rgba(255, 193, 7, 0.2) !important;
+    box-shadow: inset 0 0 0 2px #ffc107;
+}
+
+#matrixTable .editable-cell:active {
+    background: rgba(255, 193, 7, 0.3) !important;
+    transform: scale(0.98);
+}
+
+/* 편집 중인 셀 스타일 */
+.editing-cell {
+    background: #fff3cd !important;
+    box-shadow: inset 0 0 0 2px #ffc107;
+    position: relative !important;
+    padding: 0 !important;
+}
+
+.cell-edit-input,
+.cell-edit-textarea {
+    position: absolute !important;
+    top: 0; left: 0; right: 0; bottom: 0;
+    width: 100% !important;
+    height: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    font-size: inherit !important;
+    font-family: inherit !important;
+    resize: none !important;
+    outline: none !important;
+    z-index: 2;
+}
+
+.cell-edit-input:focus {
+    outline: none;
+    background: #fff;
+    border: 1px solid #4a90e2;
+}
+
+/* 공통가치대응 셀 편집 textarea 스타일 */
+
+
+/* 편집 불가능한 셀 */
+.no-edit {
+    cursor: default !important;
+}
+
+.no-edit:hover {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+/* 이수모형표 편집 가능한 셀 스타일 */
+.curriculum-table .editable-cell {
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.curriculum-table .editable-cell:hover {
+    background: rgba(74, 144, 226, 0.1) !important;
+    border: 1px dashed #4a90e2 !important;
+}
+
+.curriculum-table .editable-cell:active {
+    background: rgba(74, 144, 226, 0.2) !important;
+}
+
+/* 수행평가 기준 셀 */
+.performance-criteria {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: help;
+    font-size: 12px;
+    color: #666;
+}
+
+.performance-criteria:hover {
+    background: #f8f9fa;
+    color: #333;
+}
+
+.tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 30px;
+    background: white;
+    padding: 10px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    flex-wrap: wrap;
+}
+
+.tab {
+    padding: 12px 24px;
+    background: #e9ecef;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    flex: 1;
+    min-width: 120px;
+}
+
+.tab:hover {
+    background: #dee2e6;
+}
+
+.tab.active {
+    background: #4a90e2;
+    color: white;
+}
+
+.content {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.content.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.filters {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 120px;
+}
+
+.filter-group label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #6c757d;
+}
+
+select, input {
+    padding: 8px 12px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 14px;
+    background: white;
+    transition: border-color 0.3s ease;
+}
+
+select:focus, input:focus {
+    outline: none;
+    border-color: #4a90e2;
+}
+
+.table-container {
+    background: var(--table-bg-color);
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    overflow: hidden;
+    width: 100%;
+    overflow-x: auto;
+}
+
+table, .matrix-table, #coursesTable {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 800px;
+    background: var(--table-bg-color);
+    font-family: var(--font-family);
+    font-size: var(--font-size);
+    table-layout: auto !important;
+}
+
+th, td {
+    padding: var(--cell-padding);
+    border-bottom: var(--border-width) solid var(--border-color);
+    font-size: var(--font-size);
+    height: var(--row-height);
+    border-right: var(--border-width) solid var(--border-color);
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    white-space: normal;
+    word-break: break-word;
+}
+
+tr:hover {
+    background: #f8f9fa;
+}
+
+tr:hover.hover-shadow {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+tr:hover.hover-border {
+    border: 2px solid #4a90e2;
+}
+
+tr:hover.hover-none {
+    background: transparent;
+}
+
+/* 매트릭스 테이블 헤더 스타일 - 모든 색상 제거 */
+.matrix-table th {
+    /* background: #f7f7f7 !important; */
+    /* color: #000000 !important; */
+    /* border: 1px solid #bbb !important; */
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    height: 120px;
+    padding: 8px 3px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 400;
+    font-family: var(--font-family);
+    white-space: normal;
+    /* border: 1px solid #bbb !important; */
+    overflow: visible;
+    text-overflow: clip;
+    position: relative;
+    min-width: 8px;
+    width: calc((100% - 370px) / 18);
+    vertical-align: top;
+    word-break: keep-all;
+    word-wrap: break-word;
+    line-height: 1.2;
+    /* border-color: #bbb !important; */
+}
+
+/* 매트릭스 테이블 헤더 - 카테고리별 색상 제거 */
+.matrix-table th[colspan="4"] {
+    /* background: #ffffff !important; */
+    /* color: #000000 !important; */
+    /* border: 1px solid #000000; */
+}
+
+.matrix-table th[colspan="7"] {
+    /* background: #ffffff !important; */
+    /* color: #000000 !important; */
+    /* border: 1px solid #000000; */
+}
+
+.matrix-table th[colspan="5"] {
+    /* background: #ffffff !important; */
+    /* color: #000000 !important; */
+    /* border: 1px solid #000000; */
+}
+
+.matrix-table th[colspan="2"] {
+    /* background: #ffffff !important; */
+    /* color: #000000 !important; */
+    /* border: 1px solid #000000; */
+}
+
+
+.matrix-table th:nth-child(2) {
+    width: 60px !important;
+    min-width: 60px !important;
+    max-width: 120px !important;
+}
+
+.matrix-table th:nth-child(3) {
+    width: 80px;
+    min-width: 80px;       
+}
+
+.matrix-table th:nth-child(4) {
+    width: 150px;
+    min-width: 600px;
+}
+
+.matrix-table th:nth-child(5) {
+    width: 100px;
+    min-width: 100px;
+    text-align: center;
+}
+
+/* 카테고리별 헤더 스타일 */
+.matrix-table th.category-header {
+    background: #1a252f;
+    color: white;
+    font-weight: bold;
+    font-family: var(--font-family);
+    font-size: 14px;
+    text-align: center;
+    writing-mode: horizontal-tb;
+    height: auto;
+    padding: 10px 12px;
+}
+
+.matrix-table td {
+    text-align: center;
+    padding: 4px;
+    height: 30px;
+    border: 1px solid #dee2e6;
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: normal;
+    word-break: keep-all;
+    word-wrap: break-word;
+    min-width: 12px;
+    width: calc((100% - 370px) / 18);
+}
+
+.matrix-table td:first-child,
+.matrix-table td:nth-child(2),
+.matrix-table td:nth-child(3),
+.matrix-table td:nth-child(4) {
+    text-align: center;
+    width: auto;
+    min-width: 220px;
+}
+
+.matrix-table td:nth-child(4) {
+    text-align: center;
+    padding-left: 8px;
+    font-weight: 400;
+    min-width: 60px;
+}
+
+.matrix-table td:nth-child(5) {
+    text-align: center;
+    font-weight: 400;
+    min-width: 50px;
+}
+
+.matrix-table td:first-child {
+    background: #f8f9fa;
+    font-weight: bold;
+}
+
+/* 구분 카테고리별 색상 구분 */
+.matrix-table tr.category-thinking td:first-child {
+    background: transparent;
+    color: #1976d2;
+}
+
+.matrix-table tr.category-design td:first-child {
+    background: transparent;
+    color: #d32f2f;
+}
+
+.matrix-table tr.category-tech td:first-child {
+    background: transparent;
+    color: #f57c00;
+}
+
+.matrix-table tr.category-practice td:first-child {
+    background: transparent;
+    color: #388e3c;
+}
+
+.matrix-table tr:nth-child(even).category-thinking td:first-child {
+    background: transparent;
+}
+
+.matrix-table tr:nth-child(even).category-design td:first-child {
+    background: transparent;
+}
+
+.matrix-table tr:nth-child(even).category-tech td:first-child {
+    background: transparent;
+}
+
+.matrix-table tr:nth-child(even).category-practice td:first-child {
+    background: transparent;
+}
+
+/* 카테고리 셀이 없는 행들의 스타일 - 더 이상 필요하지 않음 */
+
+/* 수행평가 기준 헤더 카테고리별 색상 완전 제거 */
+.matrix-table thead tr:nth-child(2) th,
+.matrix-table thead tr:nth-child(3) th,
+.matrix-table thead tr:nth-child(4) th {
+    /* background: transparent !important; */
+    /* color: #333 !important; */
+    /* border-color: #bbb !important; */
+    /* font-weight: normal !important; */
+    /* text-align: center; */
+    /* vertical-align: middle; */
+    /* font-size: 15px; */
+}
+
+/* 상위 헤더(수행평가기준, 교과과정 등)도 동일하게 */
+.matrix-table thead tr:nth-child(1) th {
+    /* background: transparent !important; */
+    /* color: #333 !important; */
+    /* border-color: #bbb !important; */
+    /* font-weight: normal !important; */
+    /* text-align: center; */
+    /* vertical-align: middle; */
+    /* font-size: 15px; */
+    font-family: var(--font-family);
+}
+
+.matrix-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    margin: 0 auto;
+    display: inline-block;
+}
+
+.matrix-mark {
+    font-size: inherit;
+    font-weight: bold;
+    display: inline-block;
+    width: 1.2em;
+    height: 1.2em;
+    text-align: center;
+    line-height: 1.2em;
+    border-radius: 50%;
+    color: #333;
+}
+
+.matrix-mark-thinking,
+.matrix-mark-design,
+.matrix-mark-tech,
+.matrix-mark-practice {
+    color: #333;
+}
+
+.column-resizer {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 6px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 10;
+    background: transparent;
+    transition: background 0.2s;
+}
+
+.column-resizer.active,
+th.resizable:hover .column-resizer {
+    background: #b3c6ff;
+}
+
+.resizing {
+    cursor: col-resize !important;
+    user-select: none !important;
+}
+
+.resizing * {
+    cursor: col-resize !important;
+    user-select: none !important;
+}
+
+.dot-full {
+    background: #27ae60;
+}
+
+.dot-partial {
+    background: #f39c12;
+    position: relative;
+}
+
+.dot-partial::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 10px;
+    height: 10px;
+    background: white;
+    border-radius: 50%;
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.stat-card {
+    background: white;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    text-align: center;
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #1976d2;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    font-size: 14px;
+    color: #6c757d;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+    background: white;
+    width: 90%;
+    max-width: 600px;
+    margin: 50px auto;
+    padding: 30px;
+    border-radius: 10px;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from { transform: translateY(-50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.modal-header h2 {
+    color: #2c3e50;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #6c757d;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #495057;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+}
+
+.btn, .btn-secondary, .btn-primary, .btn-danger {
+    min-width: 70px;
+    padding: 1px 14px;
+    font-size: 14px;
+    height: 32px;
+    border-radius: 6px;
+    border: none;
+    outline: none;
+}
+
+.btn-sm {
+    min-width: 48px;
+    padding: 4px 10px;
+    font-size: 13px;
+    height: 28px;
+    border-radius: 5px;
+}
+
+.btn-primary {
+    background: #4a90e2;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #357abd;
+    border: none;
+    outline: none;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+    border: none;
+    outline: none;
+}
+
+.btn-add {
+    background: #27ae60;
+    color: white;
+    margin-bottom: 20px;
+    border: none;
+    outline: none;
+}
+
+.btn-add:hover {
+    background: #229954;
+    border: none;
+    outline: none;
+}
+
+.btn-danger {
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 0px 0px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+    outline: none;
+}
+
+.btn-danger:hover {
+    background: #c0392b;
+    border: none;
+    outline: none;
+}
+
+.matrix-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    justify-content: flex-end;
+}
+
+.matrix-controls .btn {
+    padding: 0px 10px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.font-size-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #00000000;
+    padding: 3px 3px;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+}
+
+.font-size-controls .btn-sm {
+    padding: 1px 1px;
+    font-size: 10px;
+    min-width: 30px;
+}
+
+.font-size-display {
+    font-size: 12px; 
+    font-weight: 500;
+    color: #6b6b6b;
+    min-width: 40px;
+    text-align: center;
+}
+
+.fullscreen-active {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 9999 !important;
+    background: white !important;
+    overflow: auto !important;
+}
+
+.fullscreen-active .matrix-controls {
+    position: sticky;
+    top: 0;
+    z-index: 10000;
+    background: white;
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* 구분(카테고리) 배지 */
+.category-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    margin-right: 2px;
+    vertical-align: middle;
+}
+.badge-category-liberal { background: #adb5bd; }
+.badge-category-thinking { background: #1976d2; }
+.badge-category-design { background: #d32f2f; }
+.badge-category-tech { background: #28a745; }
+.badge-category-practice { background: #388e3c; }
+.badge-category-etc { background: #7b1fa2; }
+
+/* 과목분류 배지 */
+.subject-type-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #fff;
+    margin-left: 2px;
+    vertical-align: middle;
+    opacity: 0.95;
+}
+.badge-type-design { background: #e57373; }
+.badge-type-digital { background: #7e57c2; }
+.badge-type-history { background: #ffb300; }
+.badge-type-theory { background: #009688; }
+.badge-type-urban { background: #ec407a; }
+.badge-type-social { background: #5c6bc0; }
+.badge-type-tech { background: #28a745; }
+.badge-type-practice { background: #43a047; }
+.badge-type-extracurricular { background: #8bc34a; }
+.badge-type-unclassified { background: #848484; }
+
+/* 반응형 디자인 */
+/* 모바일 반응형 스타일 */
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+        overflow-x: hidden;
+    }
+
+    h1 {
+        font-size: 1.5rem;
+        margin-bottom: 15px;
+        text-align: center;
+    }
+
+    /* 헤더 섹션 모바일 최적화 */
+    .main-header-content {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+
+    .main-header-content h1 {
+        position: static;
+        transform: none;
+        font-size: 1.3rem;
+        margin-bottom: 10px;
+    }
+
+    .main-header-content img {
+        height: 20px;
+    }
+
+    .version-controls {
+        align-items: center;
+        width: 100%;
+    }
+
+    .version-info-line {
+        font-size: 10px;
+        padding: 6px 10px;
+    }
+
+    .version-buttons-line {
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .version-buttons-line .btn-sm {
+        padding: 6px 10px;
+        font-size: 11px;
+    }
+
+    /* 탭 모바일 최적화 */
+    .tabs {
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .tab {
+        min-width: auto;
+        padding: 8px 12px;
+        font-size: 12px;
+        border-radius: 6px;
+    }
+
+    /* 필터 모바일 최적화 */
+    .filters {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .filter-group {
+        min-width: auto;
+        width: 100%;
+    }
+
+    .filter-group label {
+        font-size: 12px;
+        margin-bottom: 4px;
+    }
+
+    .filter-group select,
+    .filter-group input {
+        font-size: 14px;
+        padding: 8px 10px;
+    }
+
+    /* 표 모바일 최적화 */
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    table, .matrix-table, #coursesTable {
+        font-size: 12px;
+        min-width: 600px;
+    }
+
+    th, td {
+        padding: 6px 8px;
+        font-size: 11px;
+        white-space: nowrap;
+    }
+
+    /* 교과목 블록 모바일 최적화 */
+    .course-block {
+        font-size: 10px;
+        padding: 4px 6px;
+        margin: 2px;
+        border-radius: 4px;
+        min-height: 30px;
+    }
+
+    .course-block-title {
+        font-size: 10px;
+        font-weight: 600;
+        line-height: 1.2;
+        margin-bottom: 2px;
+    }
+
+    .course-credits-text {
+        font-size: 9px;
+    }
+
+    .course-block-info {
+        font-size: 9px;
+        line-height: 1.1;
+    }
+
+    .course-description {
+        font-size: 8px;
+        line-height: 1.1;
+    }
+
+    /* 매트릭스 테이블 모바일 최적화 */
+    .matrix-table th {
+        font-size: 10px;
+        padding: 4px 6px;
+        white-space: nowrap;
+    }
+
+    .matrix-table td {
+        font-size: 9px;
+        padding: 3px 4px;
+    }
+
+    .matrix-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+
+    .matrix-mark {
+        font-size: 8px;
+        padding: 1px 3px;
+    }
+
+    /* 통계 카드 모바일 최적화 */
+    .stats {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+    }
+
+    .stat-card {
+        padding: 15px;
+    }
+
+    .stat-number {
+        font-size: 1.5rem;
+    }
+
+    .stat-label {
+        font-size: 12px;
+    }
+
+    /* 모달 모바일 최적화 */
+    .modal-content {
+        width: 95%;
+        margin: 10px auto;
+        padding: 15px;
+        max-height: 90vh;
+    }
+
+    .modal-header h2 {
+        font-size: 1.2rem;
+    }
+
+    .form-group label {
+        font-size: 12px;
+    }
+
+    .form-group input,
+    .form-group select {
+        font-size: 14px;
+        padding: 8px 10px;
+    }
+
+    /* 버튼 모바일 최적화 */
+    .btn {
+        padding: 8px 12px;
+        font-size: 12px;
+        border-radius: 6px;
+    }
+
+    .btn-sm {
+        padding: 6px 10px;
+        font-size: 11px;
+    }
+
+    /* 매트릭스 필터 모바일 최적화 */
+    .matrix-filters {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .filter-section {
+        width: 100%;
+    }
+
+    .checkbox-group {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .modern-checkbox {
+        font-size: 12px;
+        padding: 6px 8px;
+    }
+
+    .label-text {
+        font-size: 11px;
+    }
+
+    /* 교과과정 테이블 모바일 최적화 */
+    .curriculum-table {
+        font-size: 10px;
+    }
+
+    .curriculum-table th,
+    .curriculum-table td {
+        padding: 4px 6px;
+        font-size: 9px;
+    }
+
+    .curriculum-table th:nth-child(-n+3) {
+        font-size: 10px;
+        font-weight: bold;
+    }
+
+    /* 공통가치 테이블 모바일 최적화 */
+    .common-values-table {
+        font-size: 10px;
+    }
+
+    .common-values-table th,
+    .common-values-table td {
+        padding: 4px 6px;
+        font-size: 9px;
+    }
+
+    /* 디자인 패널 모바일 최적화 */
+    .design-panel {
+        padding: 15px;
+    }
+
+    .design-panel h3 {
+        font-size: 1.1rem;
+    }
+
+    .design-controls {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .design-group label {
+        font-size: 12px;
+    }
+
+    .design-group input[type="range"] {
+        width: 100%;
+    }
+
+    .design-group select {
+        font-size: 12px;
+        padding: 6px 8px;
+    }
+}
+
+/* 작은 모바일 화면 최적화 */
+@media (max-width: 480px) {
+    .container {
+        padding: 5px;
+        overflow-x: hidden;
+    }
+    
+    h1 {
+        font-size: 1.2rem;
+        margin-bottom: 10px;
+    }
+
+    /* 헤더 더 작은 화면 최적화 */
+    .main-header-content h1 {
+        font-size: 1.1rem;
+    }
+
+    .main-header-content img {
+        height: 18px;
+    }
+
+    .version-info-line {
+        font-size: 9px;
+        padding: 4px 8px;
+    }
+
+    .version-buttons-line .btn-sm {
+        padding: 4px 8px;
+        font-size: 10px;
+    }
+
+    /* 탭 더 작은 화면 최적화 */
+    .tab {
+        padding: 6px 10px;
+        font-size: 11px;
+    }
+
+    /* 필터 더 작은 화면 최적화 */
+    .filter-group label {
+        font-size: 11px;
+    }
+
+    .filter-group select,
+    .filter-group input {
+        font-size: 13px;
+        padding: 6px 8px;
+    }
+
+    /* 표 더 작은 화면 최적화 */
+    table, .matrix-table, #coursesTable {
+        font-size: 10px;
+        min-width: 500px;
+    }
+
+    th, td {
+        padding: 4px 6px;
+        font-size: 9px;
+    }
+
+    /* 교과목 블록 더 작은 화면 최적화 */
+    .course-block {
+        font-size: 9px;
+        padding: 3px 5px;
+        margin: 1px;
+        min-height: 25px;
+    }
+
+    .course-block-title {
+        font-size: 9px;
+        margin-bottom: 1px;
+    }
+
+    .course-credits-text {
+        font-size: 8px;
+    }
+
+    .course-block-info {
+        font-size: 8px;
+    }
+
+    .course-description {
+        font-size: 7px;
+    }
+
+    /* 매트릭스 테이블 더 작은 화면 최적화 */
+    .matrix-table {
+        font-size: 10px;
+    }
+    
+    .matrix-table th {
+        font-size: 9px;
+        padding: 3px 4px;
+    }
+    
+    .matrix-table td {
+        font-size: 8px;
+        padding: 2px 3px;
+    }
+
+    .matrix-dot {
+        width: 6px;
+        height: 6px;
+    }
+
+    .matrix-mark {
+        font-size: 7px;
+        padding: 1px 2px;
+    }
+
+    /* 교과과정 테이블 더 작은 화면 최적화 */
+    .curriculum-table {
+        font-size: 9px;
+    }
+
+    .curriculum-table th,
+    .curriculum-table td {
+        padding: 3px 4px;
+        font-size: 8px;
+    }
+
+    .curriculum-table th:nth-child(-n+3) {
+        font-size: 9px;
+    }
+
+    /* 공통가치 테이블 더 작은 화면 최적화 */
+    .common-values-table {
+        font-size: 9px;
+    }
+
+    .common-values-table th,
+    .common-values-table td {
+        padding: 3px 4px;
+        font-size: 8px;
+    }
+
+    /* 버튼 더 작은 화면 최적화 */
+    .btn {
+        padding: 6px 10px;
+        font-size: 11px;
+    }
+
+    .btn-sm {
+        padding: 4px 8px;
+        font-size: 10px;
+    }
+
+    /* 모달 더 작은 화면 최적화 */
+    .modal-content {
+        width: 98%;
+        margin: 5px auto;
+        padding: 10px;
+    }
+
+    .modal-header h2 {
+        font-size: 1.1rem;
+    }
+
+    .form-group label {
+        font-size: 11px;
+    }
+
+    .form-group input,
+    .form-group select {
+        font-size: 13px;
+        padding: 6px 8px;
+    }
+
+    /* 통계 카드 더 작은 화면 최적화 */
+    .stat-card {
+        padding: 10px;
+    }
+
+    .stat-number {
+        font-size: 1.3rem;
+    }
+
+    .stat-label {
+        font-size: 11px;
+    }
+}
+
+.matrix-table th.resizable {
+    position: relative;
+}
+
+/* 모든 th, td 가운데 정렬 및 중간 정렬 */
+.matrix-table th, .matrix-table td {
+    text-align: center !important;
+    vertical-align: middle !important;
+    writing-mode: horizontal-tb !important;
+    text-orientation: initial !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: keep-all !important;
+    word-wrap: break-word !important;
+    min-width: unset !important;
+    min-height: unset !important;
+    width: auto !important;
+    height: auto !important;
+    padding: 2px 4px !important;
+    box-sizing: border-box;
+    border: 1px solid #bbb !important;
+}
+
+/* 수행평가 항목 이름(헤더 4번째 행)도 가로쓰기, 가운데 정렬 */
+.matrix-table thead tr:nth-child(4) th.resizable {
+    writing-mode: horizontal-tb !important;
+    text-orientation: initial !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    vertical-align: middle !important;
+    word-break: keep-all !important;
+    word-wrap: break-word !important;
+    line-height: 1.2;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* 수행평가 항목 번호(3번째 행)는 가로쓰기 */
+.matrix-table thead tr:nth-child(3) th.resizable {
+    writing-mode: horizontal-tb !important;
+    text-orientation: initial !important;
+    white-space: nowrap !important;
+    vertical-align: middle !important;
+    font-size: 14px;
+    padding: 2px 4px;
+    height: auto;
+    min-height: 0;
+    width: auto;
+    min-width: 0;
+}
+
+/* 수행평가 항목 이름(4번째 행)는 세로쓰기 */
+.matrix-table thead tr:nth-child(4) th.resizable {
+    writing-mode: vertical-rl !important;
+    text-orientation: mixed !important;
+    white-space: normal !important;
+    vertical-align: middle !important;
+    word-break: keep-all !important;
+    word-wrap: break-word !important;
+    font-size: 14px;
+    padding: 2px 4px;
+    height: auto;
+    min-height: 0;
+    width: auto;
+    min-width: 0;
+}
+
+/* 모든 th, td의 높이/폭 최소화 */
+.matrix-table th, .matrix-table td {
+    height: auto !important;
+    min-height: 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    padding: 2px 4px !important;
+    box-sizing: border-box;
+}
+
+.matrix-table thead th {
+    text-align: center !important;
+    vertical-align: middle !important;
+    white-space: nowrap;
+    font-family: var(--font-family);
+}
+
+.matrix-table thead tr:nth-child(2) th {
+    vertical-align: middle !important;
+}
+
+.matrix-table tr.major-required-row td {
+    background: #f0f0f0;
+}
+.matrix-table tr.major-required-row td:first-child {
+    background: #fff !important;
+}
+.matrix-table td.major-required-dot {
+    color: #333;
+    font-size: 16px;
+    font-weight: bold;
+    text-align: center;
+    vertical-align: middle;
+    line-height: 1;
+    padding: 0 !important;
+    height: 100%;
+}
+
+.matrix-table td:nth-child(4):hover {
+    background-color: #f0f8ff !important;
+    color: #0066cc;
+}
+
+.matrix-table td:nth-child(4) {
+    transition: all 0.2s ease;
+}
+
+.matrix-table td:nth-child(5):hover {
+    background-color: #f0f8ff !important;
+    color: #0066cc;
+}
+
+.matrix-table td:nth-child(5) {
+    transition: all 0.2s ease;
+}
+
+.matrix-table th:nth-child(n+6):nth-last-child(n+2),
+.matrix-table td:nth-child(n+6):nth-last-child(n+2) {
+    width: 5.56% !important;
+    min-width: 60px;
+    max-width: 1fr;
+    text-align: center;
+}
+
+/* 건축적사고 (1~4번) */
+.matrix-table thead tr:nth-child(2) th:nth-child(6),
+.matrix-table thead tr:nth-child(3) th:nth-child(1),
+.matrix-table thead tr:nth-child(3) th:nth-child(2),
+.matrix-table thead tr:nth-child(3) th:nth-child(3),
+.matrix-table thead tr:nth-child(3) th:nth-child(4),
+.matrix-table thead tr:nth-child(4) th:nth-child(1),
+.matrix-table thead tr:nth-child(4) th:nth-child(2),
+.matrix-table thead tr:nth-child(4) th:nth-child(3),
+.matrix-table thead tr:nth-child(4) th:nth-child(4) {
+    background: #e3f2fd !important;
+    color: #333 !important; 
+    font-weight: 400 !important;
+    font-family: var(--font-family);
+    font-size: 14px;
+}
+
+/* 설계 (5~11번) */
+.matrix-table thead tr:nth-child(2) th:nth-child(7),
+.matrix-table thead tr:nth-child(3) th:nth-child(5),
+.matrix-table thead tr:nth-child(3) th:nth-child(6),
+.matrix-table thead tr:nth-child(3) th:nth-child(7),
+.matrix-table thead tr:nth-child(3) th:nth-child(8),
+.matrix-table thead tr:nth-child(3) th:nth-child(9),
+.matrix-table thead tr:nth-child(3) th:nth-child(10),
+.matrix-table thead tr:nth-child(3) th:nth-child(11),
+.matrix-table thead tr:nth-child(4) th:nth-child(5),
+.matrix-table thead tr:nth-child(4) th:nth-child(6),
+.matrix-table thead tr:nth-child(4) th:nth-child(7),
+.matrix-table thead tr:nth-child(4) th:nth-child(8),
+.matrix-table thead tr:nth-child(4) th:nth-child(9),
+.matrix-table thead tr:nth-child(4) th:nth-child(10),
+.matrix-table thead tr:nth-child(4) th:nth-child(11) {
+    background: #ffebee !important;
+    color: #333 !important;
+    font-weight: 400 !important;
+    font-family: var(--font-family);
+    font-size: 14px;
+}
+
+/* 기술 (12~16번) */
+.matrix-table thead tr:nth-child(2) th:nth-child(8),
+.matrix-table thead tr:nth-child(3) th:nth-child(12),
+.matrix-table thead tr:nth-child(3) th:nth-child(13),
+.matrix-table thead tr:nth-child(3) th:nth-child(14),
+.matrix-table thead tr:nth-child(3) th:nth-child(15),
+.matrix-table thead tr:nth-child(3) th:nth-child(16),
+.matrix-table thead tr:nth-child(4) th:nth-child(12),
+.matrix-table thead tr:nth-child(4) th:nth-child(13),
+.matrix-table thead tr:nth-child(4) th:nth-child(14),
+.matrix-table thead tr:nth-child(4) th:nth-child(15),
+.matrix-table thead tr:nth-child(4) th:nth-child(16) {
+    background: #fff3e0 !important;
+    color: #333 !important;
+    font-weight: 400 !important;
+    font-family: var(--font-family);
+    font-size: 14px;
+}
+
+/* 실무 (17~18번) */
+.matrix-table thead tr:nth-child(2) th:nth-child(9),
+.matrix-table thead tr:nth-child(3) th:nth-child(17),
+.matrix-table thead tr:nth-child(3) th:nth-child(18),
+.matrix-table thead tr:nth-child(4) th:nth-child(17),
+.matrix-table thead tr:nth-child(4) th:nth-child(18) {
+    background: #e8f5e8 !important;
+    color: #333 !important;
+    font-weight: 400 !important;
+    font-family: var(--font-family);
+    font-size: 14px;
+}
+
+.matrix-table thead tr:first-child th,
+.matrix-table thead tr:nth-child(2) th {
+
+    border-top: 1px solid #bbb !important;
+}
+
+/* 정렬 기능 스타일 */
+th.sortable {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+}
+
+th.sortable:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.sort-icon {
+    font-size: 12px;
+    margin-left: 5px;
+    opacity: 0.5;
+}
+
+th.sortable.asc .sort-icon::after {
+    content: "▲";
+    opacity: 1;
+    color: #007bff;
+    font-weight: bold;
+}
+
+th.sortable.desc .sort-icon::after {
+    content: "▼";
+    opacity: 1;
+    color: #007bff;
+    font-weight: bold;
+}
+
+th.sortable:not(.asc):not(.desc) .sort-icon::after {
+    content: "▲▼";
+    opacity: 0.4;
+    font-size: 0.8em;
+    letter-spacing: -2px;
+}
+
+/* 매트릭스 필터 스타일 */
+.matrix-filters {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    padding: 3px 16px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-right: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    justify-content: flex-end;
+    width: auto;
+    flex: none;
+}
+
+.filter-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.filter-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #495057;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.filter-icon {
+    display: none;
+}
+
+.checkbox-group {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.modern-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    position: relative;
+    padding: 6px 10px;
+    background: white;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    border: 1px solid #dee2e6;
+}
+
+.modern-checkbox:hover {
+    background: #f8f9fa;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.modern-checkbox input[type="checkbox"] {
+    display: none;
+}
+
+.checkmark {
+    width: 16px;
+    height: 16px;
+    background: #e9ecef;
+    border: 2px solid #ced4da;
+    border-radius: 4px;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.modern-checkbox input[type="checkbox"]:checked + .checkmark {
+    background: #007bff;
+    border-color: #007bff;
+}
+
+.modern-checkbox input[type="checkbox"]:checked + .checkmark::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.label-text {
+    color: #495057;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.btn-reset {
+    background: #6c757d;
+    color: white;
+    border: 1px solid #6c757d;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-reset:hover {
+    background: #5a6268;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.reset-icon {
+    display: none;
+}
+
+/* 교과목 관리 수정모드 버튼 스타일 */
+.btn-edit-mode-courses {
+    background: #28a745;
+    color: white;
+    border: none;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    margin-left: 10px;
+    outline: none;
+}
+
+.btn-edit-mode-courses:hover {
+    background: #218838;
+    border: none;
+    outline: none;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+}
+
+.btn-edit-mode-courses.active {
+    background: #dc3545;
+    border: none;
+    outline: none;
+}
+
+.btn-edit-mode-courses.active:hover {
+    background: #c82333;
+    border: none;
+    outline: none;
+}
+
+/* 교과목 관리 컨트롤 배치 */
+.courses-controls {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-bottom: 15px;
+    gap: 10px;
+}
+
+.btn-add,
+.btn-edit-mode-courses {
+    vertical-align: middle;
+    line-height: 1.5;
+    margin-top: 0;
+    margin-bottom: 0;
+    display: flex;
+    align-items: center;
+}
+
+.courses-controls-left {
+    /* 왼쪽 영역 (필요시 사용) */
+}
+
+.courses-controls-right {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+/* 매트릭스 수정모드 버튼 빨간색 */
+.btn-edit-mode-matrix {
+    background: #28a745;
+    color: white;
+    border: none;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    outline: none;
+}
+
+.btn-edit-mode-matrix:hover {
+    background: #218838;
+    border: none;
+    outline: none;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+}
+
+.btn-edit-mode-matrix.active {
+    background: #dc3545;
+    border: none;
+    outline: none;
+}
+
+.btn-edit-mode-matrix.active:hover {
+    background: #c82333;
+    border: none;
+    outline: none;
+}
+
+.criteria-partial {
+    color: #bbb;
+    font-weight: normal;
+}
+
+/* 기존 테두리색 #dee2e6 → #bbb로 일괄 변경 */
+table, .matrix-table, #coursesTable,
+th, td, .matrix-table th, .matrix-table td {
+    border-color: #bbb !important;
+}
+
+/* 교과목 블록 스타일 */
+.course-block {
+    background: #f8f9fa;
+    border: none;
+    border-radius: 12px;
+    margin: 1px auto; /* 중앙 정렬 */
+    padding: 2px 6px;
+    cursor: grab;
+    user-select: none;
+    transition: all 0.2s ease;
+    font-size: 12px;
+    min-height: 32px;
+    max-width: 280px;
+    min-width: 150px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+}
+
+/* 카테고리(구분)별 색상 */
+.course-block-category-liberal {
+    background: #e9ecef;
+}
+.course-block-category-thinking {
+    background: #e3f2fd;
+}
+.course-block-category-design {
+    background: #ffebee;
+}
+.course-block-category-tech {
+    background: #fff3e0;
+}
+.course-block-category-practice {
+    background: #e8f5e8;
+}
+.course-block-category-etc {
+    background: #f3e5f5;
+}
+
+/* 과목분류별 색상 (공통가치대응 탭용) */
+.course-block-type-design {
+    background: #e8e8e8;
+}
+.course-block-type-tech {
+    background: #fff3e0;
+}
+.course-block-type-practice {
+    background: #e8f5e8;
+}
+.course-block-type-digital {
+    background: #f5f2e5;
+}
+.course-block-type-history {
+    background: #ffece1;
+}
+.course-block-type-theory {
+    background: #e0f2f1;
+}
+.course-block-type-urban {
+    background: #fce4ec;
+}
+.course-block-type-social {
+    background: #e8eaf6;
+}
+.course-block-type-extracurricular {
+    background: #f1f8e9;
+}
+.course-block-type-unclassified {
+    background: #f6f6f683;
+}
+.course-block-type-default {
+    background: #f5f5f5;
+}
+
+.course-block:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.course-block:active {
+    cursor: grabbing;
+    transform: scale(0.98);
+}
+
+.course-block.dragging {
+    opacity: 0.5;
+    transform: rotate(5deg);
+}
+
+.course-block-title {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0px;
+    line-height: 1.2;
+    font-size: 13px;
+}
+
+.course-credits-text {
+    font-weight: normal;
+}
+
+.course-block-info {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 11px;
+    color: #6c757d;
+    width: 100%;
+}
+
+.course-description {
+    font-size: 10px;
+    color: #6c757d;
+    font-style: italic;
+    line-height: 1.2;
+    margin-top: 2px;
+}
+
+.course-block-original-name {
+    font-size: 9px;
+    color: #999;
+    font-style: italic;
+    line-height: 1.1;
+    margin-top: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 이수모형표 전체 테이블 레이아웃 */
+.curriculum-table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+/* 학년-학기 셀은 웹페이지 폭에 맞게 동일한 폭으로 자동 조정 */
+.curriculum-table td[id^="cell-"] {
+    min-width: 100px;
+    width: 8.33% !important; /* 12개 컬럼 중 1개씩 균등 분배 */
+    max-width: none !important;
+}
+
+/* 범례, 번호, 구분, 학점 셀은 내용에 맞게 자동 조정 */
+.curriculum-table td:not([id^="cell-"]),
+.curriculum-table th {
+    width: auto !important;
+    min-width: none !important;
+}
+
+.curriculum-table td[id^="cell-"]:hover {
+    background-color: #f8f9fa;
+}
+
+/* 기술분야 드롭존 스타일 */
+.curriculum-table td[id*="-구조-"],
+.curriculum-table td[id*="-환경-"],
+.curriculum-table td[id*="-시공-"],
+.curriculum-table td[id*="-디지털-"] {
+    position: relative;
+    min-height: 60px;
+    transition: all 0.3s ease;
+}
+
+/* 드래그 오버 상태 */
+.curriculum-table td[id^="cell-"]:has(.course-block:hover) {
+    background-color: #f8f9fa;
+    border-color: #bbb;
+}
+
+/* 학점 열 폭 조정 */
+.curriculum-table th:last-child,
+.curriculum-table td:last-child {
+    min-width: 220px;
+    width: 220px;
+}
+
+/* 교과목 블록 툴팁 스타일 */
+.course-block {
+    position: relative;
+}
+
+/* 커스텀 교과목 툴팁 스타일 (작고 아담하게) */
+.custom-course-tooltip {
+    position: absolute;
+    background: rgba(80, 82, 87, 0.98);
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-family: var(--font-family);
+    box-shadow: 0 4px 16px rgba(56, 56, 56, 0.18), 0 1px 3px rgba(0,0,0,0.08);
+    z-index: 9999;
+    min-width: 120px;
+    max-width: 220px;
+    pointer-events: none;
+    transition: opacity 0.15s cubic-bezier(.4,0,.2,1);
+    opacity: 0.98;
+    line-height: 0.5em;
+    border: 1px solid rgba(255,255,255,0.08);
+    white-space: pre-line;
+}
+.custom-course-tooltip .tooltip-title {
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 1.2;
+    color: #ffd86b;
+    letter-spacing: 1.2px;
+}
+.custom-course-tooltip .tooltip-row {
+    margin: 5;
+    padding: 0;
+    font-size: 12px;
+    word-break: keep-all;
+    line-height: 1.2;
+}
+.custom-course-tooltip .tooltip-row:last-child {
+    margin-bottom: 0;
+}
+
+/* 이수모형 수정모드 버튼 스타일 */
+.btn-edit-mode-curriculum {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+    outline: none;
+}
+
+.btn-edit-mode-curriculum:hover {
+    background: #218838;
+    border: none;
+    outline: none;
+}
+
+.btn-edit-mode-curriculum.active {
+    background: #dc3545;
+    border: none;
+    outline: none;
+}
+
+.btn-edit-mode-curriculum.active:hover {
+    background: #c82333;
+    border: none;
+    outline: none;
+}
+
+#font-size-display,
+#curriculum-font-size-display,
+#commonValues-font-size-display {
+    font-size: 12px;
+    font-weight: 500;
+    color: #6b6b6b;
+    min-width: 40px;
+    text-align: center;
+}
+
+/* 이수모형 테이블 셀 텍스트 가운데 정렬 */
+.curriculum-table td[id^="cell-"] {
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* 변경된 교과목 블록 강조 스타일 */
+
+/* 공통 변경 블록 스타일 */
+.course-block.highlighted,
+.course-block.modified {
+    position: relative;
+    z-index: 2;
+    transform: scale(1.02);
+    transition: all 0.3s ease;
+    border-width: 3px !important;
+    border-style: solid !important;
+}
+
+.course-block.highlighted .course-block-title,
+.course-block.modified .course-block-title,
+.course-block.deleted .course-block-title,
+.course-block.ghost .course-block-title {
+    font-size: 1.1em !important;
+    font-weight: 700 !important;
+}
+
+.course-block.highlighted .course-block-info,
+.course-block.modified .course-block-info {
+    font-size: 1.2em !important;
+}
+
+.course-block.modified .course-block-original-name {
+    font-size: 10px !important;
+    color: #bbb !important;
+}
+
+/* 수정된 과목 스타일 (파란색 계열) */
+.course-block.modified {
+    box-shadow: 0 2px 8px rgba(25, 118, 210, 0.3) !important;
+}
+
+.course-block.modified.course-block-liberal {
+    background: #d6d8db !important;
+    border-color: #1976d2 !important;
+}
+
+.course-block.modified.course-block-thinking {
+    background: #bbdefb !important;
+    border-color: #0d47a1 !important;
+}
+
+.course-block.modified.course-block-design {
+    background: #ffcdcd !important;
+    border-color: #1976d2 !important;
+}
+
+.course-block.modified.course-block-tech {
+    background: #ffe0b2 !important;
+    border-color: #1976d2 !important;
+}
+
+.course-block.modified.course-block-practice {
+    background: #c8e6c9 !important;
+    border-color: #1976d2 !important;
+}
+
+/* 추가된 과목 스타일 (빨간색 계열) */
+.course-block.highlighted {
+    border: 2px solid #f44336 !important;
+    box-shadow: 0 2px 8px rgba(244, 67, 54, 0.3) !important;
+}
+
+.course-block.highlighted.course-block-liberal {
+    background: #d6d8db !important;
+    border-color: #f44336 !important;
+}
+
+.course-block.highlighted.course-block-thinking {
+    background: #bbdefb !important;
+    border-color: #d32f2f !important;
+}
+
+.course-block.highlighted.course-block-design {
+    background: #ffcdd2 !important;
+    border-color: #f44336 !important;
+}
+
+.course-block.highlighted.course-block-tech {
+    background: #ffe0b2 !important;
+    border-color: #f44336 !important;
+}
+
+.course-block.highlighted.course-block-practice {
+    background: #c8e6c9 !important;
+    border-color: #d32f2f !important;
+}
+
+/* 삭제된 과목 스타일 (회색 계열) */
+.course-block.deleted {
+    margin: 0 !important;
+    padding: 2px 6px !important;
+    min-width: 0 !important;
+    opacity: 0.4 !important;
+    border: 1.5px dashed #bbb;
+    background: #f5f5f5;
+    color: #888;
+}
+
+.course-block.deleted .course-block-title {
+    font-size: 1.1em !important;
+    font-weight: 700 !important;
+    color: #757575 !important; /* 회색 글씨 */
+    font-style: italic !important; /* 이탤릭 */
+    text-decoration: line-through !important; /* 취소선 */
+}
+
+.course-block.deleted .course-block-info {
+    font-size: 1.2em !important;
+    color: #9e9e9e !important; /* 회색 글씨 */
+    font-style: italic !important; /* 이탤릭 */
+    text-decoration: line-through !important; /* 취소선 */
+}
+
+.course-block.deleted .course-credits-text {
+    color: #9e9e9e !important; /* 학점 텍스트도 회색 */
+    text-decoration: line-through !important; /* 취소선 */
+}
+
+.course-block.deleted .course-description {
+    color: #bdbdbd !important; /* 상세내용도 회색 */
+}
+
+/* 삭제된 교과목 툴팁 스타일 */
+.custom-course-tooltip .tooltip-row[style*="color: #f44336"] {
+    background: rgba(244, 67, 54, 0.1);
+    padding: 2px 4px;
+    border-radius: 3px;
+    border-left: 3px solid #f44336;
+    margin: 2px 0;
+}
+
+/* 호버 효과 */
+.course-block.highlighted:hover,
+.course-block.modified:hover {
+    transform: scale(1.05) !important;
+}
+
+.course-block.highlighted:hover {
+    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4) !important;
+}
+
+.course-block.modified:hover {
+    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.4) !important;
+}
+
+.course-block.deleted:hover {
+    opacity: 0.8;
+    /* 삭제된 블록은 크기 변화 없음 */
+}
+
+.course-block.ghost {
+    opacity: 0.7 !important;
+    filter: grayscale(0.6) brightness(0.95) !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important;
+    cursor: default !important;
+    border: 2px dashed #888 !important;
+    background: #e8e8e8 !important;
+    position: relative;
+    font-size: 11px !important;
+}
+
+.course-block.ghost .course-block-title {
+    color: #666 !important;
+    font-style: italic !important;
+}
+
+.course-block.ghost .course-block-info {
+    color: #888 !important;
+    font-style: italic !important;
+}
+
+.curriculum-block.highlighted {
+    border: 3px solid #f44336 !important;
+    box-shadow: 0 0 16px #f4433688, 0 0 0 4px #fff inset;
+    background: linear-gradient(120deg, #fff5f5 80%, #ffcdd2 100%);
+    position: relative;
+    animation: highlight-blink 1.2s linear infinite alternate;
+    z-index: 2;
+}
+@keyframes highlight-blink {
+    0% { box-shadow: 0 0 16px #f4433688, 0 0 0 4px #fff inset; }
+    100% { box-shadow: 0 0 32px #f44336cc, 0 0 0 4px #fff inset; }
+}
+.curriculum-block.highlighted::after {
+    content: '★';
+    position: absolute;
+    top: 4px; right: 8px;
+    font-size: 18px;
+    color: #f44336;
+    pointer-events: none;
+}
+
+.curriculum-block.modified {
+    border: 3.5px solid #283593 !important;
+    background: linear-gradient(120deg, #c5cae9 60%, #7986cb 100%);
+    position: relative;
+    z-index: 3;
+    box-shadow: 0 0 18px #28359355, 0 0 0 5px #fff inset;
+    animation: modified-blink 1.2s linear infinite alternate;
+}
+@keyframes modified-blink {
+    0% { box-shadow: 0 0 18px #28359355, 0 0 0 5px #fff inset; }
+    100% { box-shadow: 0 0 36px #283593cc, 0 0 0 5px #fff inset; }
+}
+.curriculum-block.modified .course-block-title {
+    font-size: 1.45em !important;
+    font-weight: bold;
+    color: #0d133d !important;
+    letter-spacing: 0.5px;
+    text-shadow: 0 2px 8px #fff, 0 0 2px #28359388;
+}
+.curriculum-block.modified::after {
+    content: '✎';
+    position: absolute;
+    top: 4px; right: 8px;
+    font-size: 20px;
+    color: #283593;
+    pointer-events: none;
+    filter: drop-shadow(0 0 2px #fff);
+}
+
+.change-history-delete-btn {
+    display: inline-block;
+    /* margin-left: 8px; */
+    background: none;
+    border: none;
+    color: #e53935;
+    font-size: 18px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+    vertical-align: middle;
+}
+
+.change-history-apply-btn {
+    display: inline-block;
+    /* margin-left: 2px; */
+    background: none;
+    border: none;
+    color: #4caf50;
+    font-size: 18px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+    vertical-align: middle;
+}
+
+#changeHistoryPanelList li:hover .change-history-delete-btn,
+#changeHistoryPanelList li:hover .change-history-apply-btn {
+    opacity: 1;
+}
+
+.matrix-extra-table {
+    font-size: var(--font-size);
+    border-top: none;
+    margin-top: 0;
+    
+}
+
+.matrix-extra-table td,
+.matrix-extra-table th {
+    padding: 8px 3px;
+    border: 1px solid #dee2e6;
+    height: 20px;
+    text-align: center;
+    font-weight: 400;
+    font-family: var(--font-family);
+    white-space: normal;
+    /* border: 1px solid #bbb !important; */
+    overflow: visible;
+    text-overflow: clip;
+    position: relative;
+    min-width: 8px;
+    width: calc((100% - 370px) / 18);
+    vertical-align: middle;
+    word-break: keep-all;
+    word-wrap: break-word;
+    line-height: 1.2;
+}
+
+
+/* 공통가치대응 테이블 컬럼별 스타일 */
+.common-values-table td.col-type {
+    background: #faf8f9b6;
+    font-weight: 600;
+    color: #2c3e50;
+    text-align: center;
+}
+.common-values-table td.col-major-required,
+.common-values-table td.col-major-elective {
+    background: #f8f9fa;
+    font-weight: 500;
+    text-align: center;
+}
+.common-values-table td.col-major-required-credit,
+.common-values-table td.col-major-elective-credit {
+    background: #f8f9fa;
+    font-weight: 600;
+    text-align: center;
+    color: #495057;
+}
+.common-values-table td.col-value1,
+.common-values-table td.col-value2,
+.common-values-table td.col-value3 {
+    /* width: 40%; 삭제 */
+}
+
+.common-values-table .block-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+
+    width: 100%;
+    height: 100%;
+    gap: 8px;
+}
+
+/* 과목분류 배지 스타일 */
+.subject-type-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    text-align: center;
+    min-width: 50px;
+}
+
+.badge-design {
+    background: #e3f2fd;
+    color: #1976d2;
+    border: 1px solid #bbdefb;
+}
+
+.badge-digital {
+    background: #f3e5f5;
+    color: #7b1fa2;
+    border: 1px solid #e1bee7;
+}
+
+.badge-history {
+    background: #fff3e0;
+    color: #f57c00;
+    border: 1px solid #ffcc02;
+}
+
+.badge-theory {
+    background: #e8f5e8;
+    color: #388e3c;
+    border: 1px solid #c8e6c9;
+}
+
+.badge-urban {
+    background: #fce4ec;
+    color: #c2185b;
+    border: 1px solid #f8bbd9;
+}
+
+.badge-social {
+    background: #f1f8e9;
+    color: #689f38;
+    border: 1px solid #dcedc8;
+}
+
+.badge-tech {
+    background: #e0f2f1;
+    color: #00796b;
+    border: 1px solid #b2dfdb;
+}
+
+.badge-practice {
+    background: #fff8e1;
+    color: #f57f17;
+    border: 1px solid #ffecb3;
+}
+
+.badge-extracurricular {
+    background: #fafafa;
+    color: #616161;
+    border: 1px solid #e0e0e0;
+}
+
+.badge-default {
+    background: #f5f5f5;
+    color: #757575;
+    border: 1px solid #e0e0e0;
+}
+
+.badge-unclassified {
+    background: #fafafa;
+    color: #9e9e9ed5;
+    border: 1px solid #e0e0e0;
+}
+
+/* 공통가치대응 탭 수정모드 버튼 스타일 */
+.btn-edit-mode-commonValues {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    outline: none;
+}
+
+.btn-edit-mode-commonValues:hover {
+    background: #218838;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border: none;
+    outline: none;
+}
+
+.btn-edit-mode-commonValues.active {
+    background: #dc3545;
+    border: none;
+    outline: none;
+}
+
+.btn-edit-mode-commonValues.active:hover {
+    background: #c82333;
+    border: none;
+    outline: none;
+}
+
+/* 설계 교과목 색상 기준 전환 스타일 */
+.course-block-design.color-mode-subject-type {
+    background: #e8e8e8; /* 과목분류 모드: 연한 빨간색 */
+}
+
+.course-block-design.color-mode-category {
+    background: #ffebee; /* 구분 모드: 회색 */
+}
+
+.common-values-table td[rowspan] {
+    font-weight: bold;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.common-values-table th {
+    border-top: 1px solid #bbb !important;
+}
+
+.common-values-table .course-block,
+.common-values-table .course-block-title,
+.common-values-table .course-block-info {
+    font-size: var(--font-size) !important;
+
+}
+
+.common-values-table .course-block {
+    min-width: 150px;
+}
+
+#coursesTable th, #coursesTable td {
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+
+#coursesTable th {
+    border-top: 1px solid #bbb !important;
+}
+
+/* 수행평가 매트릭스 헤더 1~4행 폰트 두껍게 */
+.matrix-table thead tr:nth-child(-n+4) th {
+    font-weight: 700 !important;
+}
+
+.curriculum-table th:nth-child(-n+3),
+.curriculum-table td:nth-child(-n+3) {
+    font-weight: bold;
+}
+
+.curriculum-table th {
+    border-top: 1px solid #bbb !important;
+}
+
+.curriculum-table th:nth-child(1),
+.curriculum-table td:nth-child(1) {
+    width: 80px !important;
+    min-width: 80px !important;
+    max-width: 10px !important;
+}
+.curriculum-table th:nth-child(2),
+.curriculum-table td:nth-child(2) {
+    width: 50px !important;
+    min-width: 70px !important;
+    max-width: 10px !important;
+}
+.curriculum-table th:nth-child(13),
+.curriculum-table td:nth-child(13) {
+    width: 80px !important;
+    min-width: 80px !important;
+    max-width: 120px !important;
+}
+.curriculum-table tr:nth-child(5) td,
+.curriculum-table tr:nth-child(5) th,
+.curriculum-table tr:nth-child(6) td,
+.curriculum-table tr:nth-child(12) td,
+.curriculum-table tr:nth-child(16) td,
+.curriculum-table tr:nth-child(6) th {
+    background: #f7f9fa !important; 
+    font-weight: 500 !important; 
+}
+
+/* 매트릭스 제목 편집 스타일 */
+#matrixTitle {
+    transition: all 0.3s ease;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin: 0;
+    display: inline-block;
+    min-width: 200px;
+    position: relative;
+}
+
+#matrixTitle[contenteditable="true"] {
+    background-color: #fffbe7;
+    border: 2px dashed #4a90e2;
+    outline: none;
+    cursor: text;
+    box-shadow: 0 2px 8px rgba(74, 144, 226, 0.2);
+    animation: titleEditPulse 2s infinite;
+}
+
+#matrixTitle[contenteditable="true"]:focus {
+    background-color: #fff3cd;
+    border-color: #2196f3;
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+    animation: none;
+}
+
+#matrixTitle[contenteditable="true"]::after {
+    content: "편집 중...";
+    position: absolute;
+    top: -25px;
+    left: 0;
+    font-size: 12px;
+    color: #4a90e2;
+    font-weight: 500;
+    background: rgba(74, 144, 226, 0.1);
+    padding: 2px 6px;
+    border-radius: 3px;
+    opacity: 0;
+    animation: fadeInOut 2s infinite;
+}
+
+@keyframes titleEditPulse {
+    0%, 100% { box-shadow: 0 2px 8px rgba(74, 144, 226, 0.2); }
+    50% { box-shadow: 0 2px 12px rgba(74, 144, 226, 0.4); }
+}
+
+@keyframes fadeInOut {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 1; }
+}
+
+#matrixTitle[contenteditable="false"] {
+    background-color: transparent;
+    border: none;
+    cursor: default;
+    box-shadow: none;
+    animation: none;
+}
+
+#matrixTitle[contenteditable="false"]::after {
+    display: none;
+}
+
+.common-values-table .editing-cell {
+    padding: 0 !important;
+    position: relative !important;
+}
+
+/* ===== 커리큘럼 표(이수모형표) 영역별 스타일 ===== */
+.curriculum-table .legend-cell,
+.curriculum-table .category-cell {
+    background: #e3eafc;
+    color: #1a237e;
+    font-weight: bold;
+    border-right: 2px solid #1a237e;
+}
+
+.curriculum-table .year-header,
+.curriculum-table .semester-header {
+    background: #fff3e0;
+    color: #bf360c;
+    font-weight: bold;
+    border-bottom: 2px solid #bf360c;
+}
+
+.curriculum-table .subject-cell.gyo-yang { background: #f5f5f5; color: #616161; }
+.curriculum-table .subject-cell.jun-gong { background: #e3f2fd; color: #1976d2; }
+.curriculum-table .subject-cell.sil-mu   { background: #fffde7; color: #fbc02d; }
+.curriculum-table .subject-cell.elective { background: #e0f2f1; color: #00897b; }
+
+.curriculum-table .sum-cell,
+.curriculum-table .total-cell {
+    background: #fbe9e7;
+    color: #d84315;
+    font-weight: bold;
+    border-left: 2px solid #d84315;
+}
+
+#header img {
+  vertical-align: middle;
+  margin-right: 16px;
+}
+
+.main-header-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.main-header-content img {
+  vertical-align: middle;
+  margin-right: 16px;
+}
+
+/* 내부 섹션 헤더(이미지 없음) */
+.section-header-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+/* 반응형 차트 레이아웃 */
+.charts-container {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 20px !important;
+}
+
+.chart-wrapper {
+  flex: 1 !important;
+}
+
+/* 1200px 이상에서 가로 배치 */
+@media (min-width: 1200px) {
+  .charts-container {
+    flex-direction: row !important;
+    gap: 30px !important;
+  }
+  
+  .chart-wrapper {
+    width: 50% !important;
+    flex: 1 !important;
+  }
+}
+
+/* ===== 학년별 교과목 분포 표 스타일 ===== */
+#analysis .table-container table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+#analysis .table-container table th,
+#analysis .table-container table td {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    text-align: center;
+    min-width: 60px;
+    font-size: 14px;
+}
+
+#analysis .table-container table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+    color: #333;
+}
+
+#analysis .table-container table td:first-child {
+    text-align: center;
+    font-weight: bold;
+    background-color: #f8f9fa;
+    min-width: 50px;
+}
+
+#analysis .table-container table td {
+    min-width: 50px;
+}
+
+.matrix-table tbody tr:hover {
+    background: #f0f4ff !important;
+    transition: background 0.2s;
+}
+
+.matrix-table .block-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+}
+@media (max-width: 900px) {
+    .matrix-table .block-wrap {
+        flex-direction: column;
+        gap: 4px;
+    }
+}
+
+.curriculum-table .block-wrap,
+.matrix-table .block-wrap,
+.common-values-table .block-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    align-content: flex-start;
+    gap: 4px;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+}
+@media (max-width: 900px) {
+    .curriculum-table .block-wrap,
+    .matrix-table .block-wrap,
+    .common-values-table .block-wrap {
+        flex-direction: column;
+        gap: 2px;
+    }
+}
+
+.course-block {
+    margin: 0;
+    padding: 2px 6px;
+}
+
+.change-history-list li {
+    font-size: 15px;
+    padding: 12px 14px;
+    /* gap: 12px; */
+}
+#changeHistoryPanel {
+    overflow: hidden !important;
+    resize: both !important;
+    min-width: 320px !important;
+    min-height: 120px !important;
+    max-width: 90vw !important;
+    max-height: 90vh !important;
+}
+#changeHistoryPanelHeader {
+    font-size: 16px !important;
+    padding: 12px 18px 12px 18px !important;
+}
+.change-history-type {
+    font-size: 13px !important;
+    padding: 3px 10px !important;
+    min-width: 36px !important;
+}
+.change-history-summary {
+    font-size: 15px !important;
+}
+.change-history-delete-btn {
+    font-size: 30px !important;
+    width: 36px !important;
+    height: 36px !important;
+    right: 18px !important;
+    /* margin-left: 34px !important; */
+}
+
+.drag-preview-placeholder {
+    background: #f8fff9;
+    border: 2px dashed #28a745;
+    color: #f60000;
+    font-weight: bold;
+    border-radius: 6px;
+    margin: 4px 0;
+    z-index: 999;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.drag-preview-block {
+    background: #f8fff9 !important;
+    border: 2px dashed #28a745 !important;
+    opacity: 0.8 !important;
+    transform: scale(0.95) !important;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3) !important;
+    pointer-events: none !important;
+    position: relative !important;
+    z-index: 5 !important;
+    transition: none !important; /* 깜박임 방지 */
+}
+.course-block.dragging {
+    opacity: 0.1 !important;
+    z-index: 1000 !important;
+    transform: scale(0.95) !important;
+    box-shadow: 0 4px 16px rgba(236, 28, 0, 0.3) !important;
+}
+.course-block.drag-over-animate {
+    /* transform은 JS에서 동적으로 지정 */
+    z-index: 0;
+}
+
+
+
+.block-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.course-block {
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.course-block:hover {
+  transform: scale(1.02);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.course-block.dragging {
+  opacity: 0.7;
+  transform: scale(0.95);
+  box-shadow: 0 4px 16px rgba(40, 167, 69, 0.3);
+  z-index: 1000;
+}
+
+.cell-highlight {
+  position: relative;
+}
+
+/* 추가/변경/삭제 교과목 블럭 테두리 및 취소선 스타일 명확화 */
+.course-block.highlighted {
+    border: 2px solid #27ae60 !important; /* 녹색 */
+    box-shadow: 0 2px 8px rgba(39, 174, 96, 0.3) !important;
+}
+.course-block.modified {
+    border: 2px solid #1976d2 !important; /* 파란색 */
+    box-shadow: 0 2px 8px rgba(25, 118, 210, 0.3) !important;
+}
+.course-block.deleted {
+    border: 1.5px dashed #f44336 !important; /* 빨간색 */
+    background: #f5f5f5 !important;
+    color: #888 !important;
+    opacity: 0.7 !important;
+}
+.course-block.deleted .course-block-title,
+.course-block.deleted .course-block-info,
+.course-block.deleted .course-credits-text,
+.course-block.deleted .course-description {
+    color: #f44336 !important;
+    text-decoration: line-through !important;
+    font-style: italic !important;
+    opacity: 1 !important;
+}
+
+.course-block.highlighted,
+.course-block.modified,
+.course-block.deleted {
+    font-size: inherit !important;
+}
+
+.course-block.highlighted .course-block-title,
+.course-block.modified .course-block-title,
+.course-block.deleted .course-block-title,
+.course-block.ghost .course-block-title,
+.course-block.highlighted .course-block-info,
+.course-block.modified .course-block-info,
+.course-block.deleted .course-block-info,
+.course-block.ghost .course-block-info,
+.course-block.deleted .course-block-credits-text,
+.course-block.deleted .course-block-description {
+    font-size: inherit !important;
+}
+
+/* 클라우드 동기화 로딩 스피너 */
+.cloud-spinner {
+    width: 56px;
+    height: 56px;
+    border: 7px solid #e3eafc;
+    border-top: 7px solid #1976d2;
+    border-radius: 50%;
+    animation: cloud-spin 1s linear infinite;
+    box-sizing: border-box;
+}
+@keyframes cloud-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.spinner {
+  border: 8px solid #f3f3f3;
+  border-top: 8px solid #3498db;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 매트릭스 테이블 교과목 변경 상태 색상 */
+.matrix-table .course-added {
+    color: #28a745 !important;
+    font-weight: bold;
+}
+
+.matrix-table .course-deleted {
+    color: #dc3545 !important;
+    text-decoration: line-through;
+    font-weight: bold;
+}
+
+.matrix-table .course-modified {
+    color: #07bdff !important;
+    font-weight: bold;
+}
+
+/* 추가 모바일 최적화 스타일 */
+@media (max-width: 768px) {
+    /* 터치 스크롤 최적화 */
+    .table-container {
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: #888 #f1f1f1;
+    }
+
+    .table-container::-webkit-scrollbar {
+        height: 6px;
+    }
+
+    .table-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 3px;
+    }
+
+    .table-container::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 3px;
+    }
+
+    .table-container::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    /* 터치 인터랙션 개선 */
+    .btn, .tab, .course-block {
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+    }
+
+    /* 교과목 블록 터치 최적화 */
+    .course-block {
+        cursor: pointer;
+        transition: transform 0.1s ease, box-shadow 0.1s ease;
+    }
+
+    .course-block:active {
+        transform: scale(0.98);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    /* 매트릭스 점 터치 최적화 */
+    .matrix-dot {
+        cursor: pointer;
+        transition: transform 0.1s ease;
+    }
+
+    .matrix-dot:active {
+        transform: scale(1.2);
+    }
+
+    /* 필터 터치 최적화 */
+    .modern-checkbox {
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .modern-checkbox:active {
+        transform: scale(0.95);
+    }
+
+    /* 모달 터치 최적화 */
+    .modal {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .modal-content {
+        -webkit-overflow-scrolling: touch;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    /* 버튼 터치 최적화 */
+    .btn:active {
+        transform: scale(0.98);
+    }
+
+    /* 탭 터치 최적화 */
+    .tab:active {
+        transform: scale(0.98);
+    }
+
+    /* 드래그 앤 드롭 모바일 최적화 */
+    .course-block.dragging {
+        opacity: 0.8;
+        transform: scale(1.05);
+        z-index: 1000;
+    }
+
+    /* 툴팁 모바일 최적화 */
+    .custom-course-tooltip {
+        max-width: 250px;
+        font-size: 11px;
+        padding: 8px;
+    }
+
+    .custom-course-tooltip .tooltip-title {
+        font-size: 12px;
+        margin-bottom: 6px;
+    }
+
+    .custom-course-tooltip .tooltip-row {
+        font-size: 10px;
+        margin-bottom: 4px;
+    }
+
+    /* 버전 관리 모바일 최적화 */
+    .version-item {
+        padding: 8px;
+        margin-bottom: 8px;
+    }
+
+    .version-item-name {
+        font-size: 13px;
+    }
+
+    .version-item-description {
+        font-size: 11px;
+    }
+
+    .version-item-date {
+        font-size: 10px;
+    }
+
+    .version-item-actions .btn-sm {
+        padding: 4px 8px;
+        font-size: 10px;
+    }
+
+    /* 변경 이력 패널 모바일 최적화 */
+    #changeHistoryPanel {
+        width: 95%;
+        max-height: 80vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .change-history-list li {
+        padding: 8px;
+        font-size: 11px;
+    }
+
+    .change-history-type {
+        font-size: 10px;
+    }
+
+    .change-history-summary {
+        font-size: 11px;
+    }
+
+    /* 디자인 패널 모바일 최적화 */
+    .design-controls {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .design-group {
+        margin-bottom: 8px;
+    }
+
+    .design-group label {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 11px;
+    }
+
+    .design-group input[type="range"] {
+        width: 100%;
+        margin: 4px 0;
+    }
+
+    .design-group select {
+        width: 100%;
+        font-size: 11px;
+        padding: 6px 8px;
+    }
+
+    .design-group span {
+        font-size: 10px;
+    }
+
+    /* 분석 섹션 모바일 최적화 */
+    .charts-container {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .chart-wrapper {
+        min-height: 200px;
+    }
+
+    #analysis .table-container table {
+        font-size: 10px;
+    }
+
+    #analysis .table-container table th,
+    #analysis .table-container table td {
+        padding: 4px 6px;
+        font-size: 9px;
+    }
+
+    /* 매트릭스 컨트롤 모바일 최적화 */
+    .matrix-controls {
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+    }
+
+    .matrix-controls .btn {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+
+    .font-size-controls {
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .font-size-controls .btn-sm {
+        padding: 4px 8px;
+        font-size: 10px;
+    }
+
+    .font-size-display {
+        font-size: 11px;
+        padding: 4px 8px;
+    }
+
+    /* 교과과정 컨트롤 모바일 최적화 */
+    .courses-controls {
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+    }
+
+    .btn-add,
+    .btn-edit-mode-courses {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+
+    /* 블록 래퍼 모바일 최적화 */
+    .block-wrap {
+        min-height: 20px;
+        padding: 2px;
+    }
+
+    /* 셀 하이라이트 모바일 최적화 */
+    .cell-highlight {
+        border: 2px solid #4CAF50;
+        background-color: rgba(76, 175, 80, 0.1);
+    }
+
+    /* 드래그 프리뷰 모바일 최적화 */
+    .drag-preview-placeholder {
+        border: 2px dashed #ccc;
+        background-color: rgba(204, 204, 204, 0.1);
+        min-height: 20px;
+        border-radius: 4px;
+    }
+
+    .drag-preview-block {
+        opacity: 0.8;
+        transform: scale(0.9);
+        pointer-events: none;
+    }
+}
+
+/* 초소형 모바일 화면 최적화 */
+@media (max-width: 360px) {
+    .container {
+        padding: 3px;
+    }
+
+    h1 {
+        font-size: 1rem;
+    }
+
+    .main-header-content h1 {
+        font-size: 1rem;
+    }
+
+    .main-header-content img {
+        height: 16px;
+    }
+
+    .tab {
+        padding: 4px 8px;
+        font-size: 10px;
+    }
+
+    .btn {
+        padding: 4px 8px;
+        font-size: 10px;
+    }
+
+    .btn-sm {
+        padding: 3px 6px;
+        font-size: 9px;
+    }
+
+    table, .matrix-table, #coursesTable {
+        font-size: 9px;
+        min-width: 400px;
+    }
+
+    th, td {
+        padding: 3px 4px;
+        font-size: 8px;
+    }
+
+    .course-block {
+        font-size: 8px;
+        padding: 2px 4px;
+        min-height: 20px;
+    }
+
+    .course-block-title {
+        font-size: 8px;
+    }
+
+    .course-credits-text {
+        font-size: 7px;
+    }
+
+    .course-block-info {
+        font-size: 7px;
+    }
+
+    .course-description {
+        font-size: 6px;
+    }
+
+    .matrix-table th {
+        font-size: 8px;
+        padding: 2px 3px;
+    }
+
+    .matrix-table td {
+        font-size: 7px;
+        padding: 1px 2px;
+    }
+
+    .matrix-dot {
+        width: 5px;
+        height: 5px;
+    }
+
+    .matrix-mark {
+        font-size: 6px;
+        padding: 1px;
+    }
+
+    .curriculum-table {
+        font-size: 8px;
+    }
+
+    .curriculum-table th,
+    .curriculum-table td {
+        padding: 2px 3px;
+        font-size: 7px;
+    }
+
+    .common-values-table {
+        font-size: 8px;
+    }
+
+    .common-values-table th,
+    .common-values-table td {
+        padding: 2px 3px;
+        font-size: 7px;
+    }
+
+    .modal-content {
+        width: 99%;
+        margin: 2px auto;
+        padding: 8px;
+    }
+
+    .modal-header h2 {
+        font-size: 1rem;
+    }
+
+    .form-group label {
+        font-size: 10px;
+    }
+
+    .form-group input,
+    .form-group select {
+        font-size: 12px;
+        padding: 4px 6px;
+    }
+
+    .stat-card {
+        padding: 8px;
+    }
+
+    .stat-number {
+        font-size: 1.1rem;
+    }
+
+    .stat-label {
+        font-size: 10px;
+    }
+}
+
+/* 네트워크 그래프 노드(노드블럭)에 교과목 블럭 스타일 적용 */
+.vis-network .vis-node.box {
+    background: #f8f9fa !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 2px 6px !important;
+    font-size: 12px !important;
+    min-height: 32px !important;
+    max-width: 280px !important;
+    min-width: 150px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    text-align: center !important;
+    position: relative !important;
+    z-index: 1 !important;
+    color: #495057 !important;
+    font-family: 'Noto Sans KR', sans-serif !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease !important;
+    cursor: grab !important;
+    user-select: none !important;
+}
+
+.vis-network .vis-node.box.selected {
+    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.4) !important;
+    border: 2px solid #1976d2 !important;
+}
+

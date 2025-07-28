@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>     UOSARCH 교과목 관리 시스템</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://unpkg.com/vis-network/styles/vis-network.min.css" rel="stylesheet" type="text/css" />
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    
+    <!-- SheetJS for Excel export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- jsPDF for vector PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        @keyframes restoreHighlight {
+            0% { background-color: #28a745; color: white; }
+            50% { background-color: #28a745; color: white; transform: scale(1.05); }
+            100% { background-color: inherit; color: inherit; transform: scale(1); }
+        }
+        
+        .current-version {
+            border: 2px solid #28a745 !important;
+            background-color: #f8fff9 !important;
+        }
+        
+        .current-version-info {
+            margin-bottom: 15px;
+        }
+        
+        .version-item-summary {
+            margin-top: 5px;
+            color: #6c757d;
+            font-size: 0.85em;
+        }
+        .curriculum-table td:nth-child(-n+3) {
+            font-weight: bold;
+        }
+        .curriculum-table td.no-bold {
+            font-weight: normal !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-section">
+            <div class="main-header-content" style="display: flex; align-items: center; gap: 16px;">
+                <img src="logo_uosarch.png" alt="uosarch 로고" style="height: 25px;">
+                <h1>UOSARCH 교과목 관리 시스템</h1>
+                
+                <div class="version-controls">
+                    <div class="version-info-line">
+                        <span class="version-info">버전 :</span>
+                        <div class="version-nav-buttons">
+                            <button class="btn btn-sm version-nav-btn-small" onclick="previousVersion()" title="이전 버전" style="padding: 1px 3px; font-size: 8px; min-width: 16px; height: 14px; border-radius: 2px;">◀</button>
+                            <button class="btn btn-sm version-nav-btn-small" onclick="nextVersion()" title="다음 버전" style="padding: 1px 3px; font-size: 8px; min-width: 16px; height: 14px; border-radius: 2px;">▶</button>
+                        </div>
+                        <span class="current-version-display"><span id="currentVersion">기본</span></span>
+                    </div>
+                    <div class="version-buttons-line">
+                                    <button class="btn btn-sm" onclick="saveVersion()">버전 저장</button>
+            <button class="btn btn-sm" onclick="showVersionManager()">버전 관리</button>
+                <button class="btn btn-sm" onclick="toggleChangeHistoryPanel()">변경 이력</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('courses', event)">교과목 관리</button>
+            <button class="tab" onclick="showTab('matrix', event)">수행평가 매트릭스</button>
+            <button class="tab" onclick="showTab('curriculum', event)">이수모형</button>
+            <button class="tab" onclick="showTab('analysis', event)">분석 및 통계</button>
+            <button class="tab" onclick="showTab('commonValues', event)">공통가치대응</button>
+        </div>
+        
+
+        <div id="courses" class="content active">
+            <div class="courses-controls">
+                <button class="btn btn-add" onclick="showModal()">+ 교과목 추가</button>
+                <button class="btn btn-edit-mode-courses" id="editModeToggleCourses" onclick="toggleEditModeCourses()">
+                    <span id="editModeTextCourses">일반모드</span>
+                </button>
+            </div>
+            
+            <!-- 디자인 설정 패널 -->
+            <div id="designPanel" class="design-panel" style="display: none;">
+                <h3>표 디자인 설정</h3>
+                <div class="design-controls">
+                    <div class="design-group">
+                        <label>표 배경색</label>
+                        <input type="color" id="tableBgColor" value="#ffffff" onchange="updateTableDesign()">
+                    </div>
+                    <div class="design-group">
+                        <label>헤더 배경색</label>
+                        <input type="color" id="headerBgColor" value="#2c3e50" onchange="updateTableDesign()">
+                    </div>
+                    <div class="design-group">
+                        <label>헤더 텍스트색</label>
+                        <input type="color" id="headerTextColor" value="#ffffff" onchange="updateTableDesign()">
+                    </div>
+                    <div class="design-group">
+                        <label>셀 테두리색</label>
+                        <input type="color" id="borderColor" value="#dee2e6" onchange="updateTableDesign()">
+                    </div>
+                    <div class="design-group">
+                        <label>폰트 크기</label>
+                        <input type="range" id="fontSize" min="10" max="20" value="14" onchange="updateTableDesign()">
+                        <span id="fontSizeValue">14px</span>
+                    </div>
+                    <div class="design-group">
+                        <label>폰트 패밀리</label>
+                        <select id="fontFamily" onchange="updateTableDesign()">
+                            <option value="'Noto Sans KR', sans-serif">Noto Sans KR</option>
+                            <option value="'Malgun Gothic', sans-serif">맑은 고딕</option>
+                            <option value="'Nanum Gothic', sans-serif">나눔고딕</option>
+                            <option value="Arial, sans-serif">Arial</option>
+                            <option value="'Times New Roman', serif">Times New Roman</option>
+                        </select>
+                    </div>
+                    <div class="design-group">
+                        <label>행 간격</label>
+                        <input type="range" id="rowHeight" min="30" max="80" value="50" onchange="updateTableDesign()">
+                        <span id="rowHeightValue">50px</span>
+                    </div>
+                    <div class="design-group">
+                        <label>셀 패딩</label>
+                        <input type="range" id="cellPadding" min="5" max="20" value="12" onchange="updateTableDesign()">
+                        <span id="cellPaddingValue">12px</span>
+                    </div>
+                    <div class="design-group">
+                        <label>테두리 두께</label>
+                        <input type="range" id="borderWidth" min="1" max="5" value="1" onchange="updateTableDesign()">
+                        <span id="borderWidthValue">1px</span>
+                    </div>
+                    <div class="design-group">
+                        <label>호버 효과</label>
+                        <select id="hoverEffect" onchange="updateTableDesign()">
+                            <option value="background">배경색 변경</option>
+                            <option value="border">테두리 강조</option>
+                            <option value="shadow">그림자 효과</option>
+                            <option value="none">없음</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="design-actions">
+                    <button class="btn btn-primary" onclick="saveDesignSettings()">설정 저장</button>
+                    <button class="btn btn-secondary" onclick="resetDesignSettings()">기본값 복원</button>
+                    <button class="btn btn-secondary" onclick="exportDesignSettings()">설정 내보내기</button>
+                    <button class="btn btn-secondary" onclick="importDesignSettings()">설정 가져오기</button>
+                </div>
+            </div>
+            
+            <div class="filters">
+                <div class="filter-group">
+                    <label>학년</label>
+                    <select id="yearFilter" onchange="filterCourses()">
+                        <option value="">전체</option>
+                        <option value="1">1학년</option>
+                        <option value="2">2학년</option>
+                        <option value="3">3학년</option>
+                        <option value="4">4학년</option>
+                        <option value="5">5학년</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>학기</label>
+                    <select id="semesterFilter" onchange="filterCourses()">
+                        <option value="">전체</option>
+                        <option value="1">1학기</option>
+                        <option value="2">2학기</option>
+                        <option value="계절">계절학기</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>구분</label>
+                    <select id="categoryFilter" onchange="filterCourses()">
+                        <option value="">전체</option>
+                        <option value="건축적사고">건축적사고</option>
+                        <option value="설계">설계</option>
+                        <option value="기술">기술</option>
+                        <option value="실무">실무</option>
+                        <option value="기타">기타</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>과목분류</label>
+                    <select id="subjectTypeFilter" onchange="filterCourses()">
+                        <option value="">전체</option>
+                        <option value="설계">설계</option>
+                        <option value="디지털">디지털</option>
+                        <option value="역사">역사</option>
+                        <option value="이론">이론</option>
+                        <option value="도시">도시</option>
+                        <option value="사회">사회</option>
+                        <option value="기술">기술</option>
+                        <option value="실무">실무</option>
+                        <option value="비교과">비교과</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>검색</label>
+                    <input type="text" id="searchInput" placeholder="과목명 검색" onkeyup="filterCourses()">
+                </div>
+            </div>
+            <div class="table-container">
+                <table id="coursesTable">
+                    <thead>
+                        <tr>
+                            <th class="resizable sortable" data-sort="yearSemester">학년-학기 <span class="sort-icon">↕</span></th>
+                            <th class="resizable sortable" data-sort="courseNumber">교과목번호 <span class="sort-icon">↕</span></th>
+                            <th class="resizable sortable" data-sort="courseName">과목명 <span class="sort-icon">↕</span></th>
+                            <th class="resizable sortable" data-sort="professor">담당교수 <span class="sort-icon">↕</span></th>
+                            <th class="resizable sortable" data-sort="credits">학점 <span class="sort-icon">↕</span></th>
+                            <th class="resizable sortable" data-sort="category">구분 <span class="sort-icon">↕</span></th>
+                            <th class="resizable sortable" data-sort="subjectType">과목분류 <span class="sort-icon">↕</span></th>
+                            <th class="resizable sortable" data-sort="isRequired">필수여부 <span class="sort-icon">↕</span></th>
+                            <th class="resizable sortable" data-sort="performanceCriteria">수행평가기준 <span class="sort-icon">↕</span></th>
+                            <th class="resizable">작업</th>
+                        </tr>
+                    </thead>
+                    <tbody id="coursesTableBody">
+                        <!-- 동적으로 생성됨 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div id="matrix" class="content">
+            <div class="matrix-controls">
+                <!-- 매트릭스 필터 -->
+                <div class="matrix-filters">
+                    <div class="filter-section">
+                        <div class="filter-label">
+                            <i class="filter-icon">🎓</i>
+                            <span>학년</span>
+                        </div>
+                        <div class="checkbox-group">
+                            <label class="modern-checkbox">
+                                <input type="checkbox" value="1" onchange="filterMatrix()">
+                                <span class="checkmark"></span>
+                                <span class="label-text">1학년</span>
+                            </label>
+                            <label class="modern-checkbox">
+                                <input type="checkbox" value="2" onchange="filterMatrix()">
+                                <span class="checkmark"></span>
+                                <span class="label-text">2학년</span>
+                            </label>
+                            <label class="modern-checkbox">
+                                <input type="checkbox" value="3" onchange="filterMatrix()">
+                                <span class="checkmark"></span>
+                                <span class="label-text">3학년</span>
+                            </label>
+                            <label class="modern-checkbox">
+                                <input type="checkbox" value="4" onchange="filterMatrix()">
+                                <span class="checkmark"></span>
+                                <span class="label-text">4학년</span>
+                            </label>
+                            <label class="modern-checkbox">
+                                <input type="checkbox" value="5" onchange="filterMatrix()">
+                                <span class="checkmark"></span>
+                                <span class="label-text">5학년</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="filter-section">
+                        <div class="filter-label">
+                            <i class="filter-icon">📋</i>
+                            <span>필수여부</span>
+                        </div>
+                        <div class="checkbox-group">
+                            <label class="modern-checkbox">
+                                <input type="checkbox" value="필수" onchange="filterMatrix()">
+                                <span class="checkmark"></span>
+                                <span class="label-text">필수</span>
+                            </label>
+                            <label class="modern-checkbox">
+                                <input type="checkbox" value="선택" onchange="filterMatrix()">
+                                <span class="checkmark"></span>
+                                <span class="label-text">선택</span>
+                            </label>
+                        </div>
+                    </div>
+                    <button class="btn btn-reset" onclick="resetMatrixFilters()">
+                        <i class="reset-icon">🔄</i>
+                        <span>필터 초기화</span>
+                    </button>
+                </div>
+                
+                <div class="font-size-controls">
+                    <button class="btn btn-sm" onclick="decreaseFontSize()">A-</button>
+                    <span id="font-size-display">14px</span>
+                    <button class="btn btn-sm" onclick="increaseFontSize()">A+</button>
+                </div>
+                <button class="btn btn-primary" onclick="toggleFullscreen()">
+                    <span id="fullscreen-text">전체 화면</span>
+                </button>
+                <button class="btn btn-secondary" onclick="exportToExcel()">
+                    Excel 내보내기
+                </button>
+                <button class="btn btn-secondary" onclick="exportToPDF()">
+                    PDF 내보내기
+                </button>
+                <!-- 수정모드 토글 버튼 -->
+                <button class="btn btn-edit-mode-matrix" id="editModeToggle" onclick="toggleEditMode()">
+                    <span id="editModeText">일반모드</span>
+                </button>
+            </div>
+            
+            <div class="table-container">
+                <!-- 표 제목+버전 수평 정렬 -->
+                <div class="matrix-header-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; gap: 10px;">
+                    <h3 id="matrixTitle" style="margin-left: 8px; padding: 0; background: #fff; margin: 8; border-bottom: 0px solid #222; color: #222; min-height: 32px; display: inline-block;" contenteditable="false">수행평가 매트릭스</h3>
+                    <div style="display: flex; align-items: center; gap: 0px;">
+                        <span id="matrixVersionLabel" style="font-size: 13px; color: #333; font-weight: 400; margin:8; padding:0;">◐: 신설된 항목으로 설계 SPC 에 대한 이론학습의 보완을 제공하는 것을 표시함 [메트릭스 개정: <span id="matrixVersionText">{{VERSION}}</span>]</span>
+                        <div style="width: 12px;"></div>
+                    </div>
+                </div>
+
+
+                <div style="overflow-x: auto;">
+                    <table class="matrix-table" id="matrixTable">
+                        <thead>
+                            <tr>
+                                <th colspan="5" style="border-bottom: 2px solid #bbb;">교과과정</th>
+                                <th colspan="18" style="border-bottom: 2px solid #bbb;">수행평가기준</th>
+                                <th rowspan="4">전공필수여부</th>
+                            </tr>
+                            <tr>
+                                <th rowspan="3">인증항목 구분</th>
+                                <th rowspan="3" style="font-weight: normal;">학년 학기</th>
+                                <th rowspan="3">교과목번호</th>
+                                <th rowspan="3">과목명</th>
+                                <th rowspan="3">학점</th>
+                                <th colspan="4">건축적사고</th>
+                                <th colspan="7">설계</th>
+                                <th colspan="5">기술</th>
+                                <th colspan="2">실무</th>
+                            </tr>
+                            <tr>
+                                <th>1</th>
+                                <th>2</th>
+                                <th>3</th>
+                                <th>4</th>
+                                <th>5</th>
+                                <th>6</th>
+                                <th>7</th>
+                                <th>8</th>
+                                <th>9</th>
+                                <th>10</th>
+                                <th>11</th>
+                                <th>12</th>
+                                <th>13</th>
+                                <th>14</th>
+                                <th>15</th>
+                                <th>16</th>
+                                <th>17</th>
+                                <th>18</th>
+                            </tr>
+                            <tr>
+                                <th>건축과 예술 및 과학기술</th>
+                                <th>세계 건축의 역사와 문화</th>
+                                <th>한국 건축과 전통</th>
+                                <th>건축과 사회</th>
+                                <th>형태 및 공간구성</th>
+                                <th>대지와 외부공간 계획</th>
+                                <th>안전 설계</th>
+                                <th>건축재료와 구성방법</th>
+                                <th>건물시스템 통합설계</th>
+                                <th>건축과 도시설계</th>
+                                <th>연구기반 종합설계</th>
+                                <th>구조원리</th>
+                                <th>구조시스템</th>
+                                <th>환경조절 시스템</th>
+                                <th>건축설비 시스템</th>
+                                <th>시공 및 건설관리</th>
+                                <th>프로젝트 수행과 건축사무소 운영</th>
+                                <th>건축사법과 건축법 및 관계법령</th>
+                            </tr>
+                        </thead>
+                        <tbody id="matrixTableBody">
+                            <!-- 동적으로 생성됨 -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 하부 안내 표 이미지와 완전히 동일하게 재구성 -->
+                <div class="table-container" style="margin-top: 20px;">
+                    <table class="matrix-extra-table" style="width: 100%; border-collapse: collapse;">
+                        <tbody>
+<tr><td style="width: 9.6335%; text-align: center;"rowspan="4">교양필수</td><td style="width: 42.199%; text-align: center;" colspan="3" rowspan="2">고전과함께하는비판적토론(2) / 대학영어(W)(2) / 일반수학(3)/<br>UOS미래디자인(1) / UOS커리어디자인(1)</td><td style="width: 24.0837%; text-align: center;" rowspan="4">교양선택군</td><td style="width: 12.0419%; text-align: center;" colspan="2">통섭영역 또는 인성영역 (3)</td></tr>
+<tr><td style="width: 12.0419%; text-align: center;" colspan="2">인문사회영역 (3)</td></tr>
+<tr><td style="width: 42.199%; text-align: center;" colspan="3" rowspan="2">과학기술글쓰기 (2) / 대학영어(S) (2)</td><td style="width: 12.0419%; text-align: center;" colspan="2">컴퓨터[웹디자인] (2)</td></tr>
+<tr><td style="width: 12.0419%; text-align: center;" colspan="2">교양선택군 중 택일(14학점)</td></tr>
+<tr><td style="width: 9.6335%; text-align: center;" rowspan="3"><p>타과</p><p>전공선택</p><p>인정과목</p><p>(최대9학점)</p><p><br></p><p><br></p></td><td style="width: 42.199%; text-align: center;" colspan="3">건축공학전공</td><td style="width: 24.0837%; text-align: center;" colspan="3">건축공학개론, 철근콘크리트공학, 철골구조학, 컴퓨터의공학응용, 건축공정관리및실습, 건축공기조화설비, 건설사업관리, 건축구조계획, 건축환경성능, 건설경영</td></tr>
+<tr><td style="width: 14.2408%; text-align: center;">도시공학과</td><td style="width: 12.8796%; text-align: center;">조경학과</td><td style="width: 15.0786%; text-align: center;">도시사회학과</td><td style="width: 24.0837%; text-align: center;">도시계획론, 도시설계원론, GIS와도시공간분석</td><td style="width: 12.0419%; text-align: center;">조경학개론, 조경계획, 서양조경문화론</td><td style="width: 12.0419%; text-align: center;">환경과도시</td></tr>
+<tr><td style="width: 14.2408%; text-align: center;"><p>디자인학과(시각디자인전공)</p></td><td style="width: 12.8796%; text-align: center;">환경조각학과</td><td style="width: 15.0786%; text-align: center;">도시과학대학</td><td style="width: 24.0837%; text-align: center;">서비스디자인프로젝트</td><td style="width: 12.0419%; text-align: center;">기초실기스튜디오Ⅰ, 한국미술사연구, 서양미술사연구Ⅰ</td><td style="width: 12.0419%; text-align: center;">도시과학의이해, UOS현장실습Ⅱ-Ⅵ</td></tr>
+<tr><td style="width: 9.6335%; text-align: center;">기타</td><td style="width: 78.3246%; text-align: center;" colspan="6">일반선택, 타과과목 등</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div id="analysis" class="content">
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalCredits">0</div>
+                    <div class="stat-label">총학점</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="requiredCourses">0</div>
+                    <div class="stat-label">전공필수과목</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="electiveCourses">0</div>
+                    <div class="stat-label">전공선택과목</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="designCourses">0</div>
+                    <div class="stat-label">설계과목</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="designRatio">0%</div>
+                    <div class="stat-label">설계과목 비율</div>
+                </div>
+            </div>
+            <div class="table-container" style="margin-bottom: 40px;">
+                <h3 style="padding: 20px; background: #f8f9fa; margin: 0; border-bottom: 1px solid #dee2e6;">학년별 교과목 분포</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>학년</th>
+                            <th>1학기</th>
+                            <th>2학기</th>
+                            <th>계절학기</th>
+                            <th>합계</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>1학년</td>
+                            <td>2과목</td>
+                            <td>1과목</td>
+                            <td>-</td>
+                            <td>3과목</td>
+                        </tr>
+                        <tr>
+                            <td>2학년</td>
+                            <td>6과목</td>
+                            <td>6과목</td>
+                            <td>-</td>
+                            <td>12과목</td>
+                        </tr>
+                        <tr>
+                            <td>3학년</td>
+                            <td>6과목</td>
+                            <td>6과목</td>
+                            <td>-</td>
+                            <td>12과목</td>
+                        </tr>
+                        <tr>
+                            <td>4학년</td>
+                            <td>5과목</td>
+                            <td>5과목</td>
+                            <td>1과목</td>
+                            <td>11과목</td>
+                        </tr>
+                        <tr>
+                            <td>5학년</td>
+                            <td>1과목</td>
+                            <td>4과목</td>
+                            <td>-</td>
+                            <td>5과목</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="charts-container">
+                <div class="chart-wrapper">
+                    <div class="table-container">
+                        <h3 style="padding: 20px; background: #f8f9fa; margin: 0; border-bottom: 1px solid #dee2e6;">수행평가 항목별 충족도</h3>
+                        <canvas id="chartCanvas" style="width: 100%; height: 400px; padding: 20px;"></canvas>
+                    </div>
+                </div>
+                <div class="chart-wrapper">
+                    <div class="table-container">
+                        <h3 style="padding: 20px; background: #f8f9fa; margin: 0; border-bottom: 1px solid #dee2e6;">과목별분류별 분포</h3>
+                        <canvas id="subjectTypeChartCanvas" style="width: 100%; height: 400px; padding: 20px;"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="curriculum" class="content">
+            
+            <!-- 이수모형 컨트롤 버튼들 -->
+            <div class="matrix-controls" style="margin-bottom: 20px;">
+                <!-- 색상 기준 전환 스위치 -->
+                <div class="color-mode-switch" style="display: flex; align-items: center; gap: 8px; margin-right: 15px;">
+                    <span style="font-size: 12px; color: #666; font-weight: 500;">색상 기준:</span>
+                    <div class="toggle-switch-curriculum" style="position: relative; width: 60px; height: 24px; background: #e9ecef; border-radius: 12px; cursor: pointer; transition: background 0.3s ease;" onclick="toggleColorModeCurriculum()">
+                        <div id="toggleSliderCurriculum" style="position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: #6c757d; border-radius: 50%; transition: all 0.3s ease;"></div>
+                        <span id="colorModeTextCurriculum" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; color: #666; font-weight: 500; pointer-events: none;">분야</span>
+                    </div>
+                </div>
+                <div class="font-size-controls">
+                    <button class="btn btn-sm" onclick="decreaseCurriculumFontSize()">A-</button>
+                    <span id="curriculum-font-size-display">12px</span>
+                    <button class="btn btn-sm" onclick="increaseCurriculumFontSize()">A+</button>
+                </div>
+                <button class="btn btn-primary" onclick="toggleCurriculumFullscreen()">
+                    <span id="curriculum-fullscreen-text">전체 화면</span>
+                </button>
+                <button class="btn btn-secondary" onclick="exportCurriculumToExcel()">
+                    Excel 내보내기
+                </button>
+                <button class="btn btn-secondary" onclick="exportCurriculumToPDF()">
+                    PDF 내보내기
+                </button>
+
+                <!-- 교과목 추가 버튼 (수정모드에서만 표시) -->
+                <button class="btn btn-add curriculum-add-btn" onclick="showModal()" style="display: none;">
+                    교과목 추가
+                </button>
+                <!-- 수정모드 토글 버튼 -->
+                <button class="btn btn-edit-mode-curriculum" id="editModeToggleCurriculum" onclick="toggleEditModeCurriculum()">
+                    <span id="editModeTextCurriculum">일반모드</span>
+                </button>
+            </div>
+            
+            <div class="table-container">
+                <!-- 표 제목+버전 수평 정렬 -->
+                <div class="matrix-header-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; gap: 10px;">
+                    <h3 id="curriculumTitle" style="margin-left: 8px; padding: 0; background: #fff; margin: 8; border-bottom: 0px solid #222; color: #222; min-height: 32px; display: inline-block;" contenteditable="false">건축학전공 교과과정 이수모형 2025</h3>
+                    <div style="display: flex; align-items: center; gap: 0px;">
+                        <span id="curriculumVersionLabel" style="font-size: 13px; color: #333; font-weight: 400; margin:8; padding:0;">이수모형 개정: <span id="curriculumVersionText">{{CURRENTVERSION}}</span></span>
+                        <div style="width: 12px;"></div>
+                    </div>
+                </div>
+                <table class="curriculum-table" style="width:100%; text-align:center; border-collapse:collapse;">
+                    <thead>
+                        <tr>
+                            <th rowspan="2">범례</th>
+                            <th rowspan="2">번호</th>
+                            <th rowspan="2">구분</th>
+                            <th colspan="2">1학년</th>
+                            <th colspan="2">2학년</th>
+                            <th colspan="2">3학년</th>
+                            <th colspan="2">4학년</th>
+                            <th colspan="2">5학년</th>
+                            <th colspan="2" rowspan="2">학점</th>
+
+                        </tr>
+                        <tr>
+                            <th style="width: 120px;">1학기</th><th style="width: 120px;">2학기</th>
+                            <th style="width: 120px;">1학기</th><th style="width: 120px;">2학기</th>
+                            <th style="width: 120px;">1학기</th><th style="width: 120px;">2학기</th>
+                            <th style="width: 120px;">1학기</th><th style="width: 120px;">2학기</th>
+                            <th style="width: 120px;">1학기</th><th style="width: 120px;">2학기</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 교양 구간 -->
+                        <tr><td rowspan="2">교양</td><td colspan="2">교양필수</td><td id="cell-교양-교양필수-1-1"></td><td id="cell-교양-교양필수-1-2"></td><td id="cell-교양-교양필수-2-1"></td><td id="cell-교양-교양필수-2-2"></td><td id="cell-교양-교양필수-3-1"></td><td id="cell-교양-교양필수-3-2"></td><td id="cell-교양-교양필수-4-1"></td><td id="cell-교양-교양필수-4-2"></td><td id="cell-교양-교양필수-5-1"></td><td id="cell-교양-교양필수-5-2"></td><td colspan="2"></td></tr>
+                        <tr><td colspan="2">교양선택군</td><td colspan="10" id="cell-교양-교양선택-merged" ></td><td colspan="2"class="no-bold"></td></tr>
+                        <!-- 전공필수 구간 -->
+                        <tr><td rowspan="8">전공필수</td><td colspan="2">건축적사고</td><td id="cell-전공필수-건축적사고-1-1"></td><td id="cell-전공필수-건축적사고-1-2"></td><td id="cell-전공필수-건축적사고-2-1"></td><td id="cell-전공필수-건축적사고-2-2"></td><td id="cell-전공필수-건축적사고-3-1"></td><td id="cell-전공필수-건축적사고-3-2"></td><td id="cell-전공필수-건축적사고-4-1"></td><td id="cell-전공필수-건축적사고-4-2"></td><td id="cell-전공필수-건축적사고-5-1"></td><td id="cell-전공필수-건축적사고-5-2"></td><td colspan="2"></td></tr>
+                        <tr><td rowspan="3" colspan="2">설계</td><td id="cell-전공필수-설계-1-1"></td><td id="cell-전공필수-설계-1-2"></td><td id="cell-전공필수-설계-2-1"></td><td id="cell-전공필수-설계-2-2"></td><td id="cell-전공필수-설계-3-1"></td><td id="cell-전공필수-설계-3-2"></td><td id="cell-전공필수-설계-4-1"></td><td id="cell-전공필수-설계-4-2"></td><td id="cell-전공필수-설계-5-1"></td><td id="cell-전공필수-설계-5-2"></td><td colspan="2"rowspan="3"></td></tr>
+                        <tr><td id="cell-전공필수-설계2-1-1"></td><td id="cell-전공필수-설계2-1-2"></td><td colspan="2" id="cell-전공필수-설계2-2-1"></td><td colspan="2" id="cell-전공필수-설계2-3-1"></td><td colspan="2" id="cell-전공필수-설계2-4-1"></td><td id="cell-전공필수-설계2-5-1"></td><td id="cell-전공필수-설계2-5-2"></td></tr>
+                        <tr><td id="cell-전공필수-설계3-1-1"></td><td id="cell-전공필수-설계3-1-2"></td><td id="cell-전공필수-설계3-2-1"></td><td id="cell-전공필수-설계3-2-2"></td><td id="cell-전공필수-설계3-3-1"></td><td id="cell-전공필수-설계3-3-2"></td><td id="cell-전공필수-설계3-4-1"></td><td id="cell-전공필수-설계3-4-2"></td><td id="cell-전공필수-설계3-5-1"></td><td id="cell-전공필수-설계3-5-2"></td></tr>
+                        <tr><td rowspan="4">기술</td><td>구조</td><td id="cell-전공필수-구조-1-1"></td><td id="cell-전공필수-구조-1-2"></td><td id="cell-전공필수-구조-2-1"></td><td id="cell-전공필수-구조-2-2"></td><td id="cell-전공필수-구조-3-1"></td><td id="cell-전공필수-구조-3-2"></td><td id="cell-전공필수-구조-4-1"></td><td id="cell-전공필수-구조-4-2"></td><td id="cell-전공필수-구조-5-1"></td><td id="cell-전공필수-구조-5-2"></td><td colspan="2"></td></tr>
+                        <tr><td>환경</td><td id="cell-전공필수-환경-1-1"></td><td id="cell-전공필수-환경-1-2"></td><td id="cell-전공필수-환경-2-1"></td><td id="cell-전공필수-환경-2-2"></td><td id="cell-전공필수-환경-3-1"></td><td id="cell-전공필수-환경-3-2"></td><td id="cell-전공필수-환경-4-1"></td><td id="cell-전공필수-환경-4-2"></td><td id="cell-전공필수-환경-5-1"></td><td id="cell-전공필수-환경-5-2"></td><td colspan="2"></td></tr>
+                        <tr><td>시공</td><td id="cell-전공필수-시공-1-1"></td><td id="cell-전공필수-시공-1-2"></td><td id="cell-전공필수-시공-2-1"></td><td id="cell-전공필수-시공-2-2"></td><td id="cell-전공필수-시공-3-1"></td><td id="cell-전공필수-시공-3-2"></td><td id="cell-전공필수-시공-4-1"></td><td id="cell-전공필수-시공-4-2"></td><td id="cell-전공필수-시공-5-1"></td><td id="cell-전공필수-시공-5-2"></td><td colspan="2"></td></tr>
+                        <tr><td>디지털</td><td id="cell-전공필수-디지털-1-1"></td><td id="cell-전공필수-디지털-1-2"></td><td id="cell-전공필수-디지털-2-1"></td><td id="cell-전공필수-디지털-2-2"></td><td id="cell-전공필수-디지털-3-1"></td><td id="cell-전공필수-디지털-3-2"></td><td id="cell-전공필수-디지털-4-1"></td><td id="cell-전공필수-디지털-4-2"></td><td id="cell-전공필수-디지털-5-1"></td><td id="cell-전공필수-디지털-5-2"></td><td colspan="2"></td></tr>
+                        <tr><td colspan="3">실무</td><td id="cell-전공필수-실무-1-1"></td><td id="cell-전공필수-실무-1-2"></td><td id="cell-전공필수-실무-2-1"></td><td id="cell-전공필수-실무-2-2"></td><td id="cell-전공필수-실무-3-1"></td><td id="cell-전공필수-실무-3-2"></td><td id="cell-전공필수-실무-4-1"></td><td id="cell-전공필수-실무-4-2"></td><td id="cell-전공필수-실무-5-1"></td><td id="cell-전공필수-실무-5-2"></td><td colspan="2"></td></tr>
+                        <tr><td colspan="3">개설 전공필수 소계</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td colspan="2"></td></tr>
+                        <!-- 전공선택 구간 -->
+                        <tr><td rowspan="3">전공선택</td><td colspan="2">이론</td><td id="cell-전공선택-이론-1-1"></td><td id="cell-전공선택-이론-1-2"></td><td id="cell-전공선택-이론-2-1"></td><td id="cell-전공선택-이론-2-2"></td><td id="cell-전공선택-이론-3-1"></td><td id="cell-전공선택-이론-3-2"></td><td id="cell-전공선택-이론-4-1"></td><td id="cell-전공선택-이론-4-2"></td><td id="cell-전공선택-이론-5-1"></td><td id="cell-전공선택-이론-5-2"></td><td colspan="2"></td></tr>
+                        <tr><td colspan="2">설계</td><td id="cell-전공선택-설계-1-1"></td><td id="cell-전공선택-설계-1-2"></td><td id="cell-전공선택-설계-2-1"></td><td id="cell-전공선택-설계-2-2"></td><td id="cell-전공선택-설계-3-1"></td><td id="cell-전공선택-설계-3-2"></td><td id="cell-전공선택-설계-4-1"></td><td id="cell-전공선택-설계-4-2"></td><td id="cell-전공선택-설계-5-1"></td><td id="cell-전공선택-설계-5-2"></td><td colspan="2"></td></tr>
+                        <tr><td colspan="2">기타</td><td id="cell-전공선택-기타-1-1"></td><td id="cell-전공선택-기타-1-2"></td><td id="cell-전공선택-기타-2-1"></td><td id="cell-전공선택-기타-2-2"></td><td id="cell-전공선택-기타-3-1"></td><td id="cell-전공선택-기타-3-2"></td><td id="cell-전공선택-기타-4-1"></td><td id="cell-전공선택-기타-4-2"></td><td id="cell-전공선택-기타-5-1"></td><td id="cell-전공선택-기타-5-2"></td><td colspan="2"></td></tr>
+                        <tr><td colspan="3">개설 전공선택 소계</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td colspan="2"></td></tr>
+                        <tr><td colspan="3">졸업 최저이수학점</td><td colspan="10" id="cell-졸업 최저이수학점"></td><td colspan="2" id="cell-졸업 최저이수학점sum"></td></tr>
+                    </tbody>
+                </table>
+                
+
+                
+
+            </div>
+        </div>
+        <!-- 공통가치대응 탭 콘텐츠 -->
+        <div id="commonValues" class="content">
+            <div class="matrix-controls">
+                <!-- 색상 기준 전환 스위치 -->
+                <div class="color-mode-switch" style="display: flex; align-items: center; gap: 8px; margin-right: 15px;">
+                    <span style="font-size: 12px; color: #666; font-weight: 500;">색상 기준:</span>
+                    <div class="toggle-switch" style="position: relative; width: 60px; height: 24px; background: #e9ecef; border-radius: 12px; cursor: pointer; transition: background 0.3s ease;" onclick="toggleColorMode()">
+                        <div id="toggleSlider" style="position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: #6c757d; border-radius: 50%; transition: all 0.3s ease;"></div>
+                        <span id="colorModeText" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; color: #666; font-weight: 500; pointer-events: none;">분야</span>
+                    </div>
+                </div>
+                <div class="font-size-controls">
+                    <button class="btn btn-sm" onclick="decreaseCommonValuesFontSize()">A-</button>
+                    <span id="commonValues-font-size-display">17px</span>
+                    <button class="btn btn-sm" onclick="increaseCommonValuesFontSize()">A+</button>
+                </div>
+                <button class="btn btn-primary" onclick="toggleCommonValuesFullscreen()">
+                    <span id="commonValues-fullscreen-text">전체 화면</span>
+                </button>
+                <button class="btn btn-secondary" onclick="exportCommonValuesToExcel()">
+                    Excel 내보내기
+                </button>
+                <button class="btn btn-secondary" onclick="exportCommonValuesToPDF()">
+                    PDF 내보내기
+                </button>
+                <!-- 수정모드 토글 버튼 -->
+                <button class="btn btn-edit-mode-commonValues" id="editModeToggleCommonValues" onclick="toggleEditModeCommonValues()">
+                    <span id="editModeTextCommonValues">일반모드</span>
+                </button>
+            </div>
+            
+            <div class="table-container">
+                <!-- 네트워크 그래프 영역 추가 -->
+                <div id="commonValuesNetworkGraph" style="width:100%;height:500px;min-height:800px;margin-bottom:18px;display:none;"></div>
+                <!-- 표 제목+버전 수평 정렬 -->
+                <div class="matrix-header-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; gap: 10px;">
+                    <h3 id="commonValuesTitle" style="margin-left: 8px; padding: 0; background: #fff; margin: 8; border-bottom: 0px solid #222; color: #222; min-height: 32px; display: inline-block;" contenteditable="false">공통가치 대응 매트릭스</h3>
+                    <div style="display: flex; align-items: center; gap: 0px;">
+                        <span id="commonValuesVersionLabel" style="font-size: 13px; color: #333; font-weight: 400; margin:8; padding:0;">버전: <span id="commonValuesVersionText">{{VERSION}}</span></span>
+                        <div style="width: 12px;"></div>
+                    </div>
+                </div>
+                
+                <table class="common-values-table" id="commonValuesTable">
+                    <colgroup>
+                        <col style="width: 7%;">
+                        <col style="width: 20%;">
+                        <col style="width: 2%; min-width: 42px;">
+                        <col style="width: 20%;">
+                        <col style="width: 2%; min-width: 42px;">
+                        
+                        <col>
+                        <col>
+                        <col>
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th rowspan="2" style="width: 44%; white-space: nowrap;">교과분류</th>
+                            <th colspan="2" rowspan="2" style="width: 41%; white-space: nowrap;">전공필수</th>
+                            <th colspan="2" rowspan="2" style="width: 11%; white-space: nowrap;">전공선택</th>
+                            <th colspan="1" style="width: 11%;" >환경의 지속가능성 (공통가치대응I)<br><span style="display: inline-block; font-weight: 400; font-size: 12px; word-break: keep-all; overflow-wrap: break-word; line-height: 1.2em;">프로그램은 인간과 자연환경의 공존에 대한 폭넓은 이해와 환경보전의 
+                                책무를 바탕으로 건축 및 도시의 지속가능성에 대한 가치를 담을 수 있어야한다</th>
+                            <th colspan="1">미래기술의 활용 (공통가치대응II)<br><span style="display: inline-block; font-weight: 400; font-size: 12px; word-break: keep-all; overflow-wrap: break-word; line-height: 1.2em;">프로그램은 도시와 건축의 각종 문제 탐구 및 결과물 생산에 활용될 수 있는 
+                                미래기술의 폭넓은 이해를 바탕으로 새로운 기법의 적용 및 응용에  대한 운용체계를 
+                                갖출 수 있어야 한다.</th>
+                            <th colspan="1">창의적 문제해결 (공통가치대응III)<br><span style="display: inline-block; font-weight: 400; font-size: 12px; word-break: keep-all; overflow-wrap: break-word; line-height: 1.2em;">프로그램은 설계, 기술, 이론 분야 등 발생할 수 있는 다양한 문제에 대하여 
+                                창의성과 혁신성을 바탕으로 해결능력을 배양할 수 있어야 한다.</span></th>
+                        </tr>
+
+                        
+
+                    </thead>
+                    <tbody id="commonValuesTableBody">
+                        <tr>
+                            <td rowspan="2">설계/디지털<br><span style="font-weight: 500; font-size: 12px;">Design & Digital</td>
+                            <td class="col-major-required" id="commonValues-cell-설계-필수"><div class="block-wrap"></div></td>
+                            <td class="col-major-required-credit" id="commonValues-cell-설계-필수-학점"><div class="block-wrap"></div></td>
+                            <td class="col-major-elective" id="commonValues-cell-설계-선택"><div class="block-wrap"></div></td>
+                            <td class="col-major-elective-credit" id="commonValues-cell-설계-선택-학점"><div class="block-wrap"></div></td>
+                            <td class="col-value1" id="commonValues-cell-설계-value1"><div class="block-wrap"></div></td>
+                            <td class="col-value2" id="commonValues-cell-설계-value2"><div class="block-wrap"></div></td>
+                            <td class="col-value3" id="commonValues-cell-설계-value3"><div class="block-wrap"></div></td>
+                        </tr>
+                        <tr>
+                            <td class="col-major-required" id="commonValues-cell-디지털-필수"><div class="block-wrap"></div></td>
+                            <td class="col-major-required-credit" id="commonValues-cell-디지털-필수-학점"><div class="block-wrap"></div></td>
+                            <td class="col-major-elective" id="commonValues-cell-디지털-선택"><div class="block-wrap"></div></td>
+                            <td class="col-major-elective-credit" id="commonValues-cell-디지털-선택-학점"><div class="block-wrap"></div></td>
+                            <td class="col-value1" id="commonValues-cell-디지털-value1"><div class="block-wrap"></div></td>
+                            <td class="col-value2" id="commonValues-cell-디지털-value2"><div class="block-wrap"></div></td>
+                            <td class="col-value3" id="commonValues-cell-디지털-value3"><div class="block-wrap"></div></td>
+                        </tr>
+                        <tr>
+                            <td rowspan="2">역사/이론<br><span style="font-weight: 500; font-size: 12px;">History & Theory</td>
+                            <td class="col-major-required" id="commonValues-cell-역사-필수"><div class="block-wrap"></div></td>
+                            <td class="col-major-required-credit" id="commonValues-cell-역사-필수-학점"><div class="block-wrap"></div></td>
+                            <td class="col-major-elective" id="commonValues-cell-역사-선택"><div class="block-wrap"></div></td>
+                            <td class="col-major-elective-credit" id="commonValues-cell-역사-선택-학점"><div class="block-wrap"></div></td>
+                            <td class="col-value1" id="commonValues-cell-역사-value1"><div class="block-wrap"></div></td>
+                            <td class="col-value2" id="commonValues-cell-역사-value2"><div class="block-wrap"></div></td>
+                            <td class="col-value3" id="commonValues-cell-역사-value3"><div class="block-wrap"></div></td>
+                        </tr>
+                        <tr>
+                            <td class="col-major-required" id="commonValues-cell-이론-필수"><div class="block-wrap"></div></td>
+                            <td class="col-major-required-credit" id="commonValues-cell-이론-필수-학점"><div class="block-wrap"></div></td>
+                            <td class="col-major-elective" id="commonValues-cell-이론-선택"><div class="block-wrap"></div></td>
+                            <td class="col-major-elective-credit" id="commonValues-cell-이론-선택-학점"><div class="block-wrap"></div></td>
+                            <td class="col-value1" id="commonValues-cell-이론-value1"><div class="block-wrap"></div></td>
+                            <td class="col-value2" id="commonValues-cell-이론-value2"><div class="block-wrap"></div></td>
+                            <td class="col-value3" id="commonValues-cell-이론-value3"><div class="block-wrap"></div></td>
+                        </tr>
+                        <tr>
+                            <td rowspan="2">도시/사회<br><span style="font-weight: 500; font-size: 12px;">Urbanism & Society</td>
+                            <td class="col-major-required" id="commonValues-cell-도시-필수"><div class="block-wrap"></div></td>
+                            <td class="col-major-required-credit" id="commonValues-cell-도시-필수-학점"><div class="block-wrap"></div></td>
+                            <td class="col-major-elective" id="commonValues-cell-도시-선택"><div class="block-wrap"></div></td>
+                            <td class="col-major-elective-credit" id="commonValues-cell-도시-선택-학점"><div class="block-wrap"></div></td>
+                            <td class="col-value1" id="commonValues-cell-도시-value1"><div class="block-wrap"></div></td>
+                            <td class="col-value2" id="commonValues-cell-도시-value2"><div class="block-wrap"></div></td>
+                            <td class="col-value3" id="commonValues-cell-도시-value3"><div class="block-wrap"></div></td>
+                        </tr>
+                        <tr>
+                            <td class="col-major-required" id="commonValues-cell-사회-필수"><div class="block-wrap"></div></td>
+                            <td class="col-major-required-credit" id="commonValues-cell-사회-필수-학점"><div class="block-wrap"></div></td>
+                            <td class="col-major-elective" id="commonValues-cell-사회-선택"><div class="block-wrap"></div></td>
+                            <td class="col-major-elective-credit" id="commonValues-cell-사회-선택-학점"><div class="block-wrap"></div></td>
+                            <td class="col-value1" id="commonValues-cell-사회-value1"><div class="block-wrap"></div></td>
+                            <td class="col-value2" id="commonValues-cell-사회-value2"><div class="block-wrap"></div></td>
+                            <td class="col-value3" id="commonValues-cell-사회-value3"><div class="block-wrap"></div></td>
+                        </tr>
+                        <tr>
+                            <td rowspan="2">기술/실무<br><span style="font-weight: 500; font-size: 12px;">Technology & Practice</td>
+                            <td class="col-major-required" id="commonValues-cell-기술-필수"><div class="block-wrap"></div></td>
+                            <td class="col-major-required-credit" id="commonValues-cell-기술-필수-학점"><div class="block-wrap"></div></td>
+                            <td class="col-major-elective" id="commonValues-cell-기술-선택"><div class="block-wrap"></div></td>
+                            <td class="col-major-elective-credit" id="commonValues-cell-기술-선택-학점"><div class="block-wrap"></div></td>
+                            <td class="col-value1" id="commonValues-cell-기술-value1"><div class="block-wrap"></div></td>
+                            <td class="col-value2" id="commonValues-cell-기술-value2"><div class="block-wrap"></div></td>
+                            <td class="col-value3" id="commonValues-cell-기술-value3"><div class="block-wrap"></div></td>
+                        </tr>
+                        <tr>
+                            <td class="col-major-required" id="commonValues-cell-실무-필수"><div class="block-wrap"></div></td>
+                            <td class="col-major-required-credit" id="commonValues-cell-실무-필수-학점"><div class="block-wrap"></div></td>
+                            <td class="col-major-elective" id="commonValues-cell-실무-선택"><div class="block-wrap"></div></td>
+                            <td class="col-major-elective-credit" id="commonValues-cell-실무-선택-학점"><div class="block-wrap"></div></td>
+                            <td class="col-value1" id="commonValues-cell-실무-value1"><div class="block-wrap"></div></td>
+                            <td class="col-value2" id="commonValues-cell-실무-value2"><div class="block-wrap"></div></td>
+                            <td class="col-value3" id="commonValues-cell-실무-value3"><div class="block-wrap"></div></td>
+                        </tr>
+                        <tr>
+                            <td rowspan="1">비교과</td>
+                            <td class="col-major-required" id="commonValues-cell-비교과-필수"><div class="block-wrap"></div></td>
+                            <td class="col-major-required-credit" id="commonValues-cell-비교과-필수-학점"><div class="block-wrap"></div></td>
+                            <td class="col-major-elective" id="commonValues-cell-비교과-선택"><div class="block-wrap"></div></td>
+                            <td class="col-major-elective-credit" id="commonValues-cell-비교과-선택-학점"><div class="block-wrap"></div></td>
+                            <td class="col-value1" id="commonValues-cell-비교과-value1"><div class="block-wrap"></div></td>
+                            <td class="col-value2" id="commonValues-cell-비교과-value2"><div class="block-wrap"></div></td>
+                            <td class="col-value3" id="commonValues-cell-비교과-value3"><div class="block-wrap"></div></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <!-- 미분류 교과목 별도 표 -->
+                <div style="margin-top: 30px;">
+                    <h4 style="margin-bottom: 15px; color: #666; font-size: 16px;">미분류 교과목</h4>
+                    <table class="common-values-table" id="unclassifiedTable" style="background: #fafafa;">
+                        <colgroup>
+                            <col style="width: 14%;">
+                            <col>
+                            <col>
+                            <col>
+                            <col>
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th style="width: 14%; white-space: nowrap;">교과분류</th>
+                                <th colspan="2" style="width: 1%; white-space: nowrap;">필수</th>
+                                <th colspan="2" style="width: 1%; white-space: nowrap;">선택</th>
+                            </tr>
+                        </thead>
+                        <tbody id="unclassifiedTableBody">
+                            <!-- 동적으로 생성됨 -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="commonValuesUnassignedBlocks" style="margin-top: 24px;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 전체 버전 저장 모달 -->
+    <div id="versionSaveModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>버전 저장</h2>
+                <button class="close-btn" onclick="closeVersionSaveModal()">&times;</button>
+            </div>
+            <form id="versionSaveForm" onsubmit="saveVersionData(event)">
+                <div class="form-group">
+                    <label>버전 이름</label>
+                    <input type="text" id="versionNameInput" required placeholder="예: 2024-12-20_1차">
+                </div>
+                <div class="form-group">
+                    <label>설명 (선택사항)</label>
+                    <textarea id="versionDescriptionInput" rows="3" placeholder="버전에 대한 설명을 입력하세요" style="width: 100%; box-sizing: border-box; resize: vertical;"></textarea>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: space-between; margin-top: 30px;">
+                    <button type="button" class="btn btn-primary" onclick="exportVersionsToFile()">
+                        📁 버전 파일 내보내기
+                    </button>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" class="btn btn-secondary" onclick="closeVersionSaveModal()">취소</button>
+                        <button type="submit" class="btn btn-primary">저장</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- 전체 버전 관리 모달 -->
+    <div id="versionManagerModal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2>버전 관리</h2>
+                <button class="close-btn" onclick="closeVersionManager()">&times;</button>
+            </div>
+            <div id="versionList" style="max-height: 400px; overflow-y: auto; margin-bottom: 20px;"></div>
+            <div style="display: flex; gap: 10px; justify-content: space-between;">
+                <button class="btn btn-primary" onclick="importVersionsFromFile()">
+                    📁 버전 파일 불러오기
+                </button>
+                <button class="btn btn-secondary" onclick="closeVersionManager()">닫기</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 모달 -->
+    <div id="courseModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>교과목 수정</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="courseForm">
+                <div class="form-group">
+                    <label>과목명</label>
+                    <input type="text" name="courseName" required>
+                </div>
+                <div class="form-group">
+                    <label>담당교수</label>
+                    <input type="text" name="professor">
+                </div>
+                <div class="form-group">
+                    <label>학년-학기</label>
+                    <div style="display: flex; gap: 10px;">
+                        <select name="year" required style="flex: 1;">
+                            <option value="">학년</option>
+                            <option value="1">1학년</option>
+                            <option value="2">2학년</option>
+                            <option value="3">3학년</option>
+                            <option value="4">4학년</option>
+                            <option value="5">5학년</option>
+                        </select>
+                        <select name="semester" required style="flex: 1;">
+                            <option value="">학기</option>
+                            <option value="1">1학기</option>
+                            <option value="2">2학기</option>
+                            <option value="계절">계절학기</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>교과목번호</label>
+                    <input type="text" name="courseNumber" required>
+                </div>
+                <div class="form-group">
+                    <label>학점</label>
+                    <input type="number" name="credits" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label>구분</label>
+                    <select name="category" required>
+                        <option value="">선택하세요</option>
+                        <option value="교양">교양</option>
+                        <option value="건축적사고">건축적사고</option>
+                        <option value="설계">설계</option>
+                        <option value="기술">기술</option>
+                        <option value="실무">실무</option>
+                        <option value="기타">기타</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>과목분류</label>
+                    <select name="subjectType" required>
+                        <option value="">선택하세요</option>
+                        <option value="미분류">미분류</option>
+                        <option value="설계">설계</option>
+                        <option value="디지털">디지털</option>
+                        <option value="역사">역사</option>
+                        <option value="이론">이론</option>
+                        <option value="도시">도시</option>
+                        <option value="사회">사회</option>
+                        <option value="기술">기술</option>
+                        <option value="실무">실무</option>
+                        <option value="비교과">비교과</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>필수여부</label>
+                    <select name="isRequired" required>
+                        <option value="필수">필수</option>
+                        <option value="선택">선택</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>수행평가기준</label>
+                    <div id="coursePerformanceCriteria" style="font-size:13px; color:#333; background:#f8f9fa; border-radius:6px; padding:8px 10px; min-height:32px;"></div>
+                </div>
+                <div class="form-group">
+                    <label>상세내용</label>
+                    <textarea name="description" rows="2" style="resize:vertical; width:100%; box-sizing:border-box;"></textarea>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: space-between; margin-top: 30px;">
+                    <button type="button" class="btn btn-danger btn-sm" id="deleteCourseBtn" onclick="deleteCourseFromModal()">삭제</button>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal()">취소</button>
+                        <button type="submit" class="btn btn-primary btn-sm">저장</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="app.js"></script>
+    <script>
+        // 페이지 로드 완료 후 Firebase 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            // Firebase 초기화는 app.js의 init() 함수에서 처리됨
+            console.log('페이지 로드 완료, Firebase 초기화 준비');
+            
+            // 앱 초기화
+            if (typeof init === 'function') {
+                init();
+            } else {
+                console.error('init 함수를 찾을 수 없습니다.');
+            }
+        });
+    </script>
+    <!-- 변경이력 floating 버튼 삭제 -->
+    <div id="changeHistoryPanel" style="display:none;position:fixed;top:60px;right:40px;width:360px;min-width:360px;max-width:360px;min-height:120px;height:380px;max-height:80vh;z-index:1002;background:linear-gradient(120deg,#f8fafc 80%,#e3f0ff 100%);box-shadow:0 4px 24px rgba(0,0,0,0.18);border-radius:14px;overflow:hidden;resize:both;">
+        <div id="changeHistoryPanelHeader" style="cursor:move;padding:8px 14px 8px 14px;background:#1976d2;color:#fff;font-weight:bold;border-radius:14px 14px 0 0;user-select:none;display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-size:13px;letter-spacing:0.5px;">변경 이력</span>
+            <button onclick="toggleChangeHistoryPanel()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;line-height:1;width:28px;height:28px;border-radius:50%;transition:background 0.15s;">×</button>
+        </div>
+        <div style="padding:0 0 8px 0;overflow:auto;max-height:calc(100% - 120px);">
+            <ul id="changeHistoryPanelList" class="change-history-list" style="list-style:none;margin:0;padding:0;">
+                <li style='text-align:center; color:#888; padding:12px 0;'>변경 이력이 없습니다.</li>
+            </ul>
+        </div>
+        <!-- 변경이력 확정 버튼 영역 -->
+        <div id="changeHistoryActions" style="padding:8px 12px;border-top:1px solid #e0e0e0;background:#f8f9fa;display:none;">
+            <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;">
+                <span style="font-size:11px;color:#666;">변경사항이 있습니다</span>
+                <div style="display:flex;gap:6px;">
+                    <button id="confirmChangesBtn" onclick="confirmAllChanges()" style="background:#28a745;color:#fff;border:none;padding:6px 12px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:bold;transition:background 0.2s;" onmouseover="this.style.background='#218838'" onmouseout="this.style.background='#28a745'">확정</button>
+                    <button id="resetChangesBtn" onclick="resetAllChanges()" style="background:#6c757d;color:#fff;border:none;padding:6px 12px;border-radius:4px;font-size:11px;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='#5a6268'" onmouseout="this.style.background='#6c757d'">초기화</button>
+                </div>
+            </div>
+        </div>
+        <style>
+        .change-history-list li {
+            display:flex;
+            align-items:center;
+            gap:10px;
+            padding:8px 12px;
+            border-bottom:1px solid #e0e0e0;
+            font-size:12px;
+            line-height:1.4;
+            background:#fff;
+            transition:background 0.15s;
+            position:relative;
+        }
+        .change-history-list li:hover {
+            background:#eaf3ff;
+        }
+        .change-history-type {
+            display:inline-block;
+            min-width:32px;
+            text-align:center;
+            font-weight:bold;
+            border-radius:10px;
+            padding:2px 8px;
+            font-size:11px;
+            color:#fff;
+            background:#1976d2;
+            flex-shrink:0;
+        }
+        .change-history-type.추가 { background:#43a047; }
+        .change-history-type.삭제 { background:#e53935; }
+        .change-history-type.수정 { background:#1976d2; }
+        .change-history-summary {
+            flex:1;
+            min-width:0;
+            overflow-wrap:break-word;
+            text-align:left;
+        }
+        .change-history-apply-btn,
+        .change-history-delete-btn {
+            display:inline-block;
+            /* margin-left:0px; */
+            background:none;
+            border:none;
+            font-size:18px;
+            cursor:pointer;
+            opacity:0;
+            transition:opacity 0.2s;
+            vertical-align:middle;
+            width:20px;
+            height:20px;
+            border-radius:50%;
+            line-height:1;
+        }
+        .change-history-apply-btn {
+            color:#4caf50;
+        }
+        .change-history-delete-btn {
+            color:#e53935;
+        }
+        .change-history-list li:hover .change-history-apply-btn,
+        .change-history-list li:hover .change-history-delete-btn {
+            opacity:1;
+        }
+        </style>
+    </div>
+<script>
+// 변경이력 패널 드래그 이동 기능
+(function() {
+    const panel = document.getElementById('changeHistoryPanel');
+    const header = document.getElementById('changeHistoryPanelHeader');
+    let isDragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+    header.addEventListener('mousedown', function(e) {
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        const rect = panel.getBoundingClientRect();
+        startLeft = rect.left;
+        startTop = rect.top;
+        document.body.style.userSelect = 'none';
+    });
+    document.addEventListener('mousemove', function(e) {
+        if (!isDragging) return;
+        let newLeft = startLeft + (e.clientX - startX);
+        let newTop = startTop + (e.clientY - startY);
+        // 화면 경계 제한
+        newLeft = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, newLeft));
+        newTop = Math.max(0, Math.min(window.innerHeight - 40, newTop));
+        panel.style.left = newLeft + 'px';
+        panel.style.top = newTop + 'px';
+        panel.style.right = 'auto';
+    });
+    document.addEventListener('mouseup', function() {
+        isDragging = false;
+        document.body.style.userSelect = '';
+    });
+})();
+</script>
+<script>
+function collectMatrixExtraTableData() {
+    const table = document.querySelector('.matrix-extra-table');
+    if (!table) return {};
+    const collectedData = {};
+    const cells = table.querySelectorAll('td');
+    cells.forEach((cell, idx) => {
+        cell.id = 'matrix-extra-cell-' + idx;
+        let cellContent = cell.innerHTML || '';
+        cellContent = cellContent.replace(/<br\s*\/?>/gi, '\n');
+        cellContent = cellContent.replace(/<[^>]*>/g, '');
+        collectedData[cell.id] = cellContent;
+    });
+    return collectedData;
+}
+</script>
+<script>
+function renderMatrixExtraTable() {
+    const table = document.querySelector('.matrix-extra-table');
+    if (!table) return;
+    const cells = table.querySelectorAll('td');
+    cells.forEach((cell, idx) => {
+        cell.id = 'matrix-extra-cell-' + idx;
+        if (matrixExtraTableData && cell.id in matrixExtraTableData) {
+            cell.innerHTML = matrixExtraTableData[cell.id] === '' ? '<br>' : matrixExtraTableData[cell.id].replace(/\n/g, '<br>');
+        } else {
+            cell.innerHTML = '<br>';
+        }
+    });
+    // 복원 로그
+    console.log('matrix-extra-table 복원 셀 개수:', cells.length, '복원 데이터 개수:', Object.keys(matrixExtraTableData).length);
+}
+</script>
+<script>
+// 매트릭스 하부 안내 표 데이터 병합 함수
+function mergeMatrixExtraData() {
+    const collectedMatrixExtraData = collectMatrixExtraTableData();
+    const mergedMatrixExtraData = { ...collectedMatrixExtraData };
+    Object.keys(tempMatrixExtraTableData).forEach(key => {
+        mergedMatrixExtraData[key] = tempMatrixExtraTableData[key];
+    });
+    matrixExtraTableData = mergedMatrixExtraData;
+    tempMatrixExtraTableData = {};
+    return matrixExtraTableData;
+}
+</script>
+
+<div id="sync-loading-overlay" style="display:none; position:fixed; left:0; top:0; width:100vw; height:100vh; background:rgba(255,255,255,0.7); z-index:9999; align-items:center; justify-content:center; flex-direction:column;">
+  <div class="spinner"></div>
+  <div style="margin-top:20px; font-size:18px; color:#333;">동기화 중입니다...</div>
+</div>
+
+</body>
+</html>
