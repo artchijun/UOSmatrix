@@ -502,12 +502,16 @@
             
             <!-- 이수모형 컨트롤 버튼들 -->
             <div class="matrix-controls" style="margin-bottom: 20px;">
-                <!-- 색상 기준 전환 스위치 -->
+                <!-- 색상 범례 및 기준 전환 스위치 -->
                 <div class="color-mode-switch" style="display: flex; align-items: center; gap: 8px; margin-right: 15px;">
-                    <span style="font-size: 12px; color: #666; font-weight: 500;">색상 기준:</span>
-                    <div class="toggle-switch-curriculum" style="position: relative; width: 60px; height: 24px; background: #e9ecef; border-radius: 12px; cursor: pointer; transition: background 0.3s ease;" onclick="toggleColorModeCurriculum()">
-                        <div id="toggleSliderCurriculum" style="position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: #6c757d; border-radius: 50%; transition: all 0.3s ease;"></div>
-                        <span id="colorModeTextCurriculum" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; color: #666; font-weight: 500; pointer-events: none;">분야</span>
+                    <!-- 색상 범례 -->
+                    <div id="colorLegendCurriculum" style="display: flex; align-items: center; gap: 4px; margin-right: 8px;">
+                        <!-- 동적으로 생성됨 -->
+                    </div>
+                    <span style="font-size: 14px; color: #666; font-weight: 500;">색상 기준:</span>
+                    <div class="toggle-switch-curriculum" style="position: relative; width: 80px; height: 32px; background: #e9ecef; border-radius: 16px; cursor: pointer; transition: background 0.3s ease;" onclick="toggleColorModeCurriculum()">
+                        <div id="toggleSliderCurriculum" style="position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; background: #6c757d; border-radius: 50%; transition: all 0.3s ease;"></div>
+                        <span id="colorModeTextCurriculum" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12px; color: #666; font-weight: 600; pointer-events: none;">분야</span>
                     </div>
                 </div>
                 <div class="font-size-controls">
@@ -598,12 +602,16 @@
         <!-- 공통가치대응 탭 콘텐츠 -->
         <div id="commonValues" class="content">
             <div class="matrix-controls">
-                <!-- 색상 기준 전환 스위치 -->
+                <!-- 색상 범례 및 기준 전환 스위치 -->
                 <div class="color-mode-switch" style="display: flex; align-items: center; gap: 8px; margin-right: 15px;">
-                    <span style="font-size: 12px; color: #666; font-weight: 500;">색상 기준:</span>
-                    <div class="toggle-switch" style="position: relative; width: 60px; height: 24px; background: #e9ecef; border-radius: 12px; cursor: pointer; transition: background 0.3s ease;" onclick="toggleColorMode()">
-                        <div id="toggleSlider" style="position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: #6c757d; border-radius: 50%; transition: all 0.3s ease;"></div>
-                        <span id="colorModeText" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; color: #666; font-weight: 500; pointer-events: none;">분야</span>
+                    <!-- 색상 범례 -->
+                    <div id="colorLegendCommonValues" style="display: flex; align-items: center; gap: 4px; margin-right: 8px;">
+                        <!-- 동적으로 생성됨 -->
+                    </div>
+                    <span style="font-size: 14px; color: #666; font-weight: 500;">색상 기준:</span>
+                    <div class="toggle-switch" style="position: relative; width: 80px; height: 32px; background: #e9ecef; border-radius: 16px; cursor: pointer; transition: background 0.3s ease;" onclick="toggleColorMode()">
+                        <div id="toggleSlider" style="position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; background: #6c757d; border-radius: 50%; transition: all 0.3s ease;"></div>
+                        <span id="colorModeText" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12px; color: #666; font-weight: 600; pointer-events: none;">분야</span>
                     </div>
                 </div>
                 <div class="font-size-controls">
@@ -931,16 +939,71 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="app.js"></script>
     <script>
-        // 페이지 로드 완료 후 Firebase 초기화
-        document.addEventListener('DOMContentLoaded', function() {
-            // Firebase 초기화는 app.js의 init() 함수에서 처리됨
-            console.log('페이지 로드 완료, Firebase 초기화 준비');
+        // 앱 초기화 함수 - 재시도 로직 포함
+        function initializeApp() {
+            console.log('앱 초기화 시도 중...');
             
-            // 앱 초기화
-            if (typeof init === 'function') {
+            // init 함수 가용성 확인
+            if (typeof window.init === 'function') {
+                console.log('✓ window.init 함수 발견, 실행 중...');
+                window.init();
+                return true;
+            } else if (typeof init === 'function') {
+                console.log('✓ init 함수 발견, 실행 중...');
                 init();
+                return true;
             } else {
-                console.error('init 함수를 찾을 수 없습니다.');
+                console.warn('⚠️ init 함수를 아직 찾을 수 없습니다. 재시도 중...');
+                return false;
+            }
+        }
+        
+        // 즉시 실행 (app.js가 이미 로드된 경우)
+        if (document.readyState === 'loading') {
+            // DOM이 아직 로딩 중이면 DOMContentLoaded 대기
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('DOM 로드 완료');
+                
+                // 즉시 시도
+                if (!initializeApp()) {
+                    // 실패 시 짧은 간격으로 재시도
+                    let retryCount = 0;
+                    const maxRetries = 10;
+                    const retryInterval = setInterval(function() {
+                        retryCount++;
+                        console.log(`재시도 ${retryCount}/${maxRetries}`);
+                        
+                        if (initializeApp() || retryCount >= maxRetries) {
+                            clearInterval(retryInterval);
+                            if (retryCount >= maxRetries) {
+                                console.error('❌ init 함수 로드 실패 - 최대 재시도 횟수 초과');
+                                console.log('디버깅 정보:');
+                                console.log('- window.init 타입:', typeof window.init);
+                                console.log('- init 타입:', typeof window['init']);
+                                console.log('- 사용 가능한 init 함수들:', Object.keys(window).filter(k => k.includes('init')));
+                            }
+                        }
+                    }, 100); // 100ms 간격으로 재시도
+                }
+            });
+        } else {
+            // DOM이 이미 로드됨
+            console.log('DOM 이미 로드됨');
+            if (!initializeApp()) {
+                // 재시도 로직
+                setTimeout(function() {
+                    if (!initializeApp()) {
+                        console.error('❌ init 함수 로드 실패');
+                    }
+                }, 500);
+            }
+        }
+        
+        // 백업: window.load 이벤트에서도 시도 (모든 리소스 로드 후)
+        window.addEventListener('load', function() {
+            console.log('모든 리소스 로드 완료 - 백업 초기화 시도');
+            if (typeof window.init !== 'function') {
+                initializeApp();
             }
         });
     </script>

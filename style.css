@@ -642,30 +642,7 @@ tr:hover.hover-none {
     /* border-color: #bbb !important; */
 }
 
-/* 매트릭스 테이블 헤더 - 카테고리별 색상 제거 */
-.matrix-table th[colspan="4"] {
-    /* background: #ffffff !important; */
-    /* color: #000000 !important; */
-    /* border: 1px solid #000000; */
-}
 
-.matrix-table th[colspan="7"] {
-    /* background: #ffffff !important; */
-    /* color: #000000 !important; */
-    /* border: 1px solid #000000; */
-}
-
-.matrix-table th[colspan="5"] {
-    /* background: #ffffff !important; */
-    /* color: #000000 !important; */
-    /* border: 1px solid #000000; */
-}
-
-.matrix-table th[colspan="2"] {
-    /* background: #ffffff !important; */
-    /* color: #000000 !important; */
-    /* border: 1px solid #000000; */
-}
 
 
 .matrix-table th:nth-child(2) {
@@ -784,18 +761,7 @@ tr:hover.hover-none {
 
 /* 카테고리 셀이 없는 행들의 스타일 - 더 이상 필요하지 않음 */
 
-/* 수행평가 기준 헤더 카테고리별 색상 완전 제거 */
-.matrix-table thead tr:nth-child(2) th,
-.matrix-table thead tr:nth-child(3) th,
-.matrix-table thead tr:nth-child(4) th {
-    /* background: transparent !important; */
-    /* color: #333 !important; */
-    /* border-color: #bbb !important; */
-    /* font-weight: normal !important; */
-    /* text-align: center; */
-    /* vertical-align: middle; */
-    /* font-size: 15px; */
-}
+
 
 /* 상위 헤더(수행평가기준, 교과과정 등)도 동일하게 */
 .matrix-table thead tr:nth-child(1) th {
@@ -2043,9 +2009,7 @@ th.sortable:not(.asc):not(.desc) .sort-icon::after {
     align-items: center;
 }
 
-.courses-controls-left {
-    /* 왼쪽 영역 (필요시 사용) */
-}
+
 
 .courses-controls-right {
     display: flex;
@@ -2672,11 +2636,7 @@ th, td, .matrix-table th, .matrix-table td {
     text-align: center;
     color: #495057;
 }
-.common-values-table td.col-value1,
-.common-values-table td.col-value2,
-.common-values-table td.col-value3 {
-    /* width: 40%; 삭제 */
-}
+
 
 .common-values-table .block-wrap {
     display: flex;
@@ -2799,6 +2759,75 @@ th, td, .matrix-table th, .matrix-table td {
     background: #c82333;
     border: none;
     outline: none;
+}
+
+/* 색상 범례 스타일 */
+.color-legend {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-right: 25px;
+    flex-wrap: wrap;
+}
+
+.color-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    color: #555;
+    white-space: nowrap;
+}
+
+.color-legend-box {
+    width: 20px;
+    height: 20px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.color-legend-label {
+    font-size: 14px;
+    color: #333;
+    font-weight: 600;
+}
+
+/* 모바일에서 색상 범례 반응형 */
+@media (max-width: 768px) {
+    .color-legend {
+        gap: 10px;
+        margin-right: 18px;
+    }
+    
+    .color-legend-item {
+        gap: 5px;
+    }
+    
+    .color-legend-box {
+        width: 16px;
+        height: 16px;
+    }
+    
+    .color-legend-label {
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 480px) {  
+    .color-legend {
+        gap: 8px;
+        margin-right: 15px;
+    }
+    
+    .color-legend-box {
+        width: 14px;
+        height: 14px;
+    }
+    
+    .color-legend-label {
+        font-size: 11px;
+    }
 }
 
 /* 설계 교과목 색상 기준 전환 스타일 */

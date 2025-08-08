@@ -708,6 +708,7 @@ function restoreSelectedVersionData() {
         } else {
             // 기존 구조 호환성
             commonValuesCellTexts = v.commonValuesCellTexts || {};
+            commonValuesCopiedBlocks = v.commonValuesCopiedBlocks || {};
         }
         
         // 공통 설정 복원
@@ -1781,6 +1782,7 @@ function showTab(tabName, event) {
         renderCommonValuesTable();
         }
         updateCommonValuesFontSize(); // 폰트 크기 동기화
+        updateColorLegendCommonValues(); // 색상 범례 업데이트
     }
     
     // 이수모형 탭 클릭 시 변경이력 처리
@@ -1800,13 +1802,14 @@ function showTab(tabName, event) {
         // 색상 기준 스위치 UI 동기화
         const slider = document.getElementById('toggleSliderCurriculum');
         const text = document.getElementById('colorModeTextCurriculum');
+        updateColorLegendCurriculum(); // 색상 범례 업데이트
         if (slider && text) {
             if (colorModeBySubjectTypeCurriculum) {
-                slider.style.left = '2px';
+                slider.style.left = '3px';
                 slider.style.background = '#6c757d';
                 text.textContent = '분야';
             } else {
-                slider.style.left = '38px';
+                slider.style.left = '51px';
                 slider.style.background = '#28a745';
                 text.textContent = '구분';
             }
@@ -3303,6 +3306,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 키보드 이벤트 리스너 추가
     document.addEventListener('keydown', handleMatrixKeyboardEdit);
+    
+    // 색상 범례 초기화 (페이지 로드 시)
+    setTimeout(() => {
+        updateColorLegendCurriculum();
+        updateColorLegendCommonValues();
+    }, 100);
 });
 
 // 정렬 기능 처리
@@ -4454,6 +4463,12 @@ function handleCourseBlockDragStart(e) {
     e.target.classList.add('dragging');
     isCourseBlockDragging = true; // 드래그 시작 시 플래그 true
     
+    // 공통가치대응 탭에서 드래그 시작한 경우 소스 정보 저장
+    const sourceCell = e.target.closest('td');
+    if (sourceCell && sourceCell.id && sourceCell.id.startsWith('commonValues-cell-')) {
+        e.dataTransfer.setData('sourceCell', sourceCell.id);
+    }
+    
     // 드래그 시작 시 현재 DOM 순서 로그
     const blockWrap = e.target.closest('.block-wrap');
     if (blockWrap) {
@@ -4462,19 +4477,30 @@ function handleCourseBlockDragStart(e) {
     }
     
     
-    // [추가] VALUE1,2,3 셀에서 드래그 시작 시 삭제 ZONE 표시 및 셀 정보 저장
+    // [추가] 공통가치 대응표에서 드래그 시작 시 삭제 ZONE 표시 및 셀 정보 저장
     const courseBlock = e.target.closest('.course-block');
     if (courseBlock) {
         const parentCell = courseBlock.closest('td');
-        if (parentCell && parentCell.id && parentCell.id.includes('-value')) {
-            // 드래그 시작한 셀 정보 저장
+        if (parentCell && parentCell.id && parentCell.id.startsWith('commonValues-cell-')) {
             const cellId = parentCell.id;
             const idParts = cellId.replace('commonValues-cell-', '').split('-');
-            draggedFromCell = {
-                subjectType: idParts[0],
-                valueKey: idParts[1] // value1, value2, value3
-            };
-            showDeleteZone();
+            
+            // value 컬럼에서 드래그하는 경우
+            if (idParts[1] && idParts[1].includes('value')) {
+                draggedFromCell = {
+                    subjectType: idParts[0],
+                    valueKey: idParts[1] // value1, value2, value3
+                };
+                showDeleteZone();
+            }
+            // 전공필수/선택 컬럼에서 드래그하는 경우도 삭제 가능
+            else if (idParts[1] === '필수' || idParts[1] === '선택') {
+                draggedFromCell = {
+                    subjectType: idParts[0],
+                    isRequired: idParts[1] === '필수'
+                };
+                showDeleteZone();
+            }
         }
     }
 }
@@ -5005,6 +5031,15 @@ function handleBlockWrapDrop(e) {
     const targetBlock = e.target.closest('.course-block');
     const previewBlock = blockWrap.querySelector('.drag-preview-block');
     
+    // 공통가치 대응표의 value 컬럼으로 드롭하는 경우는 처리하지 않음
+    // (handleCommonValuesDrop에서 별도 처리)
+    const td = blockWrap.closest('td');
+    if (td && td.id && td.id.includes('commonValues-cell-') && td.id.includes('-value')) {
+        // 미리보기 효과만 제거하고 종료
+        clearBlockWrapPreview(blockWrap);
+        return;
+    }
+    
     // 프리뷰 블럭이 있으면 그 위치에 드롭
     if (previewBlock) {
         const previewIndex = Array.from(blockWrap.children).indexOf(previewBlock);
@@ -5501,8 +5536,8 @@ function loadAllVersions() {
                     },
                     commonValuesTab: {
                         commonValuesTitleText: v.commonValuesTitleText || '',
-                        commonValuesCellTexts: v.commonValuesCellTexts || {}
-                        
+                        commonValuesCellTexts: v.commonValuesCellTexts || {},
+                        commonValuesCopiedBlocks: v.commonValuesCopiedBlocks || {}
                     },
                     settings: {
                         designSettings: v.designSettings || {},
@@ -5560,6 +5595,9 @@ function saveCurrentVersion() {
         
         // 공통가치대응 탭 - 셀 텍스트 데이터
         commonValuesCellTexts: commonValuesCellTexts,
+        
+        // 공통가치대응 탭 - 노드 그룹 속성 데이터 (value1,2,3 컬럼의 교과목 블록 정보)
+        commonValuesCopiedBlocks: commonValuesCopiedBlocks,
         
         // 제목 텍스트들
         matrixTitleText: localStorage.getItem('matrixTitleText') || '',
@@ -5794,6 +5832,8 @@ async function saveVersionData(event) {
             commonValuesTab: {
                 commonValuesCellTexts: typeof commonValuesCellTexts === 'object' ? 
                     JSON.parse(JSON.stringify(commonValuesCellTexts)) : {},
+                commonValuesCopiedBlocks: typeof commonValuesCopiedBlocks === 'object' ? 
+                    JSON.parse(JSON.stringify(commonValuesCopiedBlocks)) : {},
                 commonValuesTitleText: localStorage.getItem('commonValuesTitleText') || ''
             },
             settings: {
@@ -6017,6 +6057,8 @@ async function saveCurrentVersion() {
         commonValuesTab: {
             commonValuesCellTexts: typeof commonValuesCellTexts === 'object' ? 
                 JSON.parse(JSON.stringify(commonValuesCellTexts)) : {},
+            commonValuesCopiedBlocks: typeof commonValuesCopiedBlocks === 'object' ? 
+                JSON.parse(JSON.stringify(commonValuesCopiedBlocks)) : {},
             commonValuesTitleText: localStorage.getItem('commonValuesTitleText') || ''
         },
         
@@ -6110,6 +6152,9 @@ function restoreVersion(versionName) {
     }
     
     try {
+        // 버전 복원 플래그 설정
+        window.isRestoringVersion = true;
+        
         // 임시 저장소 초기화
         clearTempStorage();
         
@@ -6175,6 +6220,14 @@ function restoreVersion(versionName) {
                 }
             });
             commonValuesCellTexts = Object.keys(converted).length > 0 ? converted : raw;
+            
+            // 공통가치대응 노드 그룹 속성 데이터 복원
+            if (versionData.commonValuesTab.commonValuesCopiedBlocks) {
+                commonValuesCopiedBlocks = JSON.parse(JSON.stringify(versionData.commonValuesTab.commonValuesCopiedBlocks));
+            } else {
+                // 기존 구조 호환성을 위해 빈 객체로 초기화
+                commonValuesCopiedBlocks = {};
+            }
         
             if (versionData.commonValuesTab.commonValuesTitleText) {
                 localStorage.setItem('commonValuesTitleText', versionData.commonValuesTab.commonValuesTitleText);
@@ -6205,6 +6258,7 @@ function restoreVersion(versionName) {
         renderMatrixExtraTable();
         
         // 공통가치대응 테이블 강제 렌더링 (복원 시에는 편집 상태 무시)
+        
         window.isRestoringVersion = true;
         const originalIsCommonValuesCellEditing = isCommonValuesCellEditing;
         isCommonValuesCellEditing = false;
@@ -6871,7 +6925,522 @@ function renderCommonValuesTable() {
         }
     }
     
-/// ... existing code ...
+    // 과목분류별 행 정의 (미분류 제외)
+    const subjectTypes = [
+        '설계', '디지털', '역사', '이론', '도시', '사회', '기술', '실무', '비교과'
+    ];
+
+    subjectTypes.forEach(subjectType => {
+        // 전공필수 (교과목 블럭)
+        const tdRequired = document.getElementById(`commonValues-cell-${subjectType}-필수`);
+        if (tdRequired) {
+            tdRequired.innerHTML = '';
+            const requiredCourses = courses.filter(c => c.subjectType === subjectType && c.isRequired === '필수');
+            const wrap = document.createElement('div');
+            wrap.className = 'block-wrap';
+            requiredCourses.forEach(course => {
+                const block = createCourseBlock(course, false, false);
+                wrap.appendChild(block);
+            });
+            tdRequired.appendChild(wrap);
+            tdRequired.addEventListener('dragover', handleCommonValuesDragOver);
+            tdRequired.addEventListener('drop', handleCommonValuesDrop);
+        }
+
+        // 전공필수 학점
+        const tdRequiredCredit = document.getElementById(`commonValues-cell-${subjectType}-필수-학점`);
+        if (tdRequiredCredit) {
+            const requiredCourses = courses.filter(c => c.subjectType === subjectType && c.isRequired === '필수');
+            tdRequiredCredit.textContent = requiredCourses.reduce((sum, c) => sum + (c.credits || 0), 0);
+        }
+
+        // 전공선택 (교과목 블럭)
+        const tdElective = document.getElementById(`commonValues-cell-${subjectType}-선택`);
+        if (tdElective) {
+            tdElective.innerHTML = '';
+            const electiveCourses = courses.filter(c => c.subjectType === subjectType && c.isRequired === '선택');
+            const wrap = document.createElement('div');
+            wrap.className = 'block-wrap';
+            electiveCourses.forEach(course => {
+                const block = createCourseBlock(course, false, false);
+                wrap.appendChild(block);
+            });
+            tdElective.appendChild(wrap);
+            tdElective.addEventListener('dragover', handleCommonValuesDragOver);
+            tdElective.addEventListener('drop', handleCommonValuesDrop);
+        }
+        
+        // 전공선택 학점
+        const tdElectiveCredit = document.getElementById(`commonValues-cell-${subjectType}-선택-학점`);
+        if (tdElectiveCredit) {
+            const electiveCourses = courses.filter(c => c.subjectType === subjectType && c.isRequired === '선택');
+            tdElectiveCredit.textContent = electiveCourses.reduce((sum, c) => sum + (c.credits || 0), 0);
+        }
+
+        // 공통가치대응I, II, III (여러 줄 표시 지원)
+        const tdValue1 = document.getElementById(`commonValues-cell-${subjectType}-value1`);
+        if (tdValue1) {
+            let wrap = tdValue1.querySelector('.block-wrap');
+            if (!wrap) {
+                wrap = document.createElement('div');
+                wrap.className = 'block-wrap';
+                tdValue1.appendChild(wrap);
+            }
+            
+            // 셀이 편집 중이면 건드리지 않음
+            if (!tdValue1.classList.contains('editing-cell')) {
+                wrap.innerHTML = '';
+                
+                // [수정] 복사된 블럭 정보로 렌더링
+                const hasBlocks = commonValuesCopiedBlocks[subjectType] && 
+                                Array.isArray(commonValuesCopiedBlocks[subjectType].value1) && 
+                                commonValuesCopiedBlocks[subjectType].value1.length > 0;
+                
+                if (hasBlocks) {
+                    commonValuesCopiedBlocks[subjectType].value1.forEach(courseId => {
+                        const course = courses.find(c => c.id === courseId);
+                        if (course) {
+                            const block = createCourseBlock(course, false, false);
+                            wrap.appendChild(block);
+                        }
+                    });
+                } else {
+                    // 블럭이 없으면 텍스트 데이터를 블럭으로 변환 시도
+                    const textValue = commonValuesCellTexts?.[subjectType]?.value1 || '';
+                    
+                    if (textValue) {
+                            // 🔧 개선된 텍스트 파싱: HTML 태그 제거, 학점 정보 제거, 정규화
+                            const cleanText = textValue
+                                .replace(/<br\s*\/?>/gi, '\n')  // <br> 태그를 줄바꿈으로
+                                .replace(/<[^>]*>/g, '')        // 모든 HTML 태그 제거
+                                .replace(/\([^)]*\)/g, '')      // 괄호와 내용 제거 (학점 등)
+                                .replace(/\s+/g, ' ')           // 연속된 공백을 하나로
+                                .trim();
+                            
+                            const courseNames = cleanText
+                                .split(/[,\n]/)                 // 쉼표나 줄바꿈으로 분리
+                                .map(name => name.trim())       // 앞뒤 공백 제거
+                                .filter(name => name && name.length > 1); // 빈 값이나 너무 짧은 값 제외
+                            
+                            let hasRenderedBlocks = false;
+                            
+                            
+                            
+                            courseNames.forEach(courseName => {
+                                // 정확한 매칭 시도
+                                let course = courses.find(c => c.courseName === courseName);
+                                let matchType = 'exact';
+                                
+                                // 정확한 매칭이 실패하면 부분 매칭 시도
+                                if (!course && courseName.length > 3) {
+                                    course = courses.find(c => c.courseName.includes(courseName) || courseName.includes(c.courseName));
+                                    matchType = 'partial';
+                                }
+                                
+                                // 부분 매칭도 실패하면 더 관대한 매칭 시도 (공백, 하이픈, 언더스코어 제거)
+                                if (!course && courseName.length > 2) {
+                                    const normalizedInput = courseName.replace(/[\s\-\_]/g, '');
+                                    course = courses.find(c => {
+                                        const normalizedCourse = c.courseName.replace(/[\s\-\_]/g, '');
+                                        return normalizedCourse.includes(normalizedInput) || normalizedInput.includes(normalizedCourse);
+                                    });
+                                    matchType = 'normalized';
+                                }
+                                
+                                // 여전히 실패하면 더 적극적인 매칭 시도 (특수문자 및 숫자 제거)
+                                if (!course && courseName.length > 2) {
+                                    const ultraNormalized = courseName.replace(/[\s\-\_\d\(\)]/g, '');
+                                    course = courses.find(c => {
+                                        const normalizedCourse = c.courseName.replace(/[\s\-\_\d\(\)]/g, '');
+                                        return ultraNormalized && normalizedCourse && (
+                                            normalizedCourse.includes(ultraNormalized) || 
+                                            ultraNormalized.includes(normalizedCourse)
+                                        );
+                                    });
+                                    matchType = 'ultra-normalized';
+                                }
+                                
+                                // 💡 한국어 특성을 고려한 매칭 (끝 글자 제거 시도)
+                                if (!course && courseName.length > 3) {
+                                    const shortened = courseName.slice(0, -1);
+                                    course = courses.find(c => c.courseName.includes(shortened) || shortened.includes(c.courseName));
+                                    matchType = 'shortened';
+                                }
+                                
+                                
+                                if (course) {
+                                    const block = createCourseBlock(course, false, false);
+                                    wrap.appendChild(block);
+                                    hasRenderedBlocks = true;
+                                    
+                                    // 🎯 중요: commonValuesCopiedBlocks에도 저장하여 이후 렌더링에서 유지
+                                    if (!commonValuesCopiedBlocks[subjectType]) {
+                                        commonValuesCopiedBlocks[subjectType] = {};
+                                    }
+                                    if (!commonValuesCopiedBlocks[subjectType].value1) {
+                                        commonValuesCopiedBlocks[subjectType].value1 = [];
+                                    }
+                                    if (!commonValuesCopiedBlocks[subjectType].value1.includes(course.id)) {
+                                        commonValuesCopiedBlocks[subjectType].value1.push(course.id);
+                                    }
+                                }
+                            });
+                            
+                            // 블럭으로 변환되지 않은 경우에만 텍스트로 표시
+                            if (!hasRenderedBlocks) {
+                                const value = textValue.replace(/\n/g, '<br>');
+                                wrap.innerHTML = value;
+                            }
+                        }
+                    }
+                }
+            }
+            tdValue1.addEventListener('dragover', handleCommonValuesDragOver);
+            tdValue1.addEventListener('drop', handleCommonValuesDrop);
+            if (isEditModeCommonValues) {
+                // [수정] VALUE1,2,3 셀은 텍스트 편집 불가능하도록 설정
+                tdValue1.classList.remove('editable-cell');
+            } else {
+                // 일반 모드에서는 편집 가능
+                tdValue1.classList.add('editable-cell');
+            }
+        }
+
+        const tdValue2 = document.getElementById(`commonValues-cell-${subjectType}-value2`);
+        if (tdValue2) {
+            let wrap = tdValue2.querySelector('.block-wrap');
+            if (!wrap) {
+                wrap = document.createElement('div');
+                wrap.className = 'block-wrap';
+                tdValue2.appendChild(wrap);
+            }
+            
+            // 셀이 편집 중이면 건드리지 않음
+            if (!tdValue2.classList.contains('editing-cell')) {
+                wrap.innerHTML = '';
+                
+                // [수정] 복사된 블럭 정보로 렌더링
+                const hasBlocks = commonValuesCopiedBlocks[subjectType] && 
+                                Array.isArray(commonValuesCopiedBlocks[subjectType].value2) && 
+                                commonValuesCopiedBlocks[subjectType].value2.length > 0;
+                
+                if (hasBlocks) {
+                    commonValuesCopiedBlocks[subjectType].value2.forEach(courseId => {
+                        const course = courses.find(c => c.id === courseId);
+                        if (course) {
+                            const block = createCourseBlock(course, false, false);
+                            wrap.appendChild(block);
+                        }
+                    });
+                } else {
+                    // 블럭이 없으면 텍스트 데이터를 블럭으로 변환 시도
+                    const textValue = commonValuesCellTexts?.[subjectType]?.value2 || '';
+                    
+                    if (textValue) {
+                            // 🔧 개선된 텍스트 파싱: HTML 태그 제거, 학점 정보 제거, 정규화
+                            const cleanText = textValue
+                                .replace(/<br\s*\/?>/gi, '\n')  // <br> 태그를 줄바꿈으로
+                                .replace(/<[^>]*>/g, '')        // 모든 HTML 태그 제거
+                                .replace(/\([^)]*\)/g, '')      // 괄호와 내용 제거 (학점 등)
+                                .replace(/\s+/g, ' ')           // 연속된 공백을 하나로
+                                .trim();
+                            
+                            const courseNames = cleanText
+                                .split(/[,\n]/)                 // 쉼표나 줄바꿈으로 분리
+                                .map(name => name.trim())       // 앞뒤 공백 제거
+                                .filter(name => name && name.length > 1); // 빈 값이나 너무 짧은 값 제외
+                            
+                            let hasRenderedBlocks = false;
+                            
+                            courseNames.forEach(courseName => {
+                                // 정확한 매칭 시도
+                                let course = courses.find(c => c.courseName === courseName);
+                                let matchType = 'exact';
+                                
+                                // 정확한 매칭이 실패하면 부분 매칭 시도
+                                if (!course && courseName.length > 3) {
+                                    course = courses.find(c => c.courseName.includes(courseName) || courseName.includes(c.courseName));
+                                    matchType = 'partial';
+                                }
+                                
+                                // 부분 매칭도 실패하면 더 관대한 매칭 시도 (공백, 하이픈, 언더스코어 제거)
+                                if (!course && courseName.length > 2) {
+                                    const normalizedInput = courseName.replace(/[\s\-\_]/g, '');
+                                    course = courses.find(c => {
+                                        const normalizedCourse = c.courseName.replace(/[\s\-\_]/g, '');
+                                        return normalizedCourse.includes(normalizedInput) || normalizedInput.includes(normalizedCourse);
+                                    });
+                                    matchType = 'normalized';
+                                }
+                                
+                                // 여전히 실패하면 더 적극적인 매칭 시도 (특수문자 및 숫자 제거)
+                                if (!course && courseName.length > 2) {
+                                    const ultraNormalized = courseName.replace(/[\s\-\_\d\(\)]/g, '');
+                                    course = courses.find(c => {
+                                        const normalizedCourse = c.courseName.replace(/[\s\-\_\d\(\)]/g, '');
+                                        return ultraNormalized && normalizedCourse && (
+                                            normalizedCourse.includes(ultraNormalized) || 
+                                            ultraNormalized.includes(normalizedCourse)
+                                        );
+                                    });
+                                    matchType = 'ultra-normalized';
+                                }
+                                
+                                // 💡 한국어 특성을 고려한 매칭 (끝 글자 제거 시도)
+                                if (!course && courseName.length > 3) {
+                                    const shortened = courseName.slice(0, -1);
+                                    course = courses.find(c => c.courseName.includes(shortened) || shortened.includes(c.courseName));
+                                    matchType = 'shortened';
+                                }
+                                
+                                
+                                if (course) {
+                                    const block = createCourseBlock(course, false, false);
+                                    wrap.appendChild(block);
+                                    hasRenderedBlocks = true;
+                                    
+                                    // 🎯 중요: commonValuesCopiedBlocks에도 저장하여 이후 렌더링에서 유지
+                                    if (!commonValuesCopiedBlocks[subjectType]) {
+                                        commonValuesCopiedBlocks[subjectType] = {};
+                                    }
+                                    if (!commonValuesCopiedBlocks[subjectType].value2) {
+                                        commonValuesCopiedBlocks[subjectType].value2 = [];
+                                    }
+                                    if (!commonValuesCopiedBlocks[subjectType].value2.includes(course.id)) {
+                                        commonValuesCopiedBlocks[subjectType].value2.push(course.id);
+                                    }
+                                }
+                            });
+                            
+                            // 블럭으로 변환되지 않은 경우에만 텍스트로 표시
+                            if (!hasRenderedBlocks) {
+                                const value = textValue.replace(/\n/g, '<br>');
+                                wrap.innerHTML = value;
+                            }
+                        }
+                    }
+                }
+            }
+            tdValue2.addEventListener('dragover', handleCommonValuesDragOver);
+            tdValue2.addEventListener('drop', handleCommonValuesDrop);
+            if (isEditModeCommonValues) {
+                // [수정] VALUE1,2,3 셀은 텍스트 편집 불가능하도록 설정
+                tdValue2.classList.remove('editable-cell');
+            } else {
+                // 일반 모드에서는 편집 가능
+                tdValue2.classList.add('editable-cell');
+            }
+        }
+
+        const tdValue3 = document.getElementById(`commonValues-cell-${subjectType}-value3`);
+        if (tdValue3) {
+            let wrap = tdValue3.querySelector('.block-wrap');
+            if (!wrap) {
+                wrap = document.createElement('div');
+                wrap.className = 'block-wrap';
+                tdValue3.appendChild(wrap);
+            }
+            
+            // 셀이 편집 중이면 건드리지 않음
+            if (!tdValue3.classList.contains('editing-cell')) {
+                wrap.innerHTML = '';
+                
+                // [수정] 복사된 블럭 정보로 렌더링
+                const hasBlocks = commonValuesCopiedBlocks[subjectType] && 
+                                Array.isArray(commonValuesCopiedBlocks[subjectType].value3) && 
+                                commonValuesCopiedBlocks[subjectType].value3.length > 0;
+                
+                if (hasBlocks) {
+                    commonValuesCopiedBlocks[subjectType].value3.forEach(courseId => {
+                        const course = courses.find(c => c.id === courseId);
+                        if (course) {
+                            const block = createCourseBlock(course, false, false);
+                            wrap.appendChild(block);
+                        }
+                    });
+                } else {
+                    // 블럭이 없으면 텍스트 데이터를 블럭으로 변환 시도
+                    const textValue = commonValuesCellTexts?.[subjectType]?.value3 || '';
+                    
+                    if (textValue) {
+                            // 🔧 개선된 텍스트 파싱: HTML 태그 제거, 학점 정보 제거, 정규화
+                            const cleanText = textValue
+                                .replace(/<br\s*\/?>/gi, '\n')  // <br> 태그를 줄바꿈으로
+                                .replace(/<[^>]*>/g, '')        // 모든 HTML 태그 제거
+                                .replace(/\([^)]*\)/g, '')      // 괄호와 내용 제거 (학점 등)
+                                .replace(/\s+/g, ' ')           // 연속된 공백을 하나로
+                                .trim();
+                            
+                            const courseNames = cleanText
+                                .split(/[,\n]/)                 // 쉼표나 줄바꿈으로 분리
+                                .map(name => name.trim())       // 앞뒤 공백 제거
+                                .filter(name => name && name.length > 1); // 빈 값이나 너무 짧은 값 제외
+                            
+                            let hasRenderedBlocks = false;
+                            
+                            courseNames.forEach(courseName => {
+                                // 정확한 매칭 시도
+                                let course = courses.find(c => c.courseName === courseName);
+                                let matchType = 'exact';
+                                
+                                // 정확한 매칭이 실패하면 부분 매칭 시도
+                                if (!course && courseName.length > 3) {
+                                    course = courses.find(c => c.courseName.includes(courseName) || courseName.includes(c.courseName));
+                                    matchType = 'partial';
+                                }
+                                
+                                // 부분 매칭도 실패하면 더 관대한 매칭 시도 (공백, 하이픈, 언더스코어 제거)
+                                if (!course && courseName.length > 2) {
+                                    const normalizedInput = courseName.replace(/[\s\-\_]/g, '');
+                                    course = courses.find(c => {
+                                        const normalizedCourse = c.courseName.replace(/[\s\-\_]/g, '');
+                                        return normalizedCourse.includes(normalizedInput) || normalizedInput.includes(normalizedCourse);
+                                    });
+                                    matchType = 'normalized';
+                                }
+                                
+                                // 여전히 실패하면 더 적극적인 매칭 시도 (특수문자 및 숫자 제거)
+                                if (!course && courseName.length > 2) {
+                                    const ultraNormalized = courseName.replace(/[\s\-\_\d\(\)]/g, '');
+                                    course = courses.find(c => {
+                                        const normalizedCourse = c.courseName.replace(/[\s\-\_\d\(\)]/g, '');
+                                        return ultraNormalized && normalizedCourse && (
+                                            normalizedCourse.includes(ultraNormalized) || 
+                                            ultraNormalized.includes(normalizedCourse)
+                                        );
+                                    });
+                                    matchType = 'ultra-normalized';
+                                }
+                                
+                                // 💡 한국어 특성을 고려한 매칭 (끝 글자 제거 시도)
+                                if (!course && courseName.length > 3) {
+                                    const shortened = courseName.slice(0, -1);
+                                    course = courses.find(c => c.courseName.includes(shortened) || shortened.includes(c.courseName));
+                                    matchType = 'shortened';
+                                }
+                                
+                                
+                                if (course) {
+                                    const block = createCourseBlock(course, false, false);
+                                    wrap.appendChild(block);
+                                    hasRenderedBlocks = true;
+                                    
+                                    // 🎯 중요: commonValuesCopiedBlocks에도 저장하여 이후 렌더링에서 유지
+                                    if (!commonValuesCopiedBlocks[subjectType]) {
+                                        commonValuesCopiedBlocks[subjectType] = {};
+                                    }
+                                    if (!commonValuesCopiedBlocks[subjectType].value3) {
+                                        commonValuesCopiedBlocks[subjectType].value3 = [];
+                                    }
+                                    if (!commonValuesCopiedBlocks[subjectType].value3.includes(course.id)) {
+                                        commonValuesCopiedBlocks[subjectType].value3.push(course.id);
+                                    }
+                                }
+                            });
+                            
+                            // 블럭으로 변환되지 않은 경우에만 텍스트로 표시
+                            if (!hasRenderedBlocks) {
+                                const value = textValue.replace(/\n/g, '<br>');
+                                wrap.innerHTML = value;
+                            }
+                        }
+                    }
+                }
+            }
+            tdValue3.addEventListener('dragover', handleCommonValuesDragOver);
+            tdValue3.addEventListener('drop', handleCommonValuesDrop);
+            if (isEditModeCommonValues) {
+                // [수정] VALUE1,2,3 셀은 텍스트 편집 불가능하도록 설정
+                tdValue3.classList.remove('editable-cell');
+            } else {
+                // 일반 모드에서는 편집 가능
+                tdValue3.classList.add('editable-cell');
+            }
+        }
+    });
+
+    // 미분류 교과목 별도 표 렌더링(기존 방식 유지)
+    const unclassifiedTbody = document.getElementById('unclassifiedTableBody');
+    if (unclassifiedTbody) {
+        unclassifiedTbody.innerHTML = '';
+        const unclassifiedCourses = courses.filter(c => c.subjectType === '미분류' && c.category !== '교양');
+        if (unclassifiedCourses.length > 0) {
+            const tr = document.createElement('tr');
+            const tdType = document.createElement('td');
+            tdType.className = 'col-type';
+            tdType.textContent = '미분류';
+            tr.appendChild(tdType);
+            const tdRequired = document.createElement('td');
+            tdRequired.className = 'col-major-required';
+            tdRequired.id = 'commonValues-cell-미분류-필수';
+            const requiredUnclassified = unclassifiedCourses.filter(c => c.isRequired === '필수');
+            requiredUnclassified.forEach(course => {
+                const block = createCourseBlock(course, false, false);
+                tdRequired.appendChild(block);
+            });
+            tdRequired.addEventListener('dragover', handleCommonValuesDragOver);
+            tdRequired.addEventListener('drop', handleCommonValuesDrop);
+            tr.appendChild(tdRequired);
+            const tdRequiredCredit = document.createElement('td');
+            tdRequiredCredit.className = 'col-major-required-credit';
+            tdRequiredCredit.id = 'commonValues-cell-미분류-필수-학점';
+            tdRequiredCredit.textContent = requiredUnclassified.reduce((sum, c) => sum + (c.credits || 0), 0);
+            tr.appendChild(tdRequiredCredit);
+            const tdElective = document.createElement('td');
+            tdElective.className = 'col-major-elective';
+            tdElective.id = 'commonValues-cell-미분류-선택';
+            const electiveUnclassified = unclassifiedCourses.filter(c => c.isRequired === '선택');
+            electiveUnclassified.forEach(course => {
+                const block = createCourseBlock(course, false, false);
+                tdElective.appendChild(block);
+            });
+            tdElective.addEventListener('dragover', handleCommonValuesDragOver);
+            tdElective.addEventListener('drop', handleCommonValuesDrop);
+            tr.appendChild(tdElective);
+            const tdElectiveCredit = document.createElement('td');
+            tdElectiveCredit.className = 'col-major-elective-credit';
+            tdElectiveCredit.id = 'commonValues-cell-미분류-선택-학점';
+            tdElectiveCredit.textContent = electiveUnclassified.reduce((sum, c) => sum + (c.credits || 0), 0);
+            tr.appendChild(tdElectiveCredit);
+            
+            unclassifiedTbody.appendChild(tr);
+        }
+    }
+
+    // 표 아래에 배치되지 않은 교과목 블럭 나열 (미분류 제외)
+    const assignedIds = new Set();
+    subjectTypes.forEach(subjectType => {
+        courses.forEach(c => {
+            if (c.subjectType === subjectType) {
+                assignedIds.add(c.id);
+            }
+        });
+    });
+    courses.forEach(c => {
+        if (c.subjectType === '미분류') {
+            assignedIds.add(c.id);
+        }
+    });
+    const unassigned = courses.filter(c => !assignedIds.has(c.id));
+    const unassignedDiv = document.getElementById('commonValuesUnassignedBlocks');
+    if (unassignedDiv) {
+        unassignedDiv.innerHTML = '';
+        if (unassigned.length > 0) {
+            const label = document.createElement('div');
+            label.textContent = '표에 배치되지 않은 교과목';
+            label.style.fontWeight = 'bold';
+            label.style.marginBottom = '8px';
+            unassignedDiv.appendChild(label);
+            unassigned.forEach(course => {
+                const block = createCourseBlock(course, false, false);
+                unassignedDiv.appendChild(block);
+            });
+        }
+    }
+    
+    // 모든 렌더링 작업 끝난 후 그래프도 갱신
+    renderCommonValuesNetworkGraph();
+}
 
 // 폴리곤 선택 상태 관리 (전역)
 let selectedCommonValuesBlob = null;
@@ -7181,12 +7750,10 @@ function renderCommonValuesNetworkGraph() {
     const stabilityThreshold = 0.5; // 안정화 임계값 (픽셀 단위)
     
     // 반발력 시스템을 즉시 시작 (네트워크 안정화와 무관하게)
-    console.log('[RepulsionSystem] Initializing immediate start');
     
     // 스플라인 데이터가 없는 경우를 대비한 테스트 데이터 생성
     setTimeout(() => {
         if (!commonValuesBlobData.value1 || commonValuesBlobData.value1.length === 0) {
-            console.log('[RepulsionSystem] Creating test spline data');
             // 각 그룹 주변에 간단한 직사각형 스플라인 생성
             valueKeys.forEach((key, index) => {
                 const centerX = 200 + (index * 300); // 그룹별로 300px씩 떨어뜨림
@@ -7200,7 +7767,6 @@ function renderCommonValuesNetworkGraph() {
                     {x: centerX + width/2, y: centerY + height/2}, // 오른쪽 아래
                     {x: centerX - width/2, y: centerY + height/2}  // 왼쪽 아래
                 ];
-                console.log(`[RepulsionSystem] Created test spline for ${key}:`, commonValuesBlobData[key]);
             });
         }
         startRepulsionSystem();
@@ -7208,7 +7774,6 @@ function renderCommonValuesNetworkGraph() {
     
     // 네트워크 안정화 완료 후에도 다시 한번 확인
     network.on('stabilizationIterationsDone', function() {
-        console.log('[RepulsionSystem] Network stabilization done');
         if (!repulsionInterval) {
             startRepulsionSystem();
         }
@@ -7217,7 +7782,6 @@ function renderCommonValuesNetworkGraph() {
     // 최종 백업 - 2초 후 무조건 시작
     setTimeout(() => {
         if (!repulsionInterval) {
-            console.log('[RepulsionSystem] Fallback start after 2 seconds');
             startRepulsionSystem();
         }
     }, 2000);
@@ -7316,7 +7880,6 @@ function renderCommonValuesNetworkGraph() {
                     
                     // 강제적으로 더 넓은 범위에서 반발력 적용
                     if (isInsideSpline || distanceToSpline < maxRepulsionDistance) {
-                        console.log(`[SplineForce] Node ${nodeId} vs ${groupKey}: inside=${isInsideSpline}, dist=${distanceToSpline.toFixed(1)}`);
                         // 스플라인 내부 또는 근처에 있는 외부 노드 처리
                         
                         let forceMultiplier = 1.0;
@@ -7345,7 +7908,6 @@ function renderCommonValuesNetworkGraph() {
                         const finalForceStrength = baseForceStrength * forceMultiplier * distanceDecay;
                         
                         const repulsionForce = calculateSplineRepulsion(position, groupBoundary, finalForceStrength);
-                        console.log(`[SplineForce] Applied force to node ${nodeId}: (${repulsionForce.x.toFixed(2)}, ${repulsionForce.y.toFixed(2)}), strength=${finalForceStrength.toFixed(1)}`);
                         
                         if (!boundaryForces.has(nodeId)) {
                             boundaryForces.set(nodeId, { x: 0, y: 0 });
@@ -7431,8 +7993,6 @@ function renderCommonValuesNetworkGraph() {
         if (totalNodesProcessed > 0) {
             const blobDataStatus = valueKeys.map(key => `${key}: ${commonValuesBlobData[key] ? 'OK' : 'MISSING'}`).join(', ');
             const labelStatus = valueKeys.map(key => `${key}: ${groupLabelPositions.has(key) ? 'OK' : 'MISSING'}`).join(', ');
-            console.log(`[RepulsionCalc] Processed: ${totalNodesProcessed} nodes, Forces applied: ${nodesWithForces}, Total forces: ${boundaryForces.size}`);
-            console.log(`[RepulsionCalc] BlobData: ${blobDataStatus}, Labels: ${labelStatus}`);
         }
     }
     
@@ -7622,7 +8182,6 @@ function renderCommonValuesNetworkGraph() {
             }
             
             // 디버깅을 위한 로그
-            console.log(`[RepulsionSystem] Forces: ${boundaryForces.size}, Updates: ${Object.keys(nodesToUpdate).length}, Stable: ${stabilityInfo.isStable}, Intruders: ${stabilityInfo.hasIntruders}, Max Movement: ${stabilityInfo.maxMovement.toFixed(2)}`);
         } else if (stabilityInfo.isStable && stabilityInfo.checkCount >= 10) {
             // 완전히 안정화되었고 10번 이상 체크되었으면 주기를 늦춤 (성능 최적화)
             // 하지만 여전히 모니터링은 계속
@@ -7632,7 +8191,6 @@ function renderCommonValuesNetworkGraph() {
     // 반발력 시스템 시작
     function startRepulsionSystem() {
         if (repulsionInterval) clearInterval(repulsionInterval);
-        console.log('[RepulsionSystem] Starting repulsion system with 40ms interval (25fps)');
         repulsionInterval = setInterval(applyBoundaryRepulsion, 80); // 80ms마다 실행 (12.5fps) - 부드러운 속도
         repulsionSystemActive = true;
     }
@@ -8762,296 +9320,6 @@ window.showTab = function(tabName, event) {
         if (container) container.style.display = 'none';
     }
 };
-// ... existing code ...
-    
-    // 과목분류별 행 정의 (미분류 제외)
-    const subjectTypes = [
-        '설계', '디지털', '역사', '이론', '도시', '사회', '기술', '실무', '비교과'
-    ];
-
-    subjectTypes.forEach(subjectType => {
-        // 전공필수 (교과목 블럭)
-
-
-        // 전공필수 (교과목 블럭)
-        const tdRequired = document.getElementById(`commonValues-cell-${subjectType}-필수`);
-        if (tdRequired) {
-            tdRequired.innerHTML = '';
-            const requiredCourses = courses.filter(c => c.subjectType === subjectType && c.isRequired === '필수');
-            const wrap = document.createElement('div');
-            wrap.className = 'block-wrap';
-            requiredCourses.forEach(course => {
-                const block = createCourseBlock(course, false, false);
-                wrap.appendChild(block);
-            });
-            tdRequired.appendChild(wrap);
-            tdRequired.addEventListener('dragover', handleCommonValuesDragOver);
-            tdRequired.addEventListener('drop', handleCommonValuesDrop);
-        }
-
-        // 전공선택 (교과목 블럭)
-        const tdElective = document.getElementById(`commonValues-cell-${subjectType}-선택`);
-        if (tdElective) {
-            tdElective.innerHTML = '';
-            const electiveCourses = courses.filter(c => c.subjectType === subjectType && c.isRequired === '선택');
-            const wrap = document.createElement('div');
-            wrap.className = 'block-wrap';
-            electiveCourses.forEach(course => {
-                const block = createCourseBlock(course, false, false);
-                wrap.appendChild(block);
-            });
-            tdElective.appendChild(wrap);
-            tdElective.addEventListener('dragover', handleCommonValuesDragOver);
-            tdElective.addEventListener('drop', handleCommonValuesDrop);
-        }
-        // 전공선택 학점
-        const tdElectiveCredit = document.getElementById(`commonValues-cell-${subjectType}-선택-학점`);
-        if (tdElectiveCredit) {
-            const electiveCourses = courses.filter(c => c.subjectType === subjectType && c.isRequired === '선택');
-            tdElectiveCredit.textContent = electiveCourses.reduce((sum, c) => sum + (c.credits || 0), 0);
-        }
-        // 공통가치대응I, II, III (여러 줄 표시 지원)
-        const tdValue1 = document.getElementById(`commonValues-cell-${subjectType}-value1`);
-        if (tdValue1) {
-            let wrap = tdValue1.querySelector('.block-wrap');
-            if (!wrap) {
-                wrap = document.createElement('div');
-                wrap.className = 'block-wrap';
-                tdValue1.appendChild(wrap);
-            }
-            wrap.innerHTML = '';
-            // [수정] 복사된 블럭 정보로 렌더링
-            if (commonValuesCopiedBlocks[subjectType] && Array.isArray(commonValuesCopiedBlocks[subjectType].value1)) {
-                commonValuesCopiedBlocks[subjectType].value1.forEach(courseId => {
-                const course = courses.find(c => c.id === courseId);
-                if (course) {
-                        const block = createCourseBlock(course, false, false);
-                        wrap.appendChild(block);
-                }
-            });
-        }
-            tdValue1.addEventListener('dragover', handleCommonValuesDragOver);
-            tdValue1.addEventListener('drop', handleCommonValuesDrop);
-            // 셀이 편집 중이면 건드리지 않음
-            if (!tdValue1.classList.contains('editing-cell')) {
-                // 복원 시에는 기존 내용을 무시하고 데이터에서 가져오기
-                if (window.isRestoringVersion) {
-                    const value = (commonValuesCellTexts?.[subjectType]?.value1 || '').replace(/\n/g, '<br>');
-                    wrap.innerHTML = value;
-                } else {
-                    // 기존 내용이 있으면 보존, 없으면 데이터에서 가져오기
-                    const existingContent = wrap.innerHTML.trim();
-                    if (!existingContent) {
-                        const value = (commonValuesCellTexts?.[subjectType]?.value1 || '').replace(/\n/g, '<br>');
-                        wrap.innerHTML = value;
-                    }
-                }
-            }
-            if (isEditModeCommonValues) {
-                // [수정] VALUE1,2,3 셀은 텍스트 편집 불가능하도록 설정
-                tdValue1.classList.remove('editable-cell');
-                tdValue1.style.cursor = '';
-                tdValue1.style.position = '';
-                tdValue1.onclick = null;
-            } else {
-                tdValue1.classList.remove('editable-cell');
-                tdValue1.style.cursor = '';
-                tdValue1.style.position = '';
-                tdValue1.onclick = null;
-            }
-        }
-        const tdValue2 = document.getElementById(`commonValues-cell-${subjectType}-value2`);
-        if (tdValue2) {
-            let wrap = tdValue2.querySelector('.block-wrap');
-            if (!wrap) {
-                wrap = document.createElement('div');
-                wrap.className = 'block-wrap';
-                tdValue2.appendChild(wrap);
-            }
-            wrap.innerHTML = '';
-            // [수정] 복사된 블럭 정보로 렌더링
-            if (commonValuesCopiedBlocks[subjectType] && Array.isArray(commonValuesCopiedBlocks[subjectType].value2)) {
-                commonValuesCopiedBlocks[subjectType].value2.forEach(courseId => {
-                    const course = courses.find(c => c.id === courseId);
-                    if (course) {
-                        const block = createCourseBlock(course, false, false);
-                        wrap.appendChild(block);
-                    }
-                });
-            }
-            tdValue2.addEventListener('dragover', handleCommonValuesDragOver);
-            tdValue2.addEventListener('drop', handleCommonValuesDrop);
-            // 셀이 편집 중이면 건드리지 않음
-            if (!tdValue2.classList.contains('editing-cell')) {
-                // 복원 시에는 기존 내용을 무시하고 데이터에서 가져오기
-                if (window.isRestoringVersion) {
-                    const value = (commonValuesCellTexts?.[subjectType]?.value2 || '').replace(/\n/g, '<br>');
-                    wrap.innerHTML = value;
-                } else {
-                    // 기존 내용이 있으면 보존, 없으면 데이터에서 가져오기
-                    const existingContent = wrap.innerHTML.trim();
-                    if (!existingContent) {
-                        const value = (commonValuesCellTexts?.[subjectType]?.value2 || '').replace(/\n/g, '<br>');
-                        wrap.innerHTML = value;
-                    }
-                }
-            }
-            if (isEditModeCommonValues) {
-                // [수정] VALUE1,2,3 셀은 텍스트 편집 불가능하도록 설정
-                tdValue2.classList.remove('editable-cell');
-                tdValue2.style.cursor = '';
-                tdValue2.style.position = '';
-                tdValue2.onclick = null;
-            } else {
-                tdValue2.classList.remove('editable-cell');
-                tdValue2.style.cursor = '';
-                tdValue2.style.position = '';
-                tdValue2.onclick = null;
-            }
-        }
-        const tdValue3 = document.getElementById(`commonValues-cell-${subjectType}-value3`);
-        if (tdValue3) {
-            let wrap = tdValue3.querySelector('.block-wrap');
-            if (!wrap) {
-                wrap = document.createElement('div');
-                wrap.className = 'block-wrap';
-                tdValue3.appendChild(wrap);
-            }
-            wrap.innerHTML = '';
-            // [수정] 복사된 블럭 정보로 렌더링
-            if (commonValuesCopiedBlocks[subjectType] && Array.isArray(commonValuesCopiedBlocks[subjectType].value3)) {
-                commonValuesCopiedBlocks[subjectType].value3.forEach(courseId => {
-                    const course = courses.find(c => c.id === courseId);
-                    if (course) {
-                        const block = createCourseBlock(course, false, false);
-                        wrap.appendChild(block);
-                    }
-                });
-            }
-            tdValue3.addEventListener('dragover', handleCommonValuesDragOver);
-            tdValue3.addEventListener('drop', handleCommonValuesDrop);
-            // 셀이 편집 중이면 건드리지 않음
-            if (!tdValue3.classList.contains('editing-cell')) {
-                // 복원 시에는 기존 내용을 무시하고 데이터에서 가져오기
-                if (window.isRestoringVersion) {
-                    const value = (commonValuesCellTexts?.[subjectType]?.value3 || '').replace(/\n/g, '<br>');
-                    wrap.innerHTML = value;
-                } else {
-                    // 기존 내용이 있으면 보존, 없으면 데이터에서 가져오기
-                    const existingContent = wrap.innerHTML.trim();
-                    if (!existingContent) {
-                        const value = (commonValuesCellTexts?.[subjectType]?.value3 || '').replace(/\n/g, '<br>');
-                        wrap.innerHTML = value;
-                    }
-                }
-            }
-            if (isEditModeCommonValues) {
-                // [수정] VALUE1,2,3 셀은 텍스트 편집 불가능하도록 설정
-                tdValue3.classList.remove('editable-cell');
-                tdValue3.style.cursor = '';
-                tdValue3.style.position = '';
-                tdValue3.onclick = null;
-            } else {
-                tdValue3.classList.remove('editable-cell');
-                tdValue3.style.cursor = '';
-                tdValue3.style.position = '';
-                tdValue3.onclick = null;
-            }
-        }
-        // 전공필수 학점 (교과목 블럭 드롭 불가, 학점 합계만 표시)
-        const tdRequiredCredit = document.getElementById(`commonValues-cell-${subjectType}-필수-학점`);
-        if (tdRequiredCredit) {
-            const requiredCourses = courses.filter(c => c.subjectType === subjectType && c.isRequired === '필수');
-            tdRequiredCredit.textContent = requiredCourses.reduce((sum, c) => sum + (c.credits || 0), 0);
-        }
-    });
-
-    // 미분류 교과목 별도 표 렌더링(기존 방식 유지)
-    const unclassifiedTbody = document.getElementById('unclassifiedTableBody');
-    if (unclassifiedTbody) {
-        unclassifiedTbody.innerHTML = '';
-        const unclassifiedCourses = courses.filter(c => c.subjectType === '미분류' && c.category !== '교양');
-        if (unclassifiedCourses.length > 0) {
-            const tr = document.createElement('tr');
-            const tdType = document.createElement('td');
-            tdType.className = 'col-type';
-            tdType.textContent = '미분류';
-            tr.appendChild(tdType);
-            const tdRequired = document.createElement('td');
-            tdRequired.className = 'col-major-required';
-            tdRequired.id = 'commonValues-cell-미분류-필수';
-            const requiredUnclassified = unclassifiedCourses.filter(c => c.isRequired === '필수');
-            requiredUnclassified.forEach(course => {
-                const block = createCourseBlock(course, false, false);
-                // 드래그 가능 여부는 createCourseBlock 내부에서 처리되므로 별도 설정 불필요
-                tdRequired.appendChild(block);
-            });
-            // 드래그 이벤트 리스너 설정
-            tdRequired.addEventListener('dragover', handleCommonValuesDragOver);
-            tdRequired.addEventListener('drop', handleCommonValuesDrop);
-            tr.appendChild(tdRequired);
-            const tdRequiredCredit = document.createElement('td');
-            tdRequiredCredit.className = 'col-major-required-credit';
-            tdRequiredCredit.id = 'commonValues-cell-미분류-필수-학점';
-            tdRequiredCredit.textContent = requiredUnclassified.reduce((sum, c) => sum + (c.credits || 0), 0);
-            tr.appendChild(tdRequiredCredit);
-            const tdElective = document.createElement('td');
-            tdElective.className = 'col-major-elective';
-            tdElective.id = 'commonValues-cell-미분류-선택';
-            const electiveUnclassified = unclassifiedCourses.filter(c => c.isRequired === '선택');
-            electiveUnclassified.forEach(course => {
-                const block = createCourseBlock(course, false, false);
-                // 드래그 가능 여부는 createCourseBlock 내부에서 처리되므로 별도 설정 불필요
-                tdElective.appendChild(block);
-            });
-            // 드래그 이벤트 리스너 설정
-            tdElective.addEventListener('dragover', handleCommonValuesDragOver);
-            tdElective.addEventListener('drop', handleCommonValuesDrop);
-            tr.appendChild(tdElective);
-            const tdElectiveCredit = document.createElement('td');
-            tdElectiveCredit.className = 'col-major-elective-credit';
-            tdElectiveCredit.id = 'commonValues-cell-미분류-선택-학점';
-            tdElectiveCredit.textContent = electiveUnclassified.reduce((sum, c) => sum + (c.credits || 0), 0);
-            tr.appendChild(tdElectiveCredit);
-            
-            unclassifiedTbody.appendChild(tr);
-        }
-    }
-
-    // 표 아래에 배치되지 않은 교과목 블럭 나열 (미분류 제외)
-    const assignedIds = new Set();
-    subjectTypes.forEach(subjectType => {
-        courses.forEach(c => {
-            if (c.subjectType === subjectType) {
-                assignedIds.add(c.id);
-            }
-        });
-    });
-    courses.forEach(c => {
-        if (c.subjectType === '미분류') {
-            assignedIds.add(c.id);
-        }
-    });
-    const unassigned = courses.filter(c => !assignedIds.has(c.id));
-    const unassignedDiv = document.getElementById('commonValuesUnassignedBlocks');
-    if (unassignedDiv) {
-        unassignedDiv.innerHTML = '';
-        if (unassigned.length > 0) {
-            const label = document.createElement('div');
-            label.textContent = '표에 배치되지 않은 교과목';
-            label.style.fontWeight = 'bold';
-            label.style.marginBottom = '8px';
-            unassignedDiv.appendChild(label);
-            unassigned.forEach(course => {
-                const block = createCourseBlock(course, false, false);
-                unassignedDiv.appendChild(block);
-            });
-        }
-    }
-    
-    // 모든 렌더링 작업 끝난 후 그래프도 갱신
-    renderCommonValuesNetworkGraph();
-}
 
 // 공통가치대응 드래그 오버/드롭 이벤트 (curriculum과 유사하게)
 function handleCommonValuesDragOver(e) {
@@ -9066,13 +9334,13 @@ function handleCommonValuesDrop(e) {
     if (!isEditMode) return;
 
     const courseName = e.dataTransfer.getData('text/plain');
+    const sourceCell = e.dataTransfer.getData('sourceCell');
     const course = courses.find(c => c.courseName === courseName);
     if (!course) return;
 
     // td의 id에서 subjectType, isRequired 추출
     let td = e.target.closest('td');
     if (!td || !td.id.startsWith('commonValues-cell-')) return;
-    // [추가] 드래그 대상 셀의 주요 속성 로그 출력
     // id 예시: commonValues-cell-설계-필수, commonValues-cell-설계-선택, ...
     const idParts = td.id.replace('commonValues-cell-', '').split('-');
     const subjectType = idParts[0];
@@ -9081,48 +9349,53 @@ function handleCommonValuesDrop(e) {
 
     // VALUE1,2,3 컬럼에 드롭하는 경우 복사 동작
     if (idParts[1] && idParts[1].startsWith('value')) {
-        // 이미 해당 셀에 같은 교과목이 있으면 중복 추가 방지
-        const wrap = td.querySelector('.block-wrap');
-        // [수정] 복사 정보 전역 객체에 저장
-        const valueKey = idParts[1]; // value1, value2, value3
-        if (!commonValuesCopiedBlocks[subjectType]) commonValuesCopiedBlocks[subjectType] = { value1: [], value2: [], value3: [] };
-        if (!commonValuesCopiedBlocks[subjectType][valueKey].includes(course.id)) {
-            commonValuesCopiedBlocks[subjectType][valueKey].push(course.id);
+        // VALUE1,2,3 컬럼인 경우 특별 처리
+        const targetColumn = idParts[1]; // value1, value2, value3
+        
+        // 해당 열의 복사된 블럭 배열 업데이트
+        if (!commonValuesCopiedBlocks[subjectType]) {
+            commonValuesCopiedBlocks[subjectType] = {};
         }
-        // DOM에만 추가하지 않고, 전체 렌더링에서 반영되도록 함
-        renderCommonValuesTable();
+        if (!commonValuesCopiedBlocks[subjectType][targetColumn]) {
+            commonValuesCopiedBlocks[subjectType][targetColumn] = [];
+        }
+        
+        // 중복 확인 후 추가
+        if (!commonValuesCopiedBlocks[subjectType][targetColumn].includes(course.id)) {
+            commonValuesCopiedBlocks[subjectType][targetColumn].push(course.id);
+        }
+        
+        // 변경 기록 추가
+        addChangeRecord('commonValues', `${subjectType}-${targetColumn}`, `${course.courseName} 블럭이 복사되었습니다.`);
+        
+        // 드래그가 완전히 종료된 후 렌더링
+        setTimeout(() => {
+            renderCommonValuesTable();
+        }, 50);
         return;
     }
 
-    // 변경 전 값들 저장
-    const oldSubjectType = course.subjectType;
-    const oldIsRequired = course.isRequired;
-
-    // 교과목의 과목분류와 필수여부 변경
-    course.subjectType = subjectType;
-    course.isRequired = isRequired ? '필수' : '선택';
-
-    // 변경이력 기록
-    const changes = [];
-    if (oldSubjectType !== subjectType) {
-        changes.push({field: '과목분류', before: oldSubjectType, after: subjectType});
+    // 기존 로직 (필수/선택 컬럼)
+    if (isRequired || idParts[1] === '선택') {
+        // 소스가 value 컬럼인 경우 복사 동작, 아니면 이동 동작
+        if (sourceCell && sourceCell.includes('-value')) {
+            // value 컬럼에서 전공필수/선택으로 드래그한 경우는 복사
+            course.subjectType = subjectType;
+            course.isRequired = isRequired ? '필수' : '선택';
+        } else {
+            // 전공필수/선택 간의 이동은 기존 동작 유지
+            course.subjectType = subjectType;
+            course.isRequired = isRequired ? '필수' : '선택';
+        }
+        
+        // 변경 기록 추가
+        addChangeRecord('commonValues', `${subjectType}-${isRequired ? '필수' : '선택'}`, `${course.courseName}이(가) ${subjectType} ${isRequired ? '필수' : '선택'}(으)로 분류되었습니다.`);
+        
+        // 드래그가 완전히 종료된 후 렌더링
+        setTimeout(() => {
+            renderCommonValuesTable();
+        }, 50);
     }
-    if (oldIsRequired !== course.isRequired) {
-        changes.push({field: '필수여부', before: oldIsRequired, after: course.isRequired});
-    }
-
-    if (changes.length > 0) {
-        addChangeHistory('수정', courseName, changes);
-        // [추가] 변경이력 팝업(토스트) 알림
-        const changeMsg = `교과목 "${courseName}" 속성 변경됨:\n` + changes.map(c => `- ${c.field}: ${c.before} → ${c.after}`).join('\n');
-        showToast(changeMsg);
-    }
-
-    // 테이블 다시 렌더링
-    renderCommonValuesTable();
-    renderCourses();
-    renderMatrix();
-    renderChangeHistoryPanel();
 }
 
 // 공통가치대응 수정모드 상태 변수 (전역에서 이미 선언됨)
@@ -9208,16 +9481,19 @@ function toggleColorMode() {
     if (slider && text) {
         if (colorModeBySubjectType) {
             // 과목분류 모드: 슬라이더를 왼쪽으로, 회색
-            slider.style.left = '2px';
+            slider.style.left = '3px';
             slider.style.background = '#6c757d';
             text.textContent = '분야';
         } else {
             // 구분 모드: 슬라이더를 오른쪽으로, 녹색
-            slider.style.left = '38px';
+            slider.style.left = '51px';
             slider.style.background = '#28a745';
             text.textContent = '구분';
         }
     }
+    
+    // 색상 범례 업데이트
+    updateColorLegendCommonValues();
     
     // 공통가치대응 탭이 활성화된 경우에만 테이블 재렌더링
     const commonValuesTab = document.getElementById('commonValues');
@@ -9252,16 +9528,19 @@ function toggleColorModeCurriculum() {
     if (slider && text) {
         if (colorModeBySubjectTypeCurriculum) {
             // 과목분류 모드: 슬라이더를 왼쪽으로, 회색
-            slider.style.left = '2px';
+            slider.style.left = '3px';
             slider.style.background = '#6c757d';
             text.textContent = '분야';
         } else {
             // 구분 모드: 슬라이더를 오른쪽으로, 녹색
-            slider.style.left = '38px';
+            slider.style.left = '51px';
             slider.style.background = '#28a745';
             text.textContent = '구분';
         }
     }
+    
+    // 색상 범례 업데이트
+    updateColorLegendCurriculum();
     
     // 이수모형 탭이 활성화된 경우에만 테이블 재렌더링
     const curriculumTab = document.getElementById('curriculum');
@@ -9338,16 +9617,27 @@ function showDeleteZone() {
             const courseName = e.dataTransfer.getData('text/plain');
             const course = courses.find(c => c.courseName === courseName);
             if (course && draggedFromCell) {
-                // [수정] 드래그 시작한 특정 셀에서만 course.id 제거
-                const { subjectType, valueKey } = draggedFromCell;
-                if (commonValuesCopiedBlocks[subjectType] && commonValuesCopiedBlocks[subjectType][valueKey]) {
-                    const index = commonValuesCopiedBlocks[subjectType][valueKey].indexOf(course.id);
-                    if (index > -1) {
-                        commonValuesCopiedBlocks[subjectType][valueKey].splice(index, 1);
+                const { subjectType, valueKey, isRequired } = draggedFromCell;
+                
+                // value 컬럼에서 드래그한 경우
+                if (valueKey) {
+                    if (commonValuesCopiedBlocks[subjectType] && commonValuesCopiedBlocks[subjectType][valueKey]) {
+                        const index = commonValuesCopiedBlocks[subjectType][valueKey].indexOf(course.id);
+                        if (index > -1) {
+                            commonValuesCopiedBlocks[subjectType][valueKey].splice(index, 1);
+                        }
                     }
                 }
-                // 테이블 다시 렌더링
-                renderCommonValuesTable();
+                // 전공필수/선택에서 드래그한 경우 - 해당 분류 제거
+                else if (isRequired !== undefined) {
+                    course.subjectType = null;
+                    course.isRequired = null;
+                }
+                
+                // 드래그가 완전히 종료된 후 렌더링
+                setTimeout(() => {
+                    renderCommonValuesTable();
+                }, 50);
                 showToast(`"${courseName}" 블럭이 삭제되었습니다.`);
             }
             // 드래그 시작 셀 정보 초기화
@@ -10646,3 +10936,92 @@ function testChangeCourseName() {
 }
 window.testChangeCourseName = testChangeCourseName;
 
+// 색상 범례 생성 함수들
+function generateColorLegend() {
+    // 과목분류별 색상 정의
+    const subjectTypeColors = {
+        '설계': '#e8e8e8',
+        '디지털': '#f5f2e5', 
+        '역사': '#ffece1',
+        '이론': '#e0f2f1',
+        '도시': '#fce4ec',
+        '사회': '#e8eaf6',
+        '기술': '#fff3e0',
+        '실무': '#e8f5e8',
+        '비교과': '#f1f8e9'
+    };
+    
+    // 구분별 색상 정의
+    const categoryColors = {
+        '교양': '#e9ecef',
+        '건축적사고': '#e3f2fd',
+        '설계': '#ffebee',
+        '기술': '#fff3e0',
+        '실무': '#e8f5e8',
+        '기타': '#f3e5f5'
+    };
+    
+    return { subjectTypeColors, categoryColors };
+}
+
+function updateColorLegendCurriculum() {
+    const legendContainer = document.getElementById('colorLegendCurriculum');
+    if (!legendContainer) return;
+    
+    const { subjectTypeColors, categoryColors } = generateColorLegend();
+    const colors = colorModeBySubjectTypeCurriculum ? subjectTypeColors : categoryColors;
+    
+    legendContainer.innerHTML = '';
+    legendContainer.className = 'color-legend';
+    
+    Object.entries(colors).forEach(([key, color]) => {
+        const legendItem = document.createElement('div');
+        legendItem.className = 'color-legend-item';
+        
+        const colorBox = document.createElement('div');
+        colorBox.className = 'color-legend-box';
+        colorBox.style.background = color;
+        
+        const label = document.createElement('span');
+        label.className = 'color-legend-label';
+        label.textContent = key;
+        
+        legendItem.appendChild(colorBox);
+        legendItem.appendChild(label);
+        legendContainer.appendChild(legendItem);
+    });
+}
+
+function updateColorLegendCommonValues() {
+    const legendContainer = document.getElementById('colorLegendCommonValues');
+    if (!legendContainer) return;
+    
+    const { subjectTypeColors, categoryColors } = generateColorLegend();
+    const colors = colorModeBySubjectType ? subjectTypeColors : categoryColors;
+    
+    legendContainer.innerHTML = '';
+    legendContainer.className = 'color-legend';
+    
+    Object.entries(colors).forEach(([key, color]) => {
+        const legendItem = document.createElement('div');
+        legendItem.className = 'color-legend-item';
+        
+        const colorBox = document.createElement('div');
+        colorBox.className = 'color-legend-box';
+        colorBox.style.background = color;
+        
+        const label = document.createElement('span');
+        label.className = 'color-legend-label';
+        label.textContent = key;
+        
+        legendItem.appendChild(colorBox);
+        legendItem.appendChild(label);
+        legendContainer.appendChild(legendItem);
+    });
+}
+
+
+// 전역 함수 할당 - 마지막에 실행되도록 보장
+window.init = init;
+window.initializeFirebase = initializeFirebase;
+window.initializeUI = initializeUI;
