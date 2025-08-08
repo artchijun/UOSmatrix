@@ -7552,15 +7552,12 @@ function renderCommonValuesNetworkGraph() {
 
     // 엣지: 같은 학년-학기 내 교과목끼리만 연결
     const edges = [];
-    const edgeMap = new Map(); // 중복 엣지 방지용
-    
     // 모든 노드(course) 정보를 id로 빠르게 참조
     const nodeCourseMap = {};
     nodes.forEach(n => {
         const course = courses.find(c => c.id === n.id);
         if (course) nodeCourseMap[n.id] = course;
     });
-    
     // yearSemester별로 그룹화
     const yearSemesterGroups = {};
     nodes.forEach(n => {
@@ -7570,44 +7567,18 @@ function renderCommonValuesNetworkGraph() {
             yearSemesterGroups[course.yearSemester].push(n.id);
         }
     });
-    
-    // 각 yearSemester 그룹 내에서 모든 쌍 연결 (같은 학년-학기는 두껍게)
+    // 각 yearSemester 그룹 내에서 모든 쌍 연결 (단, 자기 자신 제외)
     Object.entries(yearSemesterGroups).forEach(([yearSemester, groupIds]) => {
         for (let i = 0; i < groupIds.length; i++) {
             for (let j = i + 1; j < groupIds.length; j++) {
-                const edgeKey1 = `${groupIds[i]}-${groupIds[j]}`;
-                const edgeKey2 = `${groupIds[j]}-${groupIds[i]}`;
-                
-                if (!edgeMap.has(edgeKey1)) {
-                    const edge1 = { 
-                        id: edgeKey1,
-                        from: groupIds[i], 
-                        to: groupIds[j], 
-                        width: 3, // 같은 학년-학기는 두껍게
-                        title: yearSemester,
-                        color: { color: '#bdbdbd' }
-                    };
-                    edges.push(edge1);
-                    edgeMap.set(edgeKey1, edge1);
-                }
-                
-                if (!edgeMap.has(edgeKey2)) {
-                    const edge2 = { 
-                        id: edgeKey2,
-                        from: groupIds[j], 
-                        to: groupIds[i], 
-                        width: 3, // 같은 학년-학기는 두껍게
-                        title: yearSemester,
-                        color: { color: '#bdbdbd' }
-                    };
-                    edges.push(edge2);
-                    edgeMap.set(edgeKey2, edge2);
-                }
+                // 같은 학년-학기 연결은 더 두껍게, yearSemester 텍스트 팝업
+                edges.push({ from: groupIds[i], to: groupIds[j], width: 4, title: yearSemester });
+                edges.push({ from: groupIds[j], to: groupIds[i], width: 4, title: yearSemester });
             }
         }
     });
 
-    // 추가: 같은 분야(subjectType)에 있는 노드들 연결
+    // 추가: 같은 분야(subjectType)에 있는 노드들도 모두 연결
     const subjectTypeGroups = {};
     nodes.forEach(n => {
         const course = nodeCourseMap[n.id];
@@ -7616,74 +7587,11 @@ function renderCommonValuesNetworkGraph() {
             subjectTypeGroups[course.subjectType].push(n.id);
         }
     });
-    
-    // 같은 분야 노드들 연결 (이미 연결되지 않은 경우만)
     Object.values(subjectTypeGroups).forEach(groupIds => {
         for (let i = 0; i < groupIds.length; i++) {
             for (let j = i + 1; j < groupIds.length; j++) {
-                const edgeKey1 = `${groupIds[i]}-${groupIds[j]}`;
-                const edgeKey2 = `${groupIds[j]}-${groupIds[i]}`;
-                
-                // 이미 학년-학기로 연결된 경우 스킵
-                if (edgeMap.has(edgeKey1) || edgeMap.has(edgeKey2)) {
-                    continue;
-                }
-                
-                // 같은 value 그룹에 속하는지 확인
-                let sameValueGroup = false;
-                valueKeys.forEach(key => {
-                    if (valueCourseIds[key].includes(groupIds[i]) && valueCourseIds[key].includes(groupIds[j])) {
-                        sameValueGroup = true;
-                    }
-                });
-                
-                // 같은 분야이지만 다른 value 그룹인 경우 점선으로 연결
-                if (!sameValueGroup) {
-                    const edge1 = { 
-                        id: edgeKey1,
-                        from: groupIds[i], 
-                        to: groupIds[j],
-                        dashes: [5, 5],  // 점선 스타일
-                        color: { color: '#cccccc' },
-                        width: 1,
-                        title: '같은 분야'
-                    };
-                    edges.push(edge1);
-                    edgeMap.set(edgeKey1, edge1);
-                    
-                    const edge2 = { 
-                        id: edgeKey2,
-                        from: groupIds[j], 
-                        to: groupIds[i],
-                        dashes: [5, 5],  // 점선 스타일
-                        color: { color: '#cccccc' },
-                        width: 1,
-                        title: '같은 분야'
-                    };
-                    edges.push(edge2);
-                    edgeMap.set(edgeKey2, edge2);
-                } else {
-                    // 같은 value 그룹인 경우 실선으로 연결
-                    const edge1 = { 
-                        id: edgeKey1,
-                        from: groupIds[i], 
-                        to: groupIds[j],
-                        width: 2, // 기본 두께
-                        color: { color: '#bdbdbd' }
-                    };
-                    edges.push(edge1);
-                    edgeMap.set(edgeKey1, edge1);
-                    
-                    const edge2 = { 
-                        id: edgeKey2,
-                        from: groupIds[j], 
-                        to: groupIds[i],
-                        width: 2, // 기본 두께
-                        color: { color: '#bdbdbd' }
-                    };
-                    edges.push(edge2);
-                    edgeMap.set(edgeKey2, edge2);
-                }
+                edges.push({ from: groupIds[i], to: groupIds[j] });
+                edges.push({ from: groupIds[j], to: groupIds[i] });
             }
         }
     });
@@ -7691,7 +7599,7 @@ function renderCommonValuesNetworkGraph() {
     // 네트워크 옵션 (개별 노드 스타일을 덮어쓰지 않도록 최소화)
     const options = {
         nodes: {
-            chosen: false, // 선택 효과 완전 비활성화
+            chosen: true,
             shadow: {
                 enabled: true,
                 color: 'rgba(0,0,0,0.3)',
@@ -7700,7 +7608,7 @@ function renderCommonValuesNetworkGraph() {
                 y: 2
             },
             borderWidth: 2,
-            borderWidthSelected: 2 // 선택되어도 두께 변경 안함
+            borderWidthSelected: 3
         },
         groups: {
             value1: {
@@ -7721,12 +7629,10 @@ function renderCommonValuesNetworkGraph() {
             }
         },
         edges: {
-            chosen: false, // 엣지 선택 효과도 비활성화
-            color: { color: '#bdbdbd' }, // highlight 제거
-            arrows: { to: { enabled: true, scaleFactor: 0.35 } },
+            color: { color: '#bdbdbd', highlight: '#1976d2' },
+            arrows: { to: { enabled: true, scaleFactor: 0.7 } },
             smooth: { type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.4 },
-            length: 220, // 엣지 길이 더 길게
-            selectionWidth: 0 // 선택 시 두께 변경 없음
+            length: 220 // 엣지 길이 더 길게
         },
         layout: {
             improvedLayout: true,
@@ -7739,21 +7645,15 @@ function renderCommonValuesNetworkGraph() {
                 centralGravity: 0.2, // 중앙 중력 거의 제거
                 springLength: 12000, // 적당한 스프링 길이
                 springConstant: 0.0008, // 더 강한 스프링
-                damping: 0.85, // 감쇠를 줄여서 더 오래 움직이도록
+                damping: 0.95, // 더 강한 감쇠로 부드러운 움직임
                 avoidOverlap: 2 // 겹침 방지
             },
-            stabilization: { 
-                enabled: false // 안정화 비활성화 - 노드가 계속 움직임
-            },
-            minVelocity: 0.01, // 최소 속도를 매우 낮게 설정
-            maxVelocity: 50, // 최대 속도 제한
+            stabilization: { iterations: 30 },
             adaptiveTimestep: true, // 적응형 시간 간격
         },
         interaction: {
             hover: true,
             tooltipDelay: 120,
-            selectConnectedEdges: false, // 노드 선택 시 연결된 엣지 자동 선택 비활성화
-            multiselect: false, // 다중 선택 비활성화
         },
         autoResize: true,
         height: '100%',
@@ -7776,7 +7676,7 @@ function renderCommonValuesNetworkGraph() {
         
         // VALUE 그룹 소속 수에 따라 글씨 크기와 테두리 두께를 함께 조정
         const baseFontSize = 13;
-        const fontSizeStep = 3; // 그룹 하나당 2px 증가
+        const fontSizeStep = 2; // 그룹 하나당 2px 증가
         const adjustedFontSize = baseFontSize + valueGroupCount * fontSizeStep;
 
         // 테두리 두께도 그룹 수에 따라 증가 (기본 2 + 그룹당 1)
@@ -7812,7 +7712,7 @@ function renderCommonValuesNetworkGraph() {
         }
         
         // 박스 크기: VALUE 그룹 수에 따라 조정
-        const sizeMultiplier = 1 + (valueGroupCount * 0.2); // 10%씩 증가
+        const sizeMultiplier = 1 + (valueGroupCount * 0.1); // 10%씩 증가
         n.widthConstraint = { 
             minimum: Math.round(80 * sizeMultiplier), 
             maximum: Math.round(180 * sizeMultiplier) 
@@ -7836,40 +7736,12 @@ function renderCommonValuesNetworkGraph() {
         };
     });
 
-    // 노드의 원본 정보 저장 (하이라이트 복원용)
-    const originalNodesData = nodes.map(node => ({
-        id: node.id,
-        color: node.color ? JSON.parse(JSON.stringify(node.color)) : { background: '#f8f9fa', border: '#bdbdbd' },
-        borderWidth: node.borderWidth || 2,
-        opacity: node.opacity || 1.0,
-        font: node.font ? JSON.parse(JSON.stringify(node.font)) : null
-    }));
-
-    // 엣지의 원본 정보 저장 (하이라이트 복원용)
-    const originalEdgesData = edges.map(edge => ({
-        id: edge.id || `${edge.from}-${edge.to}`,
-        from: edge.from,
-        to: edge.to,
-        width: edge.width || 2,
-        color: edge.color ? JSON.parse(JSON.stringify(edge.color)) : { color: '#bdbdbd', highlight: '#1976d2' },
-        dashes: edge.dashes || false,
-        title: edge.title || ''
-    }));
+    // vis-network 인스턴스 생성 (스타일링 적용된 노드로)
+    const network = new vis.Network(container, { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) }, options);
     
-    // 디버깅: 같은 학년-학기 엣지 확인
-    console.log('같은 학년-학기 엣지 (width=3) 개수:', originalEdgesData.filter(e => e.width === 3).length);
-    console.log('전체 엣지 개수:', originalEdgesData.length);
-
-    // vis-network 인스턴스 생성 (원본 엣지 데이터 복사본 사용)
-    const edgesCopy = edges.map(e => ({ ...e }));
-    const network = new vis.Network(container, { 
-        nodes: new vis.DataSet(nodes), 
-        edges: new vis.DataSet(edgesCopy) 
-    }, options);
-    
-    // 그룹 경계 반발력 시스템 (비활성화)
+    // 그룹 경계 반발력 시스템
     let boundaryForces = new Map(); // nodeId -> {x, y} force vectors
-    let repulsionSystemActive = false; // 반발력 시스템 비활성화
+    let repulsionSystemActive = true;
     let repulsionInterval = null;
     let stabilityCheckCount = 0; // 안정화 체크 카운터
     let lastNodePositions = new Map(); // 이전 노드 위치 저장
@@ -7879,8 +7751,8 @@ function renderCommonValuesNetworkGraph() {
     let dynamicControlPoints = new Map(); // groupKey -> [{x, y, vx, vy, originalX, originalY}]
     let controlPointForces = new Map(); // controlPointId -> {x, y} force vectors
     
-    // 반발력 시스템 비활성화됨 - 아래 코드는 실행되지 않음
-    /*
+    // 반발력 시스템을 즉시 시작 (네트워크 안정화와 무관하게)
+    
     // 스플라인 데이터가 없는 경우를 대비한 테스트 데이터 생성
     setTimeout(() => {
         if (!commonValuesBlobData.value1 || commonValuesBlobData.value1.length === 0) {
@@ -7916,7 +7788,6 @@ function renderCommonValuesNetworkGraph() {
             startRepulsionSystem();
         }
     }, 2000);
-    */
     
     // 동적 제어점 초기화 및 업데이트 함수
     function updateDynamicControlPoints(groupKey, splineBoundary) {
@@ -8600,9 +8471,8 @@ function renderCommonValuesNetworkGraph() {
         }
     }
     
-    // 반발력 시스템 시작 (비활성화됨)
+    // 반발력 시스템 시작
     function startRepulsionSystem() {
-        return; // 반발력 시스템 비활성화
         if (repulsionInterval) clearInterval(repulsionInterval);
         repulsionInterval = setInterval(applyBoundaryRepulsion, 80); // 80ms마다 실행 (12.5fps) - 부드러운 속도
         repulsionSystemActive = true;
@@ -9175,141 +9045,9 @@ function renderCommonValuesNetworkGraph() {
     }
 
     // 전역 변수 사용 (상태 유지)
-    let showHeatmap = true; // 히트맵 표시 여부
-    
-    // 히트맵 토글 함수 (H 키로 제어 가능)
-    window.toggleHeatmap = function() {
-        showHeatmap = !showHeatmap;
-        network.redraw();
-        console.log('히트맵', showHeatmap ? '켜짐' : '꺼짐');
-    }
-    
-    // 키보드 이벤트 리스너 추가
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'h' || e.key === 'H') {
-            toggleHeatmap();
-        }
-    });
-    
-    // 히트맵 그리기 함수
-    function drawHeatmap(ctx) {
-        if (!showHeatmap) return; // 히트맵이 꺼져있으면 렌더링하지 않음
-        const gridSize = 40; // 히트맵 그리드 크기
-        const maxRadius = 100; // 노드 영향 반경
-        const heatmapOpacity = 0.3; // 히트맵 투명도
-        
-        // 뷰포트 경계 계산
-        const viewportBounds = network.body.view.scale;
-        const translation = network.body.view.translation;
-        const canvas = network.canvas.frame.canvas;
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-        
-        // 캔버스 좌표계에서의 뷰포트 범위 계산
-        const topLeft = network.DOMtoCanvas({x: 0, y: 0});
-        const bottomRight = network.DOMtoCanvas({x: canvasWidth, y: canvasHeight});
-        
-        // 히트맵 데이터 생성
-        const heatmapData = new Map();
-        
-        // 각 그룹별로 처리
-        valueKeys.forEach(groupKey => {
-            const groupNodes = valueCourseIds[groupKey] || [];
-            const groupColor = {
-                value1: {r: 25, g: 118, b: 210}, // #1976d2
-                value2: {r: 216, g: 27, b: 96},  // #d81b60
-                value3: {r: 56, g: 142, b: 60}   // #388e3c
-            }[groupKey] || {r: 29, g: 29, b: 29};
-            
-            groupNodes.forEach(nodeId => {
-                const nodePos = network.getPositions([nodeId])[nodeId];
-                if (!nodePos) return;
-                
-                // 노드 주변 그리드 포인트들의 히트값 계산
-                for (let x = topLeft.x; x <= bottomRight.x; x += gridSize) {
-                    for (let y = topLeft.y; y <= bottomRight.y; y += gridSize) {
-                        const dx = x - nodePos.x;
-                        const dy = y - nodePos.y;
-                        const distance = Math.sqrt(dx * dx + dy * dy);
-                        
-                        if (distance < maxRadius) {
-                            // 거리에 반비례하는 히트값 (가우시안 분포)
-                            const heat = Math.exp(-(distance * distance) / (2 * (maxRadius/3) * (maxRadius/3)));
-                            
-                            const key = `${Math.round(x)},${Math.round(y)}`;
-                            if (!heatmapData.has(key)) {
-                                heatmapData.set(key, {
-                                    x: x,
-                                    y: y,
-                                    values: {}
-                                });
-                            }
-                            
-                            const point = heatmapData.get(key);
-                            if (!point.values[groupKey]) {
-                                point.values[groupKey] = 0;
-                            }
-                            point.values[groupKey] += heat;
-                        }
-                    }
-                }
-            });
-        });
-        
-        // 히트맵 렌더링
-        ctx.save();
-        
-        heatmapData.forEach(point => {
-            let totalHeat = 0;
-            let r = 0, g = 0, b = 0;
-            
-            // 각 그룹의 기여도를 색상으로 변환
-            valueKeys.forEach(groupKey => {
-                const heat = point.values[groupKey] || 0;
-                if (heat > 0) {
-                    const groupColor = {
-                        value1: {r: 25, g: 118, b: 210},
-                        value2: {r: 216, g: 27, b: 96},
-                        value3: {r: 56, g: 142, b: 60}
-                    }[groupKey] || {r: 29, g: 29, b: 29};
-                    
-                    r += groupColor.r * heat;
-                    g += groupColor.g * heat;
-                    b += groupColor.b * heat;
-                    totalHeat += heat;
-                }
-            });
-            
-            if (totalHeat > 0) {
-                // 정규화
-                r = Math.round(r / totalHeat);
-                g = Math.round(g / totalHeat);
-                b = Math.round(b / totalHeat);
-                
-                // 히트 강도 계산 (0~1 범위로 클램핑)
-                const intensity = Math.min(totalHeat, 1);
-                
-                // 그라데이션 효과를 위한 원형 그리기
-                const gradient = ctx.createRadialGradient(
-                    point.x, point.y, 0,
-                    point.x, point.y, gridSize
-                );
-                gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${intensity * heatmapOpacity})`);
-                gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-                
-                ctx.fillStyle = gradient;
-                ctx.fillRect(point.x - gridSize, point.y - gridSize, gridSize * 2, gridSize * 2);
-            }
-        });
-        
-        ctx.restore();
-    }
     
     // 네트워크가 그려진 후 그룹 blob을 그림
     network.on('beforeDrawing', function(ctx) {
-        // 0. 히트맵 그리기 (최하단 레이어)
-        drawHeatmap(ctx);
-        
         // 1. blob 영역 먼저 그림 (노드/엣지 아래)
         valueKeys.forEach(key => {
             const ids = valueCourseIds[key];
@@ -9514,6 +9252,13 @@ function renderCommonValuesNetworkGraph() {
     // 마우스 호버 시 스플라인 하이라이트
     let hoveredBlob = null;
     let hoveredLabel = null; // 호버된 라벨 추적
+    network.on('hoverNode', function(params) {
+        // 노드 호버 시에는 스플라인 호버 해제
+        if (hoveredBlob) {
+            hoveredBlob = null;
+            network.redraw();
+        }
+    });
     
     // 직접 마우스 이벤트로 드래그 처리
     let isMouseDown = false;
@@ -9852,21 +9597,15 @@ function renderCommonValuesNetworkGraph() {
         }
     });
     
-    // 노드 및 엣지 하이라이트 업데이트 함수
+    // 노드 하이라이트 업데이트 함수
     function updateNodeHighlight() {
         const nodeUpdate = [];
-        const edgeUpdate = [];
-        
-        // 선택된 그룹의 노드 목록
-        let selectedGroupNodes = [];
-        if (selectedCommonValuesBlob && valueCourseIds[selectedCommonValuesBlob]) {
-            selectedGroupNodes = valueCourseIds[selectedCommonValuesBlob];
-        }
-        
-        // 노드 하이라이트 업데이트 (원본 데이터 참조)
-        originalNodesData.forEach(originalNode => {
-            const nodeId = originalNode.id;
-            const isInSelectedGroup = selectedGroupNodes.includes(nodeId);
+        nodes.forEach(node => {
+            const nodeId = node.id;
+            let isInSelectedGroup = false;
+            if (selectedCommonValuesBlob && valueCourseIds[selectedCommonValuesBlob]) {
+                isInSelectedGroup = valueCourseIds[selectedCommonValuesBlob].includes(nodeId);
+            }
             
             // 업데이트할 노드 객체 생성 (id는 필수)
             const updatedNode = { id: nodeId };
@@ -9879,187 +9618,54 @@ function renderCommonValuesNetworkGraph() {
                     value3: '#388e3c'
                 }[selectedCommonValuesBlob] || '#1d1d1dff';
                 
-                // 하이라이트 스타일 적용 (완전 불투명)
+                // 하이라이트 스타일 적용
                 updatedNode.color = {
-                    background: originalNode.color.background,
+                    background: node.color ? node.color.background : '#f8f9fa',
                     border: groupColor,
                     highlight: {
-                        background: originalNode.color.background,
+                        background: node.color ? node.color.background : '#f8f9fa',
                         border: groupColor
                     }
                 };
                 updatedNode.borderWidth = 3; // 선택된 노드는 테두리 두껍게
-                updatedNode.opacity = 1.0; // 완전 불투명
-                
-                // 원본 폰트 스타일 유지
-                if (originalNode.font) {
-                    updatedNode.font = originalNode.font;
-                }
             } else {
-                // 선택되지 않은 노드는 원본 스타일 기반으로 복원
+                // 선택되지 않은 노드는 원래 스타일로 복원
                 updatedNode.color = {
-                    background: originalNode.color.background,
-                    border: originalNode.color.border,
+                    background: node.color ? node.color.background : '#f8f9fa',
+                    border: node.color ? node.color.border : '#bdbdbd',
                     highlight: {
-                        background: originalNode.color.background,
-                        border: originalNode.color.border
+                        background: node.color ? node.color.background : '#f8f9fa',
+                        border: node.color ? node.color.border : '#bdbdbd'
                     }
                 };
-                updatedNode.borderWidth = originalNode.borderWidth; // 원본 테두리 두께
-                
-                // 그룹이 선택된 경우에만 투명도 적용
-                if (selectedCommonValuesBlob) {
-                    updatedNode.opacity = 0.3; // 투명하게
-                } else {
-                    updatedNode.opacity = originalNode.opacity; // 원본 투명도
-                }
-                
-                // 원본 폰트 스타일 유지
-                if (originalNode.font) {
-                    updatedNode.font = originalNode.font;
-                }
+                updatedNode.borderWidth = 2; // 기본 테두리 두께
             }
             
             nodeUpdate.push(updatedNode);
         });
         
-        // 엣지 하이라이트 업데이트 (원본 데이터 참조)
-        originalEdgesData.forEach(originalEdge => {
-            const fromInGroup = selectedGroupNodes.includes(originalEdge.from);
-            const toInGroup = selectedGroupNodes.includes(originalEdge.to);
-            
-            // 모든 속성을 복사한 새 객체 생성
-            const updatedEdge = {
-                id: originalEdge.id,
-                from: originalEdge.from,
-                to: originalEdge.to,
-                title: originalEdge.title
-            };
-            
-            if (selectedCommonValuesBlob && fromInGroup && toInGroup) {
-                // 그룹 내부 연결만 하이라이트
-                const groupColor = {
-                    value1: '#1976d2',
-                    value2: '#d81b60',
-                    value3: '#388e3c'
-                }[selectedCommonValuesBlob] || '#1976d2';
-                
-                updatedEdge.color = { color: groupColor };
-                updatedEdge.width = originalEdge.width + 2; // 원본 두께에 +2
-                updatedEdge.dashes = originalEdge.dashes; // 점선 스타일 유지
-            } else {
-                // 선택되지 않은 엣지는 원본 스타일로 복원 또는 투명도 적용
-                if (selectedCommonValuesBlob) {
-                    // 그룹이 선택된 경우 - 투명도 적용
-                    const baseColor = originalEdge.color.color || '#bdbdbd';
-                    updatedEdge.color = { 
-                        color: baseColor,
-                        opacity: 0.3 
-                    };
-                    updatedEdge.width = originalEdge.width; // 원본 두께 반드시 유지
-                    updatedEdge.dashes = originalEdge.dashes; // 점선 스타일 유지
-                } else {
-                    // 그룹이 선택되지 않은 경우 - 완전 복원
-                    updatedEdge.color = JSON.parse(JSON.stringify(originalEdge.color));
-                    updatedEdge.width = originalEdge.width; // 원본 두께 반드시 유지
-                    updatedEdge.dashes = originalEdge.dashes; // 점선 스타일 유지
-                }
-            }
-            
-            edgeUpdate.push(updatedEdge);
-        });
-        
-        // 노드와 엣지 스타일 업데이트
+        // 노드 스타일만 update()로 적용 (네트워크 전체 재생성/물리효과 X)
         try {
-            // 디버깅: 원본 데이터 확인
-            console.log('원본 엣지 데이터 샘플:', originalEdgesData.filter(e => e.width === 3).slice(0, 3));
-            console.log('업데이트할 엣지 샘플:', edgeUpdate.filter(e => e.width === 3 || e.width === 5).slice(0, 3));
-            
             network.body.data.nodes.update(nodeUpdate);
-            network.body.data.edges.update(edgeUpdate);
-            
-            // 강제 재렌더링 - 스타일 변경이 즉시 반영되도록
-            network.redraw();
-            
-            console.log('노드 및 엣지 하이라이트 업데이트 완료:', selectedCommonValuesBlob);
+            console.log('노드 하이라이트 업데이트 완료:', selectedCommonValuesBlob);
         } catch (error) {
-            console.error('노드/엣지 업데이트 오류:', error);
+            console.error('노드 업데이트 오류:', error);
         }
     }
     
-    // 호버 이벤트 완전 제거 - vis.js 기본 동작만 사용
+    // 마우스 노드 호버 효과 (간단한 방식)
+    network.on('hoverNode', function(params) {
+        // 호버된 노드만 하이라이트
+        const nodeId = params.node;
+        network.selectNodes([nodeId]);
+        document.body.style.cursor = 'pointer';
+    });
 
-    // 색상의 채도를 높이는 헬퍼 함수
-    function saturateColor(color, amount) {
-        // HEX 색상을 RGB로 변환
-        const hex = color.replace('#', '');
-        const r = parseInt(hex.substring(0, 2), 16) / 255;
-        const g = parseInt(hex.substring(2, 4), 16) / 255;
-        const b = parseInt(hex.substring(4, 6), 16) / 255;
-        
-        // RGB를 HSL로 변환
-        const max = Math.max(r, g, b);
-        const min = Math.min(r, g, b);
-        let h, s, l = (max + min) / 2;
-        
-        if (max === min) {
-            h = s = 0; // achromatic
-        } else {
-            const d = max - min;
-            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-            switch (max) {
-                case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-                case g: h = ((b - r) / d + 2) / 6; break;
-                case b: h = ((r - g) / d + 4) / 6; break;
-            }
-        }
-        
-        // 채도 증가
-        s = Math.min(1, s * (1 + amount));
-        
-        // HSL을 RGB로 변환
-        let r2, g2, b2;
-        if (s === 0) {
-            r2 = g2 = b2 = l; // achromatic
-        } else {
-            const hue2rgb = (p, q, t) => {
-                if (t < 0) t += 1;
-                if (t > 1) t -= 1;
-                if (t < 1/6) return p + (q - p) * 6 * t;
-                if (t < 1/2) return q;
-                if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-                return p;
-            };
-            const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-            const p = 2 * l - q;
-            r2 = hue2rgb(p, q, h + 1/3);
-            g2 = hue2rgb(p, q, h);
-            b2 = hue2rgb(p, q, h - 1/3);
-        }
-        
-        // RGB를 HEX로 변환
-        const toHex = (x) => {
-            const hex = Math.round(x * 255).toString(16);
-            return hex.length === 1 ? '0' + hex : hex;
-        };
-        
-        return `#${toHex(r2)}${toHex(g2)}${toHex(b2)}`;
-    }
-    
-    // 색상에 투명도 추가하는 헬퍼 함수
-    function addOpacity(color, opacity) {
-        // HEX 색상을 RGBA로 변환
-        const hex = color.replace('#', '');
-        const r = parseInt(hex.substring(0, 2), 16);
-        const g = parseInt(hex.substring(2, 4), 16);
-        const b = parseInt(hex.substring(4, 6), 16);
-        
-        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-    }
-    
-    // 엣지 호버 시 하이라이트할 노드들 추적
-    let hoveredEdgeNodes = [];
-    
+    network.on('blurNode', function(params) {
+        network.unselectAll();
+        document.body.style.cursor = 'default';
+    });
+
     // 엣지(화살표) 위에 마우스 올릴 때 해당 yearSemester의 모든 노드 하이라이트
     network.on('hoverEdge', function(params) {
         const edgeId = params.edge;
@@ -10067,178 +9673,21 @@ function renderCommonValuesNetworkGraph() {
         if (edge && edge.title) {
             // yearSemester 텍스트가 title에 있음
             const yearSemester = edge.title;
-            
-            // 같은 학년-학기의 모든 엣지를 하이라이트
-            const edgeUpdate = [];
-            const allEdges = network.body.data.edges.get();
-            allEdges.forEach(e => {
-                if (e.title === yearSemester) {
-                    edgeUpdate.push({
-                        id: e.id,
-                        color: { 
-                            color: '#1976d2', 
-                            highlight: '#1976d2',
-                            opacity: 1  // 엣지 불투명도 유지
-                        },
-                        width: 3
-                    });
-                } else {
-                    // 다른 엣지들은 약간 투명하게 (하지만 보이도록)
-                    edgeUpdate.push({
-                        id: e.id,
-                        color: { 
-                            color: 'rgba(189, 189, 189, 0.3)', 
-                            highlight: 'rgba(25, 118, 210, 0.3)',
-                            opacity: 0.3
-                        },
-                        width: 1
-                    });
-                }
-            });
-            
-            // 엣지 업데이트
-            if (edgeUpdate.length > 0) {
-                network.body.data.edges.update(edgeUpdate);
-            }
-            
-            // 모든 노드를 순회하면서 업데이트
-            const nodeUpdate = [];
-            hoveredEdgeNodes = [];
-            
-            nodes.forEach(node => {
-                // 그룹 라벨 노드는 제외
-                if (node.isGroupLabel) return;
-                
-                const nodeId = node.id;
-                const course = courses.find(c => c.id === nodeId);
-                
-                // 업데이트할 노드 객체 생성
-                const updatedNode = { id: nodeId };
-                
+            // 해당 yearSemester의 모든 노드 id 찾기
+            const highlightNodeIds = [];
+            nodes.forEach(n => {
+                const course = courses.find(c => c.id === n.id);
                 if (course && course.yearSemester === yearSemester) {
-                    // 해당 학기 노드는 채도를 높여 하이라이트
-                    hoveredEdgeNodes.push(nodeId);
-                    
-                    // 원래 배경색의 채도를 높이기
-                    const originalBg = node.color ? node.color.background : '#f8f9fa';
-                    const saturatedBg = saturateColor(originalBg, 0.5); // 50% 채도 증가
-                    
-                    updatedNode.color = {
-                        background: saturatedBg,
-                        border: '#000000', // 검은색 테두리
-                        highlight: {
-                            background: saturatedBg,
-                            border: '#000000'
-                        }
-                    };
-                    updatedNode.borderWidth = 3; // 테두리 약간 두껍게
-                    updatedNode.font = {
-                        size: 15, // 글씨 크기 약간 크게
-                        color: '#000000', // 검은색 글씨
-                        face: 'Noto Sans KR, Arial, sans-serif',
-                        bold: true
-                        // strokeWidth와 strokeColor 제거 (글씨 윤곽선 없애기)
-                    };
-                    updatedNode.opacity = 1; // 완전 불투명
-                } else {
-                    // 해당 학기가 아닌 노드는 투명하게
-                    updatedNode.color = {
-                        background: addOpacity(node.color ? node.color.background : '#f8f9fa', 0.3), // 30% 투명도
-                        border: addOpacity(node.color ? node.color.border : '#bdbdbd', 0.3),
-                        highlight: {
-                            background: addOpacity(node.color ? node.color.background : '#f8f9fa', 0.3),
-                            border: addOpacity(node.color ? node.color.border : '#bdbdbd', 0.3)
-                        }
-                    };
-                    updatedNode.borderWidth = 2; // 기본 테두리 두께
-                    updatedNode.font = {
-                        size: 13,
-                        color: 'rgba(73, 80, 87, 0.3)', // 투명한 글씨
-                        face: 'Noto Sans KR, Arial, sans-serif',
-                        bold: true
-                    };
-                    updatedNode.opacity = 0.3; // 30% 투명도
+                    highlightNodeIds.push(n.id);
                 }
-                
-                nodeUpdate.push(updatedNode);
             });
-            
-            // 노드 스타일 업데이트
-            if (nodeUpdate.length > 0) {
-                try {
-                    network.body.data.nodes.update(nodeUpdate);
-                    console.log(`${yearSemester} 학기 노드 하이라이트 (${hoveredEdgeNodes.length}개)`);
-                    network.redraw(); // 강제로 다시 그리기
-                } catch (error) {
-                    console.error('노드 하이라이트 오류:', error);
-                }
-            }
+            network.selectNodes(highlightNodeIds);
         }
         document.body.style.cursor = 'pointer';
     });
 
     network.on('blurEdge', function(params) {
-        // 모든 엣지를 원래 스타일로 복원
-        const edgeUpdate = [];
-        const allEdges = network.body.data.edges.get();
-        allEdges.forEach(e => {
-            edgeUpdate.push({
-                id: e.id,
-                color: { 
-                    color: '#bdbdbd', 
-                    highlight: '#1976d2',
-                    opacity: 1  // 모든 엣지 불투명도 복원
-                },
-                width: 1
-            });
-        });
-        
-        if (edgeUpdate.length > 0) {
-            network.body.data.edges.update(edgeUpdate);
-        }
-        
-        // 모든 노드를 원래 스타일로 복원
-        const nodeUpdate = [];
-        
-        nodes.forEach(node => {
-            if (node.isGroupLabel) return;
-            
-            // 원래 색상 복원
-            const originalBg = node.color ? node.color.background : '#f8f9fa';
-            const originalBorder = node.color ? node.color.border : '#bdbdbd';
-            
-            nodeUpdate.push({
-                id: node.id,
-                color: {
-                    background: originalBg,
-                    border: originalBorder,
-                    highlight: {
-                        background: originalBg,
-                        border: originalBorder
-                    }
-                },
-                borderWidth: 2,
-                font: {
-                    size: 13,
-                    color: '#495057',
-                    face: 'Noto Sans KR, Arial, sans-serif',
-                    bold: true
-                },
-                opacity: 1 // 원래 불투명도로 복원
-            });
-        });
-        
-        if (nodeUpdate.length > 0) {
-            try {
-                network.body.data.nodes.update(nodeUpdate);
-                console.log('노드 스타일 복원 완료');
-                network.redraw(); // 강제로 다시 그리기
-            } catch (error) {
-                console.error('노드 복원 오류:', error);
-            }
-        }
-        
-        hoveredEdgeNodes = [];
+        network.unselectAll();
         document.body.style.cursor = 'default';
     });
 }
