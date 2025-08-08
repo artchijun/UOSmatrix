@@ -939,18 +939,29 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="app.js"></script>
     <script>
+        // 초기화 플래그
+        let isInitialized = false;
+        
         // 앱 초기화 함수 - 재시도 로직 포함
         function initializeApp() {
+            // 이미 초기화되었으면 스킵
+            if (isInitialized) {
+                console.log('✓ 앱이 이미 초기화되었습니다.');
+                return true;
+            }
+            
             console.log('앱 초기화 시도 중...');
             
             // init 함수 가용성 확인
             if (typeof window.init === 'function') {
                 console.log('✓ window.init 함수 발견, 실행 중...');
                 window.init();
+                isInitialized = true;
                 return true;
             } else if (typeof init === 'function') {
                 console.log('✓ init 함수 발견, 실행 중...');
                 init();
+                isInitialized = true;
                 return true;
             } else {
                 console.warn('⚠️ init 함수를 아직 찾을 수 없습니다. 재시도 중...');

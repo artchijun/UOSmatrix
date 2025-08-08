@@ -5,7 +5,14 @@
       "Bash(rm:*)",
       "Bash(python:*)",
       "Bash(node:*)",
-      "mcp__sequential-thinking__sequentialthinking"
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(dir \"C:\\Users\\JUNHEE\\.claude\")",
+      "mcp__magic__21st_magic_component_builder",
+      "Bash(dir \"C:\\Users\\JUNHEE\\.claude\\commands\")",
+      "Bash(dir:*)",
+      "Bash(ls:*)",
+      "mcp__magic__21st_magic_component_inspiration",
+      "mcp__playwright__browser_snapshot"
     ],
     "deny": []
   }

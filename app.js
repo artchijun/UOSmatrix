@@ -295,6 +295,9 @@ let isEditModeCommonValues = false;
 // 공통가치대응 셀 편집 중인지 확인하는 전역 변수
 let isCommonValuesCellEditing = false;
 
+// 공통가치대응 네트워크 관련 전역 변수
+let hoveredBlob = null;
+
 // 전체 버전 관리 변수
 let currentVersion = '기본';
 let versions = {};
@@ -7457,7 +7460,20 @@ let groupLabelPositions = new Map(); // 그룹 라벨 위치 저장 {groupKey ->
 
 function renderCommonValuesNetworkGraph() {
     const container = document.getElementById('commonValuesNetworkGraph');
-    if (!container) return;
+    if (!container) {
+        console.warn('commonValuesNetworkGraph container not found');
+        return;
+    }
+    
+    // 기존 네트워크가 있으면 정리
+    if (window.commonValuesNetwork) {
+        try {
+            window.commonValuesNetwork.destroy();
+        } catch (e) {
+            console.warn('Error destroying existing network:', e);
+        }
+        window.commonValuesNetwork = null;
+    }
 
     // VALUE1,2,3에 포함된 교과목 id를 모두 모은다
     const subjectTypes = [
@@ -7644,15 +7660,25 @@ function renderCommonValuesNetworkGraph() {
         physics: {
             enabled: true,
             barnesHut: {
-                gravitationalConstant: -2000, // 더 강한 반발력
-                centralGravity: 0.2, // 중앙 중력 거의 제거
+                gravitationalConstant: -1500, // 반발력을 약간 줄임
+                centralGravity: 0.1, // 중앙 중력 더 감소
                 springLength: 12000, // 적당한 스프링 길이
-                springConstant: 0.0008, // 더 강한 스프링
-                damping: 0.95, // 더 강한 감쇠로 부드러운 움직임
-                avoidOverlap: 2 // 겹침 방지
+                springConstant: 0.0005, // 스프링 상수를 줄여 떨림 감소
+                damping: 0.98, // 더 강한 감쇠로 떨림 최소화
+                avoidOverlap: 1.5 // 겹침 방지 약간 감소
             },
-            stabilization: { iterations: 30 },
+            stabilization: { 
+                enabled: true,
+                iterations: 100, // 더 많은 초기 안정화 반복
+                updateInterval: 50,
+                onlyDynamicEdges: false,
+                fit: true
+            },
             adaptiveTimestep: true, // 적응형 시간 간격
+            maxVelocity: 50, // 최대 속도 제한
+            minVelocity: 0.1, // 최소 속도 설정
+            solver: 'barnesHut',
+            timestep: 0.5 // 시간 간격을 줄여 부드러운 움직임
         },
         interaction: {
             hover: true,
@@ -7750,8 +7776,88 @@ function renderCommonValuesNetworkGraph() {
     // vis-network 인스턴스 생성 (스타일링 적용된 노드로)
     const network = new vis.Network(container, { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) }, options);
     
+    // 네트워크 생성 검증
+    if (!network) {
+        console.error('Failed to create vis-network instance');
+        return;
+    }
+    
     // 전역 변수에 네트워크 저장
     window.commonValuesNetwork = network;
+    
+    // 네트워크 초기화 완료 플래그
+    window.commonValuesNetworkReady = false;
+    
+    // renderCommonValuesNetworkGraph 함수 내의 모든 중첩 함수들이 network 변수에 접근할 수 있도록
+    // 실제로는 window.commonValuesNetwork를 사용
+    
+    // 네트워크 참조 헬퍼 함수
+    function getActiveNetwork() {
+        return network || window.commonValuesNetwork;
+    }
+    
+    function isNetworkReady() {
+        const net = getActiveNetwork();
+        return net && net.body && net.body.nodes && window.commonValuesNetworkReady;
+    }
+    
+    // 존재하지 않는 노드 ID들을 정리하는 함수
+    function cleanupInvalidNodeIds() {
+        const activeNetwork = getActiveNetwork();
+        if (!activeNetwork || !activeNetwork.body || !activeNetwork.body.nodes) {
+            return;
+        }
+        
+        // 네트워크가 완전히 준비되었는지 확인
+        if (!window.commonValuesNetworkReady) {
+            // 디버그 로그는 필요시에만 활성화
+            // console.debug('네트워크가 아직 준비되지 않아 정리를 건너뜁니다');
+            return;
+        }
+        
+        let cleanupCount = 0;
+        valueKeys.forEach(groupKey => {
+            if (valueCourseIds[groupKey] && valueCourseIds[groupKey].length > 0) {
+                // 원본 배열 백업
+                const originalIds = [...valueCourseIds[groupKey]];
+                
+                const validIds = valueCourseIds[groupKey].filter(id => {
+                    // 여러 방법으로 노드 존재 확인
+                    let exists = false;
+                    
+                    // 1. body.nodes에서 확인
+                    if (activeNetwork.body && activeNetwork.body.nodes && activeNetwork.body.nodes[id]) {
+                        exists = true;
+                    }
+                    
+                    // 2. 데이터셋에서 확인
+                    if (!exists && activeNetwork.body && activeNetwork.body.data && activeNetwork.body.data.nodes) {
+                        try {
+                            const node = activeNetwork.body.data.nodes.get(id);
+                            if (node) exists = true;
+                        } catch (e) {
+                            // 무시
+                        }
+                    }
+                    
+                    if (!exists) cleanupCount++;
+                    return exists;
+                });
+                
+                // 모든 노드가 제거되는 경우 원본 유지
+                if (validIds.length === 0 && originalIds.length > 0) {
+                    console.warn(`그룹 ${groupKey}의 모든 노드가 제거되려고 했습니다. 원본 유지합니다.`);
+                    valueCourseIds[groupKey] = originalIds;
+                } else {
+                    valueCourseIds[groupKey] = validIds;
+                }
+            }
+        });
+        
+        if (cleanupCount > 0) {
+            console.log(`네트워크 정리 완료: ${cleanupCount}개의 존재하지 않는 노드 ID 제거`);
+        }
+    }
     
     // 그룹 경계 반발력 시스템
     let boundaryForces = new Map(); // nodeId -> {x, y} force vectors
@@ -7786,13 +7892,20 @@ function renderCommonValuesNetworkGraph() {
     
     // 네트워크 안정화 완료 후에도 다시 한번 확인
     network.on('stabilizationIterationsDone', function() {
-        if (!repulsionInterval) {
-            startRepulsionSystem();
-        }
+        // 네트워크가 완전히 준비될 때까지 잠시 대기
+        setTimeout(() => {
+            window.commonValuesNetworkReady = true;
+            // cleanupInvalidNodeIds(); // 일시적으로 비활성화 - 스플라인 사라짐 문제
+            if (!repulsionInterval) {
+                startRepulsionSystem();
+            }
+        }, 100); // 100ms 대기
     });
     
     // 최종 백업 - 2초 후 무조건 시작
     setTimeout(() => {
+        window.commonValuesNetworkReady = true;
+        // cleanupInvalidNodeIds(); // 일시적으로 비활성화 - 스플라인 사라짐 문제
         if (!repulsionInterval) {
             startRepulsionSystem();
         }
@@ -7802,15 +7915,17 @@ function renderCommonValuesNetworkGraph() {
     function calculateBoundaryRepulsion() {
         boundaryForces.clear();
         
-        // 네트워크 객체 존재 확인
-        if (!network || typeof network.getPositions !== 'function') {
+        // 네트워크 준비 상태 확인
+        if (!isNetworkReady()) {
             return;
         }
+        
+        const activeNetwork = getActiveNetwork();
         
         // 모든 노드에 대해 반발력 계산
         let allNodes;
         try {
-            allNodes = network.getPositions();
+            allNodes = activeNetwork.getPositions();
         } catch (e) {
             return;
         }
@@ -7893,9 +8008,17 @@ function renderCommonValuesNetworkGraph() {
                 const groupNodeIds = valueCourseIds[groupKey] || [];
                 const isGroupMember = groupNodeIds.includes(nodeId);
                 
+                // 다른 그룹에 속한 노드인지 확인
+                let belongsToOtherGroup = false;
+                valueKeys.forEach(otherKey => {
+                    if (otherKey !== groupKey && valueCourseIds[otherKey] && valueCourseIds[otherKey].includes(nodeId)) {
+                        belongsToOtherGroup = true;
+                    }
+                });
+                
                 // 테스트: 모든 노드에 스플라인 반발력 적용 (그룹 멤버십 무시)
-                const testMode = true; // 테스트용
-                if (!isGroupMember || testMode) {
+                const testMode = false; // 테스트 모드 비활성화
+                if (!isGroupMember) { // 그룹 멤버가 아닌 경우에만 반발력 적용
                     const isInsideSpline = isPointInPolygon(position, groupBoundary);
                     const distanceToSpline = getDistanceToSpline(position, groupBoundary);
                     const maxRepulsionDistance = 150; // 반발력 작용 범위 증가
@@ -7908,28 +8031,40 @@ function renderCommonValuesNetworkGraph() {
                         let baseForceStrength = 200; // 기본 반발력 강화
                         
                         if (isInsideSpline) {
-                            // 스플라인 내부에 있는 경우 - 매우 강한 반발력
-                            forceMultiplier = 6.0; // 4.0 → 6.0 증가
-                            baseForceStrength = 500; // 300 → 500 증가
+                            // 스플라인 내부에 있는 경우 - 부드러운 반발력
+                            forceMultiplier = 3.0; // 과도한 반발력 감소
+                            baseForceStrength = 250; // 기본 강도 감소
                         } else if (distanceToSpline < 30) {
-                            // 경계 매우 근처 - 강한 반발력
-                            forceMultiplier = 4.0; // 3.0 → 4.0 증가
-                            baseForceStrength = 400; // 250 → 400 증가
+                            // 경계 매우 근처 - 중간 반발력
+                            forceMultiplier = 2.0; // 감소
+                            baseForceStrength = 200; // 감소
                         } else if (distanceToSpline < 60) {
-                            // 경계 근처 - 중간 반발력
-                            forceMultiplier = 3.0; // 2.0 → 3.0 증가
-                            baseForceStrength = 300; // 200 → 300 증가
+                            // 경계 근처 - 약한 반발력
+                            forceMultiplier = 1.5; // 감소
+                            baseForceStrength = 150; // 감소
                         } else {
-                            // 멀리 있지만 영향권 내 - 약한 반발력
-                            forceMultiplier = 2.0; // 1.0 → 2.0 증가
-                            baseForceStrength = 200; // 150 → 200 증가
+                            // 멀리 있지만 영향권 내 - 매우 약한 반발력
+                            forceMultiplier = 1.0; // 감소
+                            baseForceStrength = 100; // 감소
                         }
                         
                         // 거리에 따른 추가 감쇠
                         const distanceDecay = Math.max(0.3, 1.0 - (distanceToSpline / maxRepulsionDistance));
-                        const finalForceStrength = baseForceStrength * forceMultiplier * distanceDecay;
+                        
+                        // 다른 그룹에 속한 노드는 반발력을 더 약하게 적용 (경계 떨림 방지)
+                        let groupMembershipFactor = 1.0;
+                        if (belongsToOtherGroup) {
+                            groupMembershipFactor = 0.3; // 다른 그룹 노드는 30%만 적용
+                        }
+                        
+                        const finalForceStrength = baseForceStrength * forceMultiplier * distanceDecay * groupMembershipFactor;
                         
                         const repulsionForce = calculateSplineRepulsion(position, groupBoundary, finalForceStrength);
+                        
+                        // 힘이 너무 작으면 무시 (미세한 떨림 방지)
+                        if (Math.abs(repulsionForce.x) < 0.3 && Math.abs(repulsionForce.y) < 0.3) {
+                            return;
+                        }
                         
                         if (!boundaryForces.has(nodeId)) {
                             boundaryForces.set(nodeId, { x: 0, y: 0 });
@@ -7955,10 +8090,26 @@ function renderCommonValuesNetworkGraph() {
                     // 1. 그룹 중심점으로의 인력
                     const groupPositions = groupNodeIds.map(id => {
                         try {
-                            const pos = network.getPosition(id);
-                            return pos;
+                            const activeNetwork = network || window.commonValuesNetwork;
+                            if (!activeNetwork || !activeNetwork.getPosition) {
+                                return null;
+                            }
+                            
+                            // 노드가 존재하는지 먼저 확인
+                            if (!activeNetwork.body || !activeNetwork.body.nodes || !activeNetwork.body.nodes[id]) {
+                                return null;
+                            }
+                            
+                            const pos = activeNetwork.getPosition(id);
+                            // 위치가 유효한지 확인
+                            if (pos && !isNaN(pos.x) && !isNaN(pos.y)) {
+                                return pos;
+                            }
+                            return null;
                         } catch (e) {
                             // 노드가 존재하지 않는 경우 무시
+                            // 디버그 로그는 필요시에만 활성화
+                            // console.debug(`노드 위치 확인 중 오류 (nodeId: ${id})`);
                             return null;
                         }
                     }).filter(pos => pos);
@@ -7971,8 +8122,32 @@ function renderCommonValuesNetworkGraph() {
                         const dy = centerY - position.y;
                         const distanceToCenter = Math.sqrt(dx * dx + dy * dy);
                         
-                        if (distanceToCenter > 20) { // 더 먼 거리에서만 작동 (10 → 20)
-                            const attractionStrength = Math.min(15, distanceToCenter * 0.1); // 인력 대폭 약화 (80→15, 0.5→0.1)
+                        // 개선된 균형점 시스템: 제목 가림 방지 및 안정성 강화
+                        const minDistance = 50; // 제목 가림 방지를 위한 최소 거리 감소
+                        const maxDistance = 200; // 최대 거리 크게 증가 (균형 구간 확대)
+                        const stabilityThreshold = 15; // 안정성 임계값 (움직임 감지)
+                        
+                        // 노드 속도 확인 (안정성 체크)
+                        const networkNode = activeNetwork.body.nodes[nodeId];
+                        const nodeVelocity = networkNode ? Math.sqrt((networkNode.vx || 0) ** 2 + (networkNode.vy || 0) ** 2) : 0;
+                        const isMovingFast = nodeVelocity > stabilityThreshold;
+                        
+                        // 균형 구간에서는 힘 적용하지 않음 (완전한 안정화)
+                        if (distanceToCenter >= minDistance && distanceToCenter <= maxDistance) {
+                            // 균형 구간 내에서는 속도 감소만 적용
+                            if (isMovingFast) {
+                                if (!boundaryForces.has(nodeId)) {
+                                    boundaryForces.set(nodeId, { x: 0, y: 0 });
+                                }
+                                const currentForce = boundaryForces.get(nodeId);
+                                // 부드러운 속도 감소 (댐핑)
+                                currentForce.x += (networkNode.vx || 0) * -0.15;
+                                currentForce.y += (networkNode.vy || 0) * -0.15;
+                            }
+                        } else if (distanceToCenter > maxDistance) {
+                            // 너무 멀 때만 매우 부드럽게 끌어당김
+                            const excessDistance = distanceToCenter - maxDistance;
+                            const attractionStrength = Math.min(2, excessDistance * 0.01); // 매우 약한 힘으로 감소
                             const normalizedX = dx / distanceToCenter;
                             const normalizedY = dy / distanceToCenter;
                             
@@ -7980,20 +8155,51 @@ function renderCommonValuesNetworkGraph() {
                                 boundaryForces.set(nodeId, { x: 0, y: 0 });
                             }
                             const currentForce = boundaryForces.get(nodeId);
-                            currentForce.x += normalizedX * attractionStrength * 0.3; // 추가로 30%로 약화
-                            currentForce.y += normalizedY * attractionStrength * 0.3;
+                            currentForce.x += normalizedX * attractionStrength * 0.05; // 매우 약한 계수로 감소
+                            currentForce.y += normalizedY * attractionStrength * 0.05;
+                        } else if (distanceToCenter < minDistance) {
+                            // 제목 가림 방지: 강한 반발력 적용
+                            const deficitDistance = minDistance - distanceToCenter;
+                            const repulsionStrength = Math.min(12, deficitDistance * 0.15); // 강한 반발력
+                            const normalizedX = dx / distanceToCenter;
+                            const normalizedY = dy / distanceToCenter;
                             
+                            if (!boundaryForces.has(nodeId)) {
+                                boundaryForces.set(nodeId, { x: 0, y: 0 });
+                            }
+                            const currentForce = boundaryForces.get(nodeId);
+                            currentForce.x -= normalizedX * repulsionStrength * 0.4; // 중심에서 밀어냄
+                            currentForce.y -= normalizedY * repulsionStrength * 0.4;
                         }
                     }
                     
-                    // 2. 그룹 내 노드들 간의 상호 인력 (스프링 연결)
+                    // 2. 그룹 내 노드들 간의 약한 상호 인력 (과도한 집결 방지)
+                    // 노드 수가 많을수록 개별 인력을 약화시킴
+                    const nodeCountFactor = Math.max(0.3, 1 / Math.sqrt(groupNodeIds.length));
+                    
                     groupNodeIds.forEach(otherNodeId => {
                         if (otherNodeId !== nodeId) {
                             let otherPos;
                             try {
-                                otherPos = network.getPosition(otherNodeId);
+                                const currentNetwork = network || window.commonValuesNetwork;
+                                if (!currentNetwork || !currentNetwork.getPosition) {
+                                    return;
+                                }
+                                
+                                // 노드가 존재하는지 먼저 확인
+                                if (!currentNetwork.body || !currentNetwork.body.nodes || !currentNetwork.body.nodes[otherNodeId]) {
+                                    return;
+                                }
+                                
+                                otherPos = currentNetwork.getPosition(otherNodeId);
+                                // 위치가 유효한지 확인
+                                if (!otherPos || isNaN(otherPos.x) || isNaN(otherPos.y)) {
+                                    return;
+                                }
                             } catch (e) {
                                 // 노드가 존재하지 않는 경우 무시
+                                // 디버그 로그는 필요시에만 활성화
+                                // console.debug(`노드 위치 확인 중 오류 (otherNodeId: ${otherNodeId})`);
                                 return;
                             }
                             if (otherPos) {
@@ -8001,17 +8207,24 @@ function renderCommonValuesNetworkGraph() {
                                 const dy = otherPos.y - position.y;
                                 const distance = Math.sqrt(dx * dx + dy * dy);
                                 
-                                if (distance > 30 && distance < 120) { // 더 제한적인 거리에서만 인력 작용 (20→30, 200→120)
-                                    const springForce = Math.min(8, distance * 0.05); // 스프링 인력 대폭 약화 (30→8, 0.15→0.05)
+                                // 적절한 거리에서만 매우 약한 인력 적용
+                                if (distance > 60 && distance < 120) { // 거리 범위 확대
+                                    const springForce = Math.min(1, distance * 0.005) * nodeCountFactor; // 더욱 약한 힘
                                     const normalizedX = dx / distance;
                                     const normalizedY = dy / distance;
+                                    
+                                    // 노드 속도도 고려 (빠르게 움직이면 인력 감소)
+                                    const activeNetwork = network || window.commonValuesNetwork;
+                                    const networkNode = activeNetwork && activeNetwork.body && activeNetwork.body.nodes ? activeNetwork.body.nodes[nodeId] : null;
+                                    const nodeVelocity = networkNode ? Math.sqrt((networkNode.vx || 0) ** 2 + (networkNode.vy || 0) ** 2) : 0;
+                                    const velocityDamping = Math.max(0.5, 1 - nodeVelocity * 0.02);
                                     
                                     if (!boundaryForces.has(nodeId)) {
                                         boundaryForces.set(nodeId, { x: 0, y: 0 });
                                     }
                                     const currentForce = boundaryForces.get(nodeId);
-                                    currentForce.x += normalizedX * springForce * 0.2; // 더 약하게 적용 (0.5 → 0.2)
-                                    currentForce.y += normalizedY * springForce * 0.2;
+                                    currentForce.x += normalizedX * springForce * 0.03 * velocityDamping; // 더욱 약한 적용
+                                    currentForce.y += normalizedY * springForce * 0.03 * velocityDamping;
                                 }
                             }
                         }
@@ -8023,6 +8236,59 @@ function renderCommonValuesNetworkGraph() {
             if (boundaryForces.has(nodeId)) {
                 nodesWithForces++;
             }
+        });
+        
+        // 3. 그룹 중심 간 반발력 추가 - 그룹 라벨 위치가 서로 멀리 유지되도록
+        groupLabelPositions.forEach((labelPos1, groupKey1) => {
+            groupLabelPositions.forEach((labelPos2, groupKey2) => {
+                if (groupKey1 !== groupKey2) {
+                    const dx = labelPos2.x - labelPos1.x;
+                    const dy = labelPos2.y - labelPos1.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    // 그룹 중심 간 최소 거리 설정
+                    const minGroupDistance = 350; // 그룹 중심 간 최소 거리 (확대됨)
+                    const maxRepulsionDistance = 700; // 반발력이 작용하는 최대 거리 (확대됨)
+                    
+                    if (distance > 0 && distance < maxRepulsionDistance) {
+                        // 거리가 가까울수록 강한 반발력
+                        let repulsionStrength;
+                        if (distance < minGroupDistance) {
+                            // 최소 거리보다 가까운 경우 강한 반발력
+                            repulsionStrength = 20 * (1 - distance / minGroupDistance);
+                        } else {
+                            // 최소 거리와 최대 거리 사이에서는 약한 반발력
+                            repulsionStrength = 8 * (1 - (distance - minGroupDistance) / (maxRepulsionDistance - minGroupDistance));
+                        }
+                        
+                        const normalizedX = dx / distance;
+                        const normalizedY = dy / distance;
+                        
+                        // 각 그룹의 모든 노드들에 반발력 적용
+                        const group1NodeIds = valueCourseIds[groupKey1] || [];
+                        group1NodeIds.forEach(nodeId => {
+                            if (!boundaryForces.has(nodeId)) {
+                                boundaryForces.set(nodeId, { x: 0, y: 0 });
+                            }
+                            const currentForce = boundaryForces.get(nodeId);
+                            // 그룹1 노드들은 그룹2와 반대 방향으로 밀림
+                            currentForce.x -= normalizedX * repulsionStrength * 0.3;
+                            currentForce.y -= normalizedY * repulsionStrength * 0.3;
+                        });
+                        
+                        const group2NodeIds = valueCourseIds[groupKey2] || [];
+                        group2NodeIds.forEach(nodeId => {
+                            if (!boundaryForces.has(nodeId)) {
+                                boundaryForces.set(nodeId, { x: 0, y: 0 });
+                            }
+                            const currentForce = boundaryForces.get(nodeId);
+                            // 그룹2 노드들은 그룹1과 반대 방향으로 밀림
+                            currentForce.x += normalizedX * repulsionStrength * 0.3;
+                            currentForce.y += normalizedY * repulsionStrength * 0.3;
+                        });
+                    }
+                }
+            });
         });
         
         // 계산 결과 로그
@@ -8157,8 +8423,8 @@ function renderCommonValuesNetworkGraph() {
     function applyBoundaryRepulsion() {
         if (!repulsionSystemActive) return;
         
-        // network 객체 유효성 검사
-        if (!network || typeof network.getPositions !== 'function') {
+        // 네트워크 준비 상태 확인
+        if (!isNetworkReady()) {
             return;
         }
         
@@ -8185,13 +8451,20 @@ function renderCommonValuesNetworkGraph() {
                     hasSignificantForces = true;
                     try {
                         // 네트워크 객체 존재 확인
-                        if (!window.commonValuesNetwork) {
+                        if (!window.commonValuesNetwork || !window.commonValuesNetwork.getPosition) {
                             return;
                         }
-                        const currentPos = window.commonValuesNetwork.getPosition(nodeId);
-                        if (currentPos) {
+                        
+                        // 노드가 존재하는지 먼저 확인
+                        const activeNetwork = window.commonValuesNetwork;
+                        if (!activeNetwork.body || !activeNetwork.body.nodes || !activeNetwork.body.nodes[nodeId]) {
+                            return;
+                        }
+                        
+                        const currentPos = activeNetwork.getPosition(nodeId);
+                        if (currentPos && !isNaN(currentPos.x) && !isNaN(currentPos.y)) {
                             // 안정화 정도와 노드 위치에 따라 dampening 조정
-                            let dampening = 0.18;
+                            let dampening = 0.08; // 더 부드러운 움직임을 위해 감소
                             
                             // 스플라인 침입 노드들에게는 더 강한 dampening 적용
                             let isSplineIntruder = false;
@@ -8204,14 +8477,29 @@ function renderCommonValuesNetworkGraph() {
                             });
                             
                             if (isSplineIntruder) {
-                                dampening = 0.5; // 스플라인 침입자는 매우 강한 dampening (0.25 → 0.5)
+                                dampening = 0.2; // 스플라인 침입자도 부드럽게
                             } else if (stabilityInfo.maxMovement < 1.0) {
-                                dampening *= 0.9; // 거의 안정화되면 부드럽게 (0.8 → 0.9)
+                                dampening *= 0.3; // 거의 안정화되면 매우 부드럽게
                             }
                             
+                            // 힘이 너무 작으면 무시 (떨림 방지)
+                            if (Math.abs(force.x) < 0.2 && Math.abs(force.y) < 0.2) {
+                                return;
+                            }
+                            
+                            // 스무딩을 위한 이전 위치와의 보간
+                            const smoothingFactor = 0.7; // 70%는 현재 위치, 30%만 이동
+                            const targetX = currentPos.x + force.x * dampening;
+                            const targetY = currentPos.y + force.y * dampening;
+                            
+                            // 최대 이동 거리 제한 (떨림 방지)
+                            const maxMove = 2.0; // 픽셀
+                            const moveX = Math.min(Math.max(targetX - currentPos.x, -maxMove), maxMove);
+                            const moveY = Math.min(Math.max(targetY - currentPos.y, -maxMove), maxMove);
+                            
                             nodesToUpdate[nodeId] = {
-                                x: currentPos.x + force.x * dampening,
-                                y: currentPos.y + force.y * dampening
+                                x: currentPos.x + moveX,
+                                y: currentPos.y + moveY
                             };
                         }
                     } catch (error) {
@@ -8228,12 +8516,25 @@ function renderCommonValuesNetworkGraph() {
             // 배치로 노드 위치 업데이트
             Object.entries(nodesToUpdate).forEach(([nodeId, pos]) => {
                 try {
-                    // 네트워크 객체 존재 확인
-                    if (window.commonValuesNetwork) {
-                        window.commonValuesNetwork.moveNode(nodeId, pos.x, pos.y);
+                    // 네트워크 객체와 노드 존재 확인
+                    const activeNetwork = window.commonValuesNetwork;
+                    if (!activeNetwork || !activeNetwork.moveNode) {
+                        return;
+                    }
+                    
+                    // 노드가 존재하는지 확인
+                    if (!activeNetwork.body || !activeNetwork.body.nodes || !activeNetwork.body.nodes[nodeId]) {
+                        return;
+                    }
+                    
+                    // 위치가 유효한지 확인
+                    if (!isNaN(pos.x) && !isNaN(pos.y)) {
+                        activeNetwork.moveNode(nodeId, pos.x, pos.y);
                     }
                 } catch (error) {
-                    // 노드 이동 실패 시 무시
+                    // 노드 이동 실패 시 디버그 로그만 남김
+                    // 디버그 로그는 필요시에만 활성화
+                    // console.debug(`노드 이동 중 오류 (nodeId: ${nodeId}):`, error.message);
                 }
             });
             
@@ -8265,7 +8566,7 @@ function renderCommonValuesNetworkGraph() {
         }
         
         if (repulsionInterval) clearInterval(repulsionInterval);
-        repulsionInterval = setInterval(applyBoundaryRepulsion, 80); // 80ms마다 실행 (12.5fps) - 부드러운 속도
+        repulsionInterval = setInterval(applyBoundaryRepulsion, 150); // 150ms마다 실행 (6.7fps) - 매우 안정적인 속도
         repulsionSystemActive = true;
     }
     
@@ -8309,7 +8610,7 @@ function renderCommonValuesNetworkGraph() {
                 const vertexRepulsionForce = splineVertexForce * vertexForceMultiplier * 0.008;
                 
                 // 노드에 반발력 적용
-                const node = network.body.nodes[nodeId];
+                const node = activeNetwork.body.nodes[nodeId];
                 if (node) {
                     node.vx = (node.vx || 0) + dirX * vertexRepulsionForce;
                     node.vy = (node.vy || 0) + dirY * vertexRepulsionForce;
@@ -8326,6 +8627,9 @@ function renderCommonValuesNetworkGraph() {
         if (!commonValuesBlobData || Object.keys(commonValuesBlobData).length === 0) {
             return false; // 처리할 데이터가 없음
         }
+        if (!network || !network.body || !network.body.nodes) {
+            return false; // 네트워크 객체가 준비되지 않음
+        }
 
         // 그룹 드래그 중에는 침입 노드 검사 중단 (false positive 방지)
         if (isDraggingGroup) {
@@ -8340,8 +8644,8 @@ function renderCommonValuesNetworkGraph() {
         let detectedIntruders = [];
         
         // 물리 엔진의 각 노드에 연속적으로 부드러운 힘 적용
-        Object.keys(network.body.nodes).forEach(nodeId => {
-            const node = network.body.nodes[nodeId];
+        Object.keys(activeNetwork.body.nodes).forEach(nodeId => {
+            const node = activeNetwork.body.nodes[nodeId];
             if (!node) return;
             
             const nodePosition = { x: node.x, y: node.y };
@@ -8434,6 +8738,9 @@ function renderCommonValuesNetworkGraph() {
                         setTimeout(() => {
                             let currentNodePosition;
                             try {
+                                if (!network || !network.getPosition) {
+                                    return;
+                                }
                                 currentNodePosition = network.getPosition(nodeId);
                             } catch (e) {
                                 // 노드가 존재하지 않는 경우 무시
@@ -8500,20 +8807,24 @@ function renderCommonValuesNetworkGraph() {
         
         if (nodeUpdates.length > 0) {
             try {
-                network.body.data.nodes.update(nodeUpdates);
+                if (activeNetwork && activeNetwork.body && activeNetwork.body.data && activeNetwork.body.data.nodes) {
+                    activeNetwork.body.data.nodes.update(nodeUpdates);
+                }
             } catch (error) {
             }
         }
         
         // 힘이 적용되었다면 물리 시뮬레이션 활성화
-        if (totalForceApplied > 0 && network.physics) {
-            if (!network.physics.options.enabled) {
-                network.setOptions({
-                    physics: {
-                        enabled: true,
-                        stabilization: false
-                    }
-                });
+        if (totalForceApplied > 0 && activeNetwork && activeNetwork.physics) {
+            if (!activeNetwork.physics.options.enabled) {
+                if (activeNetwork.setOptions) {
+                    activeNetwork.setOptions({
+                        physics: {
+                            enabled: true,
+                            stabilization: false
+                        }
+                    });
+                }
             }
         }
         
@@ -8562,20 +8873,34 @@ function renderCommonValuesNetworkGraph() {
     function updateGroupBoundary(groupKey) {
         if (!groupKey || !valueCourseIds[groupKey]) return;
         
+        // 네트워크가 생성되지 않았거나 준비되지 않은 경우 무시
+        if (!network || !network.body || !network.body.nodes || !window.commonValuesNetworkReady) {
+            return;
+        }
+        
         const ids = valueCourseIds[groupKey];
         if (!ids.length) return;
 
+        // 네트워크에 실제로 존재하는 노드들만 필터링
+        const activeNetwork = network || window.commonValuesNetwork;
+        if (!activeNetwork || !activeNetwork.body || !activeNetwork.body.nodes) {
+            return;
+        }
+        
+        const existingNodeIds = ids.filter(id => activeNetwork.body.nodes[id]);
+        
         let outlinePoints = [];
-        ids.forEach(id => {
+        existingNodeIds.forEach(id => {
             try {
-                const position = network.getPosition(id);
+                const position = activeNetwork.getPosition(id);
                 if (position) {
-                    const points = getNodeOutlinePoints(network, id, 15);
+                    const points = getNodeOutlinePoints(activeNetwork, id, 15);
                     outlinePoints = outlinePoints.concat(points);
                 }
             } catch (e) {
-                // 노드가 존재하지 않는 경우 무시
-                console.warn(`Node ${id} not found in network`);
+                // 극히 드문 경우에만 발생 - 로그 레벨 낮춤
+                // 극히 드문 경우에만 발생 - 로그 레벨 낮춤
+                // console.debug(`Position error for node ${id}:`, e.message);
             }
         });
 
@@ -8589,7 +8914,13 @@ function renderCommonValuesNetworkGraph() {
         
         // requestAnimationFrame을 사용하여 부드러운 렌더링
         requestAnimationFrame(() => {
-            network.redraw();
+            if (window.commonValuesNetwork && window.commonValuesNetwork.redraw && window.commonValuesNetworkReady) {
+                try {
+                    window.commonValuesNetwork.redraw();
+                } catch (e) {
+                    console.warn('Redraw failed:', e);
+                }
+            }
         });
     }
 
@@ -8598,11 +8929,14 @@ function renderCommonValuesNetworkGraph() {
         if (!commonValuesBlobData || Object.keys(commonValuesBlobData).length === 0) {
             return 0;
         }
+        if (!network || !network.body || !network.body.nodes) {
+            return 0;
+        }
 
         let invasionCount = 0;
         
-        Object.keys(network.body.nodes).forEach(nodeId => {
-            const node = network.body.nodes[nodeId];
+        Object.keys(activeNetwork.body.nodes).forEach(nodeId => {
+            const node = activeNetwork.body.nodes[nodeId];
             if (!node) return;
             
             const nodePosition = { x: node.x, y: node.y };
@@ -8806,6 +9140,9 @@ function renderCommonValuesNetworkGraph() {
     // 노드 외곽점 샘플링 함수 (더 부드러운 스플라인을 위해 더 많은 점 생성)
     // 그룹별로 겹침을 최소화하기 위해 offset을 더 크게 적용
     function getNodeOutlinePoints(network, nodeId, offset = 48) {
+        if (!network || !network.getPosition || !network.body || !network.body.nodes) {
+            return [];
+        }
         let pos;
         try {
             pos = network.getPosition(nodeId);
@@ -8883,7 +9220,7 @@ function renderCommonValuesNetworkGraph() {
             let alpha = 0.56; // 기본
             if (selectedCommonValuesBlob === key) {
                 alpha = 0.82; // 선택됨
-            } else if (hoveredBlob === key) {
+            } else if (hoveredBlob && hoveredBlob === key) {
                 alpha = 0.7; // 호버됨
             }
             ctx.globalAlpha = alpha;
@@ -8895,7 +9232,7 @@ function renderCommonValuesNetworkGraph() {
             let lineWidth = 2; // 기본
             if (selectedCommonValuesBlob === key) {
                 lineWidth = 4; // 선택됨
-            } else if (hoveredBlob === key) {
+            } else if (hoveredBlob && hoveredBlob === key) {
                 lineWidth = 3; // 호버됨
             }
             ctx.lineWidth = lineWidth;
@@ -8993,13 +9330,16 @@ function renderCommonValuesNetworkGraph() {
     let groupOriginalPositions = {};
 
     // blob 커브 클릭 및 드래그 이벤트 처리
-    network.on('click', function(params) {
+    if (network && network.on) {
+        network.on('click', function(params) {
         // 노드 클릭 시 스플라인 선택 해제
         if (params.nodes.length > 0) {
             if (selectedCommonValuesBlob) {
                 selectedCommonValuesBlob = null;
                 updateNodeHighlight();
-                network.redraw();
+                if (network && network.redraw) {
+                    network.redraw();
+                }
             }
             return;
         }
@@ -9020,25 +9360,30 @@ function renderCommonValuesNetworkGraph() {
                 // 같은 그룹 클릭 시 선택해제, 다른 그룹 클릭 시 선택 변경
                 selectedCommonValuesBlob = selectedCommonValuesBlob === clickedBlob ? null : clickedBlob;
                 updateNodeHighlight();
-                network.redraw();
+                if (network && network.redraw) {
+                    network.redraw();
+                }
             } else {
                 // 빈 영역 클릭 시 선택 해제
                 if (selectedCommonValuesBlob) {
                     selectedCommonValuesBlob = null;
                     updateNodeHighlight();
-                    network.redraw();
+                    if (network && network.redraw) {
+                        network.redraw();
+                    }
                 }
             }
         }
     });
 
     // 마우스 호버 시 스플라인 하이라이트
-    let hoveredBlob = null;
     network.on('hoverNode', function(params) {
         // 노드 호버 시에는 스플라인 호버 해제
         if (hoveredBlob) {
             hoveredBlob = null;
-            network.redraw();
+            if (network && network.redraw) {
+                network.redraw();
+            }
         }
     });
     
@@ -9057,20 +9402,40 @@ function renderCommonValuesNetworkGraph() {
         };
         
         // 해당 위치의 노드 확인 - 노드가 있으면 스플라인 드래그 방지
-        let nodeAtPosition;
+        let nodeAtPosition = null;
         try {
-            nodeAtPosition = network.getNodeAt(canvasPosition);
+            if (!network || !network.getNodeAt) {
+                // getNodeAt 메소드가 없는 경우 다른 방식으로 노드 확인
+                if (network && network.interactionHandler) {
+                    const pointer = network.interactionHandler.getPointer({x: canvasPosition.x, y: canvasPosition.y});
+                    const nodeId = network.interactionHandler.getNodeAt(pointer);
+                    if (nodeId) {
+                        nodeAtPosition = nodeId;
+                    }
+                } else {
+                    // interactionHandler도 없는 경우 스킵
+                    // 디버그 로그는 필요시에만 활성화
+                    // console.debug('Node detection methods not available');
+                }
+            } else {
+                nodeAtPosition = network.getNodeAt(canvasPosition);
+            }
+            
             if (nodeAtPosition) {
                 return;
             }
         } catch (e) {
-            console.warn('네트워크에서 노드 위치 확인 중 오류:', e.message);
-            return;
+            // 디버그 로그는 필요시에만 활성화
+            // console.debug('노드 위치 확인 중 오류 (무시됨):', e.message);
+            // 오류가 발생해도 계속 진행
         }
         
         // vis.js 캔버스 좌표계로 직접 변환
         let canvasPos;
         try {
+            if (!network || !network.DOMtoCanvas) {
+                return;
+            }
             canvasPos = network.DOMtoCanvas(canvasPosition);
         } catch (e) {
             return;
@@ -9092,6 +9457,9 @@ function renderCommonValuesNetworkGraph() {
                 if (groupNodeIds && groupNodeIds.length > 0) {
                     groupNodeIds.forEach(nodeId => {
                         try {
+                            if (!network || !network.getPosition) {
+                                return;
+                            }
                             const nodePosition = network.getPosition(nodeId);
                             if (nodePosition && typeof nodePosition.x === 'number' && typeof nodePosition.y === 'number') {
                                 groupOriginalPositions[nodeId] = { x: nodePosition.x, y: nodePosition.y };
@@ -9104,13 +9472,15 @@ function renderCommonValuesNetworkGraph() {
                 
                 // 물리 시뮬레이션과 상호작용 비활성화, 반발력 시스템 일시 정지
                 try {
-                    network.setOptions({
-                        physics: { enabled: false },
-                        interaction: {
-                            dragNodes: false,
-                            dragView: false
-                        }
-                    });
+                    if (network && network.setOptions) {
+                        network.setOptions({
+                            physics: { enabled: false },
+                            interaction: {
+                                dragNodes: false,
+                                dragView: false
+                            }
+                        });
+                    }
                 } catch (e) {
                     console.warn('네트워크 옵션 설정 중 오류:', e.message);
                 }
@@ -9217,7 +9587,9 @@ function renderCommonValuesNetworkGraph() {
                     container.style.cursor = hoveredBlob ? 'pointer' : 'default';
                 }
                 
-                network.redraw();
+                if (network && network.redraw) {
+                    network.redraw();
+                }
             }
         }
     });
@@ -9242,13 +9614,15 @@ function renderCommonValuesNetworkGraph() {
             mouseDownPosition = null;
             
             // 물리 시뮬레이션과 상호작용 재활성화, 반발력 시스템 재시작
-            network.setOptions({
-                physics: { enabled: true },
-                interaction: {
-                    dragNodes: true,
-                    dragView: true
-                }
-            });
+            if (network && network.setOptions) {
+                network.setOptions({
+                    physics: { enabled: true },
+                    interaction: {
+                        dragNodes: true,
+                        dragView: true
+                    }
+                });
+            }
             
             // 반발력 시스템 상태 확인 (이미 활성화되어 있어야 함)
             repulsionSystemActive = true;
@@ -9448,7 +9822,10 @@ function renderCommonValuesNetworkGraph() {
         network.unselectAll();
         document.body.style.cursor = 'default';
     });
+    } // end of network.on handlers check
 }
+
+
 // ... existing code ...
 
 // 공통가치대응 탭 활성화 시 네트워크 그래프 렌더링
@@ -11277,6 +11654,33 @@ function updateColorLegendCommonValues() {
     });
 }
 
+
+// 초기화 함수
+async function init() {
+    console.log('앱 초기화 시작...');
+    
+    try {
+        // Firebase 초기화
+        initializeFirebase();
+        
+        // 변경 이력 로드
+        loadChangeHistory();
+        
+        // Firebase에서 데이터 로드 시도
+        if (firebaseInitialized) {
+            await loadAllDataFromFirebase();
+        }
+        
+        console.log('앱 초기화 완료!');
+    } catch (error) {
+        console.error('앱 초기화 중 오류:', error);
+    }
+}
+
+// UI 초기화 함수 (필요시 사용)
+function initializeUI() {
+    console.log('UI 초기화...');
+}
 
 // 전역 함수 할당 - 마지막에 실행되도록 보장
 window.init = init;
