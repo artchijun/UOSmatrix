@@ -2944,19 +2944,34 @@ window.onload = function() {
             showTab(tabName, e);
         });
     });
-    // 필터 이벤트 리스너
-    document.getElementById('yearFilter').addEventListener('change', filterCourses);
-    document.getElementById('semesterFilter').addEventListener('change', filterCourses);
-    document.getElementById('categoryFilter').addEventListener('change', filterCourses);
-    document.getElementById('subjectTypeFilter').addEventListener('change', filterCourses);
-    document.getElementById('searchInput').addEventListener('keyup', filterCourses);
+    // 필터 이벤트 리스너 - null 체크 추가
+    const yearFilter = document.getElementById('yearFilter');
+    if (yearFilter) yearFilter.addEventListener('change', filterCourses);
+    
+    const semesterFilter = document.getElementById('semesterFilter');
+    if (semesterFilter) semesterFilter.addEventListener('change', filterCourses);
+    
+    const categoryFilter = document.getElementById('categoryFilter');
+    if (categoryFilter) categoryFilter.addEventListener('change', filterCourses);
+    
+    const subjectTypeFilter = document.getElementById('subjectTypeFilter');
+    if (subjectTypeFilter) subjectTypeFilter.addEventListener('change', filterCourses);
+    
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) searchInput.addEventListener('keyup', filterCourses);
     
     // 변경상태 필터 초기화 (모두 체크된 상태로 시작)
-    document.getElementById('showAdded').checked = true;
-    document.getElementById('showModified').checked = true;
-    document.getElementById('showDeleted').checked = true;
-    document.getElementById('showUnchanged').checked = true;
-    init();
+    const showAdded = document.getElementById('showAdded');
+    if (showAdded) showAdded.checked = true;
+    
+    const showModified = document.getElementById('showModified');
+    if (showModified) showModified.checked = true;
+    
+    const showDeleted = document.getElementById('showDeleted');
+    if (showDeleted) showDeleted.checked = true;
+    
+    const showUnchanged = document.getElementById('showUnchanged');
+    if (showUnchanged) showUnchanged.checked = true;
     initColumnResize();
     updateFontSize(); // 폰트 사이즈 초기화
     // 매트릭스 탭을 기본으로 표시
@@ -2975,15 +2990,13 @@ window.onload = function() {
     if (verBtn1) verBtn1.style.display = 'none';
     if (verBtn2) verBtn2.style.display = 'none';
     // 최초 로딩 시 제목 불러오기 및 이벤트 연결
-    window.addEventListener('DOMContentLoaded', function() {
-        const title = document.getElementById('matrixTitle');
-        if (title) {
-            const saved = localStorage.getItem('matrixTitleText');
-            if (saved) title.textContent = saved;
-            title.addEventListener('input', handleMatrixTitleInput);
-            setMatrixTitleEditable(false);
-        }
-    });
+    const title = document.getElementById('matrixTitle');
+    if (title) {
+        const saved = localStorage.getItem('matrixTitleText');
+        if (saved) title.textContent = saved;
+        title.addEventListener('input', handleMatrixTitleInput);
+        setMatrixTitleEditable(false);
+    }
 };
 
 // 매트릭스에서 교과목 수정
@@ -3564,8 +3577,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 색상 범례 초기화 (페이지 로드 시)
     setTimeout(() => {
-        updateColorLegendCurriculum();
-        updateColorLegendCommonValues();
+        if (typeof updateColorLegendCurriculum === 'function') {
+            updateColorLegendCurriculum();
+        }
+        if (typeof updateColorLegendCommonValues === 'function') {
+            updateColorLegendCommonValues();
+        }
     }, 100);
 });
 
@@ -4163,40 +4180,43 @@ function renderCurriculumTable() {
     
 
 
-    // 삭제된 교과목들 배치
-    const deletedCourses = diffSummary.filter(entry => entry.type === '삭제');
-    deletedCourses.forEach(entry => {
-        const course = entry.course;
-        const cellId = getCurriculumCellId(course);
-        const cell = document.getElementById(cellId);
-        if (cell) {
-            let blockWrap = cell.querySelector('.block-wrap');
-            if (!blockWrap) {
-                blockWrap = document.createElement('div');
-                blockWrap.className = 'block-wrap';
-                cell.appendChild(blockWrap);
+    // 삭제된 교과목들 배치 (변경사항 표시 모드에서만)
+    if (showChangesModeCurriculum) {
+        const deletedCourses = diffSummary.filter(entry => entry.type === '삭제');
+        deletedCourses.forEach(entry => {
+            const course = entry.course;
+            const cellId = getCurriculumCellId(course);
+            const cell = document.getElementById(cellId);
+            if (cell) {
+                let blockWrap = cell.querySelector('.block-wrap');
+                if (!blockWrap) {
+                    blockWrap = document.createElement('div');
+                    blockWrap.className = 'block-wrap';
+                    cell.appendChild(blockWrap);
+                }
+                const block = createCourseBlock(course, true, false); // 삭제된 교과목
+                blockWrap.appendChild(block);
             }
-            const block = createCourseBlock(course, true, false); // 삭제된 교과목
-            blockWrap.appendChild(block);
-        }
-    });
+        });
+    }
     
-    // 고스트 블럭 생성
-    movedCoursesForGhost.forEach((moveInfo, index) => {
-        const initialCellId = getCurriculumCellId(moveInfo.initialCourse);
-        const initialCell = document.getElementById(initialCellId);
-        if (initialCell) {
-            let blockWrap = initialCell.querySelector('.block-wrap');
-            if (!blockWrap) {
-                blockWrap = document.createElement('div');
-                blockWrap.className = 'block-wrap';
-                initialCell.appendChild(blockWrap);
+    // 고스트 블럭 생성 (변경사항 표시 모드에서만)
+    if (showChangesModeCurriculum) {
+        movedCoursesForGhost.forEach((moveInfo, index) => {
+            const initialCellId = getCurriculumCellId(moveInfo.initialCourse);
+            const initialCell = document.getElementById(initialCellId);
+            if (initialCell) {
+                let blockWrap = initialCell.querySelector('.block-wrap');
+                if (!blockWrap) {
+                    blockWrap = document.createElement('div');
+                    blockWrap.className = 'block-wrap';
+                    initialCell.appendChild(blockWrap);
+                }
+                const ghostBlock = createCourseBlock(moveInfo.initialCourse, false, true);
+                blockWrap.appendChild(ghostBlock);
             }
-            const ghostBlock = createCourseBlock(moveInfo.initialCourse, false, true);
-            blockWrap.appendChild(ghostBlock);
-        }
-    });
-    
+        });
+    }
     // 학점 합계 계산 및 표시
     calculateAndDisplayCredits();
     
@@ -4206,14 +4226,16 @@ function renderCurriculumTable() {
     // block-wrap 드래그 이벤트 연결
     setupBlockWrapDragEvents();
     
-    // 화살표 그리기 (DOM 렌더링이 확실히 끝난 뒤 실행)
-    setTimeout(() => {
-        requestAnimationFrame(() => {
+    // 화살표 그리기 (DOM 렌더링이 확실히 끝난 뒤 실행) - 변경사항 표시 모드에서만
+    if (showChangesModeCurriculum) {
+        setTimeout(() => {
             requestAnimationFrame(() => {
-                drawMoveArrows(movedCoursesForGhost);
+                requestAnimationFrame(() => {
+                    drawMoveArrows(movedCoursesForGhost);
+                });
             });
-        });
-    }, 0);
+        }, 0);
+    }
     
     // 교과목 블록 배치 후 셀 텍스트 복원 (교과목 블록이 없는 셀들만)
     let restoredCellCount = 0;
@@ -4492,6 +4514,12 @@ function createCourseBlock(course, isDeleted = false, isGhost = false) {
     block.dataset.courseName = course.courseName;
     block.dataset.courseId = course.id;
     
+    // 현재 활성화된 탭 확인 (함수 상단에서 선언)
+    const commonValuesTab = document.getElementById('commonValues');
+    const curriculumTab = document.getElementById('curriculum');
+    const isCommonValuesActive = commonValuesTab && commonValuesTab.classList.contains('active');
+    const isCurriculumActive = curriculumTab && curriculumTab.classList.contains('active');
+    
     // 삭제된 교과목인 경우
     if (isDeleted) {
         block.classList.add('deleted');
@@ -4502,36 +4530,37 @@ function createCourseBlock(course, isDeleted = false, isGhost = false) {
     } 
     // 일반 교과목인 경우
     else {
-        // 변경 유형 확인
-        const diffSummary = getCurrentDiffSummary();
-        const courseChange = diffSummary.find(entry => 
-            entry.course && entry.course.id === course.id
-        );
         
-        // 변경 유형에 따른 클래스 적용
-        if (courseChange) {
-            switch(courseChange.type) {
-                case '추가':
-                    block.classList.add('highlighted'); // 초록색 강조
-                    break;
-                case '수정':
-                    // 학년학기가 변경된 경우 moved 클래스 추가
-                    const yearSemesterChanged = courseChange.changes.some(c => c.field === 'yearSemester');
-                    if (yearSemesterChanged) {
-                        block.classList.add('moved');
-                    }
-                    block.classList.add('modified'); // 파란색 강조
-                    break;
+        // 변경사항 표시 모드일 때만 변경 유형 확인
+        if ((isCurriculumActive && showChangesModeCurriculum) || 
+            (isCommonValuesActive && showChangesModeCommonValues)) {
+            const diffSummary = getCurrentDiffSummary();
+            const courseChange = diffSummary.find(entry => 
+                entry.course && entry.course.id === course.id
+            );
+            
+            // 변경 유형에 따른 클래스 적용
+            if (courseChange) {
+                switch(courseChange.type) {
+                    case '추가':
+                        block.classList.add('highlighted'); // 초록색 강조
+                        break;
+                    case '수정':
+                        // 학년학기가 변경된 경우 moved 클래스 추가
+                        const yearSemesterChanged = courseChange.changes.some(c => c.field === 'yearSemester');
+                        if (yearSemesterChanged) {
+                            block.classList.add('moved');
+                        }
+                        block.classList.add('modified'); // 파란색 강조
+                        break;
+                }
             }
         }
     }
     
     // 카테고리별 색상 클래스 추가
     // 공통가치대응 탭이 활성화된 경우 색상 기준 전환 스위치에 따라 결정
-    const commonValuesTab = document.getElementById('commonValues');
-    const curriculumTab = document.getElementById('curriculum');
-    
-    if (commonValuesTab && commonValuesTab.classList.contains('active')) {
+    if (isCommonValuesActive) {
         if (colorModeBySubjectType) {
             // 과목분류 기준 색상
             const subjectTypeClass = getSubjectTypeClass(course.subjectType);
@@ -4545,7 +4574,7 @@ function createCourseBlock(course, isDeleted = false, isGhost = false) {
                 block.classList.add(`course-block-${categoryClass}`);
             }
         }
-    } else if (curriculumTab && curriculumTab.classList.contains('active')) {
+    } else if (isCurriculumActive) {
         if (colorModeBySubjectTypeCurriculum) {
             // 과목분류 기준 색상
             const subjectTypeClass = getSubjectTypeClass(course.subjectType);
@@ -4569,10 +4598,7 @@ function createCourseBlock(course, isDeleted = false, isGhost = false) {
     
     // 설계 교과목의 경우 색상 기준 전환을 위한 추가 클래스 적용
     if (course.category === '설계' && course.subjectType === '설계') {
-        const commonValuesTab = document.getElementById('commonValues');
-        const curriculumTab = document.getElementById('curriculum');
-        
-        if (commonValuesTab && commonValuesTab.classList.contains('active')) {
+        if (isCommonValuesActive) {
             if (colorModeBySubjectType) {
                 // 과목분류 모드에서는 subjectType 기준으로 이미 적용됨
                 block.classList.add('color-mode-subject-type');
@@ -4580,7 +4606,7 @@ function createCourseBlock(course, isDeleted = false, isGhost = false) {
                 // 구분 모드에서는 category 기준으로 이미 적용됨
                 block.classList.add('color-mode-category');
             }
-        } else if (curriculumTab && curriculumTab.classList.contains('active')) {
+        } else if (isCurriculumActive) {
             if (colorModeBySubjectTypeCurriculum) {
                 // 과목분류 모드에서는 subjectType 기준으로 이미 적용됨
                 block.classList.add('color-mode-subject-type');
@@ -4591,17 +4617,21 @@ function createCourseBlock(course, isDeleted = false, isGhost = false) {
         }
     }
     
-    // 교과목 이름 변경 이력 확인
-    const diffSummary = getCurrentDiffSummary();
-    const courseChange = diffSummary.find(entry => 
-        entry.course && entry.course.id === course.id
-    );
-    
+    // 교과목 이름 변경 이력 확인 (변경사항 표시 모드일 때만)
     let originalCourseName = '';
-    if (courseChange && courseChange.type === '수정') {
-        const nameChange = courseChange.changes.find(change => change.field === 'courseName');
-        if (nameChange) {
-            originalCourseName = nameChange.before;
+    
+    if ((isCurriculumActive && showChangesModeCurriculum) || 
+        (isCommonValuesActive && showChangesModeCommonValues)) {
+        const diffSummary = getCurrentDiffSummary();
+        const courseChange = diffSummary.find(entry => 
+            entry.course && entry.course.id === course.id
+        );
+        
+        if (courseChange && courseChange.type === '수정') {
+            const nameChange = courseChange.changes.find(change => change.field === 'courseName');
+            if (nameChange) {
+                originalCourseName = nameChange.before;
+            }
         }
     }
     
@@ -4610,7 +4640,7 @@ function createCourseBlock(course, isDeleted = false, isGhost = false) {
         <div class="course-block-title">${course.courseName}<span class="course-credits-text">(${course.credits})</span></div>
     `;
     
-    // 이전 교과목 이름이 있으면 표시
+    // 이전 교과목 이름이 있으면 표시 (변경사항 표시 모드일 때만)
     if (originalCourseName && originalCourseName !== course.courseName) {
         blockContent += `
             <div class="course-block-original-name">이전: ${originalCourseName}</div>
@@ -4671,6 +4701,15 @@ let isCourseBlockDragging = false; // 드래그 중 여부 플래그 추가
 
 function showCourseTooltip(event, course) {
     if (isCourseBlockDragging) return; // 드래그 중에는 툴팁 표시 안함
+    
+    // 수정모드일 때는 툴팁 표시 안함
+    const curriculumEditModeButton = document.getElementById('editModeToggleCurriculum');
+    const commonValuesEditModeButton = document.getElementById('editModeToggleCommonValues');
+    const isCurriculumEditMode = curriculumEditModeButton && curriculumEditModeButton.classList.contains('active');
+    const isCommonValuesEditMode = commonValuesEditModeButton && commonValuesEditModeButton.classList.contains('active');
+    
+    if (isCurriculumEditMode || isCommonValuesEditMode) return;
+    
     window.hideCourseTooltip(); // 기존 툴팁 제거 및 타이머 취소
     tooltipTimer = setTimeout(() => {
         const tooltip = document.createElement('div');
@@ -7237,8 +7276,7 @@ function renderCommonValuesNetworkGraph() {
         '설계', '디지털', '역사', '이론', '도시', '사회', '기술', '실무', '비교과'
     ];
     
-    // 디버그: commonValuesCopiedBlocks 구조 확인
-    console.log('[Debug] commonValuesCopiedBlocks:', commonValuesCopiedBlocks);
+    // commonValuesCopiedBlocks 구조 확인
     
     // 전역 valueCourseIds 초기화
     valueCourseIds = { value1: [], value2: [], value3: [] };
@@ -7255,11 +7293,7 @@ function renderCommonValuesNetworkGraph() {
         valueCourseIds[key] = Array.from(new Set(valueCourseIds[key]));
     });
     
-    // 디버그: valueCourseIds 내용 확인
-    console.log('[Debug] valueCourseIds after initialization:', valueCourseIds);
-    console.log('[Debug] value1 courses:', valueCourseIds.value1.length, valueCourseIds.value1);
-    console.log('[Debug] value2 courses:', valueCourseIds.value2.length, valueCourseIds.value2);
-    console.log('[Debug] value3 courses:', valueCourseIds.value3.length, valueCourseIds.value3);
+    // valueCourseIds 내용 확인
 
     // 노드: 교과목만 추가 (VALUE1,2,3 노드 제거)
     const nodes = [];
@@ -7269,7 +7303,7 @@ function renderCommonValuesNetworkGraph() {
             if (!nodeIdSet.has(courseId)) {
                 const course = courses.find(c => c.id === courseId);
                 if (!course) {
-                    console.log(`[Debug] Course not found for ${key}: courseId=${courseId}`);
+                    // Course not found for courseId
                 }
                 if (course) {
                     let nodeColor = {};
@@ -7353,12 +7387,7 @@ function renderCommonValuesNetworkGraph() {
         });
     });
     
-    // 디버그: 생성된 노드 수 확인
-    console.log('[Debug] Total nodes created:', nodes.length);
-    valueKeys.forEach(key => {
-        const nodesInGroup = nodes.filter(n => n.group === key).length;
-        console.log(`[Debug] Nodes created for ${key}:`, nodesInGroup);
-    });
+    // 생성된 노드 수 확인
 
     // 엣지: 같은 학년-학기 내 교과목끼리만 연결
     const edges = [];
@@ -9718,7 +9747,12 @@ function handleCommonValuesDrop(e) {
         const wrap = td.querySelector('.block-wrap');
         // [수정] 복사 정보 전역 객체에 저장
         const valueKey = idParts[1]; // value1, value2, value3
-        if (!commonValuesCopiedBlocks[subjectType]) commonValuesCopiedBlocks[subjectType] = { value1: [], value2: [], value3: [] };
+        if (!commonValuesCopiedBlocks[subjectType]) {
+            commonValuesCopiedBlocks[subjectType] = { value1: [], value2: [], value3: [] };
+        }
+        if (!commonValuesCopiedBlocks[subjectType][valueKey]) {
+            commonValuesCopiedBlocks[subjectType][valueKey] = [];
+        }
         if (!commonValuesCopiedBlocks[subjectType][valueKey].includes(course.id)) {
             commonValuesCopiedBlocks[subjectType][valueKey].push(course.id);
         }
@@ -9878,6 +9912,60 @@ function toggleColorMode() {
 
 // 색상 기준 전환 상태 변수 (true: 과목분류, false: 구분)
 let colorModeBySubjectTypeCurriculum = true;
+
+// 보기 모드 상태 변수 (true: 변경사항 표시, false: 변경사항 적용)
+let showChangesModeCurriculum = true;
+let showChangesModeCommonValues = true;
+
+// 보기 모드 전환 함수 (이수모형 탭용)
+function toggleViewModeCurriculum() {
+    showChangesModeCurriculum = !showChangesModeCurriculum;
+    const button = document.getElementById('viewModeToggleCurriculum');
+    const text = document.getElementById('viewModeTextCurriculum');
+    
+    if (button && text) {
+        if (showChangesModeCurriculum) {
+            // 변경사항 표시 모드
+            text.textContent = '변경사항 표시';
+            button.style.background = '#6c757d';
+        } else {
+            // 변경사항 적용 모드
+            text.textContent = '변경사항 적용';
+            button.style.background = '#28a745';
+        }
+    }
+    
+    // 이수모형 탭이 활성화된 경우에만 테이블 재렌더링
+    const curriculumTab = document.getElementById('curriculum');
+    if (curriculumTab && curriculumTab.classList.contains('active')) {
+        renderCurriculumTable();
+    }
+}
+
+// 보기 모드 전환 함수 (공통가치대응 탭용)
+function toggleViewModeCommonValues() {
+    showChangesModeCommonValues = !showChangesModeCommonValues;
+    const button = document.getElementById('viewModeToggleCommonValues');
+    const text = document.getElementById('viewModeTextCommonValues');
+    
+    if (button && text) {
+        if (showChangesModeCommonValues) {
+            // 변경사항 표시 모드
+            text.textContent = '변경사항 표시';
+            button.style.background = '#6c757d';
+        } else {
+            // 변경사항 적용 모드
+            text.textContent = '변경사항 적용';
+            button.style.background = '#28a745';
+        }
+    }
+    
+    // 공통가치대응 탭이 활성화된 경우에만 테이블 재렌더링
+    const commonValuesTab = document.getElementById('commonValues');
+    if (commonValuesTab && commonValuesTab.classList.contains('active')) {
+        renderCommonValuesTable();
+    }
+}
 
 // 색상 기준 전환 함수 (이수모형 탭용)
 function toggleColorModeCurriculum() {
@@ -11473,11 +11561,15 @@ document.addEventListener('click', function(event) {
 });
 
 // 파일 끝에서 init 함수를 전역으로 노출
-if (typeof init === 'function') {
-    window.init = init;
-    console.log('✓ app.js 로드 완료, window.init 함수 사용 가능');
+window.init = init;
+
+// DOM이 준비되면 자동으로 init 실행
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+        init();
+    });
 } else {
-    console.error('❌ init 함수가 정의되지 않았습니다.');
-    console.log('사용 가능한 함수들:', Object.keys(window).filter(k => k.includes('init')));
+    // DOM이 이미 로드된 경우 즉시 실행
+    init();
 }
 

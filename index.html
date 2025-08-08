@@ -669,6 +669,14 @@
                         <span id="colorModeTextCurriculum" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12px; color: #666; font-weight: 600; pointer-events: none;">분야</span>
                     </div>
                 </div>
+                
+                <!-- 보기 모드 전환 버튼 추가 -->
+                <div class="view-mode-switch" style="display: flex; align-items: center; gap: 8px; margin-right: 15px;">
+                    <span style="font-size: 14px; color: #666; font-weight: 500;">보기 모드:</span>
+                    <button class="btn btn-sm" id="viewModeToggleCurriculum" onclick="toggleViewModeCurriculum()" style="min-width: 120px; background: #6c757d; color: white;">
+                        <span id="viewModeTextCurriculum">변경사항 표시</span>
+                    </button>
+                </div>
                 <div class="font-size-controls">
                     <button class="btn btn-sm" onclick="decreaseCurriculumFontSize()">A-</button>
                     <span id="curriculum-font-size-display">12px</span>
@@ -769,6 +777,13 @@
                         <span id="colorModeText" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12px; color: #666; font-weight: 600; pointer-events: none;">분야</span>
                     </div>
                 </div>
+                                <!-- 보기 모드 전환 버튼 추가 -->
+                <div class="view-mode-switch" style="display: flex; align-items: center; gap: 8px; margin-right: 15px;">
+                    <span style="font-size: 14px; color: #666; font-weight: 500;">보기 모드:</span>
+                    <button class="btn btn-sm" id="viewModeToggleCommonValues" onclick="toggleViewModeCommonValues()" style="min-width: 120px; background: #6c757d; color: white;">
+                        <span id="viewModeTextCommonValues">변경사항 표시</span>
+                    </button>
+                </div>
                 <div class="font-size-controls">
                     <button class="btn btn-sm" onclick="decreaseCommonValuesFontSize()">A-</button>
                     <span id="commonValues-font-size-display">17px</span>
@@ -783,6 +798,7 @@
                 <button class="btn btn-secondary" onclick="exportCommonValuesToPDF()">
                     PDF 내보내기
                 </button>
+
                 <!-- 수정모드 토글 버튼 -->
                 <button class="btn btn-edit-mode-commonValues" id="editModeToggleCommonValues" onclick="toggleEditModeCommonValues()">
                     <span id="editModeTextCommonValues">일반모드</span>
@@ -1093,108 +1109,6 @@
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="app.js"></script>
-    <script>
-        // 초기화 플래그
-        let isInitialized = false;
-        
-        // 앱 초기화 함수 - 재시도 로직 포함
-        function initializeApp() {
-            // 이미 초기화되었으면 스킵
-            if (isInitialized) {
-                console.log('✓ 앱이 이미 초기화되었습니다.');
-                return true;
-            }
-            
-            console.log('앱 초기화 시도 중...');
-            
-            // init 함수 가용성 확인 (async 함수 지원)
-            if (typeof window.init === 'function') {
-                console.log('✓ window.init 함수 발견, 실행 중...');
-                try {
-                    const result = window.init();
-                    if (result && typeof result.then === 'function') {
-                        // async 함수인 경우
-                        result.catch(error => {
-                            console.error('Init 함수 실행 중 오류:', error);
-                        });
-                    }
-                    isInitialized = true;
-                    return true;
-                } catch (error) {
-                    console.error('Init 함수 실행 오류:', error);
-                    return false;
-                }
-            } else if (typeof init === 'function') {
-                console.log('✓ init 함수 발견, 실행 중...');
-                try {
-                    const result = init();
-                    if (result && typeof result.then === 'function') {
-                        // async 함수인 경우
-                        result.catch(error => {
-                            console.error('Init 함수 실행 중 오류:', error);
-                        });
-                    }
-                    isInitialized = true;
-                    return true;
-                } catch (error) {
-                    console.error('Init 함수 실행 오류:', error);
-                    return false;
-                }
-            } else {
-                console.warn('⚠️ init 함수를 아직 찾을 수 없습니다. 재시도 중...');
-                return false;
-            }
-        }
-        
-        // 즉시 실행 (app.js가 이미 로드된 경우)
-        if (document.readyState === 'loading') {
-            // DOM이 아직 로딩 중이면 DOMContentLoaded 대기
-            document.addEventListener('DOMContentLoaded', function() {
-                console.log('DOM 로드 완료');
-                
-                // 즉시 시도
-                if (!initializeApp()) {
-                    // 실패 시 짧은 간격으로 재시도
-                    let retryCount = 0;
-                    const maxRetries = 10;
-                    const retryInterval = setInterval(function() {
-                        retryCount++;
-                        console.log(`재시도 ${retryCount}/${maxRetries}`);
-                        
-                        if (initializeApp() || retryCount >= maxRetries) {
-                            clearInterval(retryInterval);
-                            if (retryCount >= maxRetries) {
-                                console.error('❌ init 함수 로드 실패 - 최대 재시도 횟수 초과');
-                                console.log('디버깅 정보:');
-                                console.log('- window.init 타입:', typeof window.init);
-                                console.log('- init 타입:', typeof window['init']);
-                                console.log('- 사용 가능한 init 함수들:', Object.keys(window).filter(k => k.includes('init')));
-                            }
-                        }
-                    }, 100); // 100ms 간격으로 재시도
-                }
-            });
-        } else {
-            // DOM이 이미 로드됨
-            console.log('DOM 이미 로드됨');
-            if (!initializeApp()) {
-                // 재시도 로직
-                setTimeout(function() {
-                    if (!initializeApp()) {
-                        console.error('❌ init 함수 로드 실패');
-                    }
-                }, 500);
-            }
-        }
-        
-        // 백업: window.load 이벤트에서도 시도 (모든 리소스 로드 후)
-        window.addEventListener('load', function() {
-            console.log('모든 리소스 로드 완료 - 백업 초기화 시도');
-            if (typeof window.init !== 'function') {
-                initializeApp();
-            }
-        });
-    </script>
     <!-- 변경이력 floating 버튼 삭제 -->
     <div id="changeHistoryPanel" style="display:none;position:fixed;top:60px;right:40px;width:360px;min-width:360px;max-width:360px;min-height:120px;height:380px;max-height:80vh;z-index:1002;background:linear-gradient(120deg,#f8fafc 80%,#e3f0ff 100%);box-shadow:0 4px 24px rgba(0,0,0,0.18);border-radius:14px;overflow:hidden;resize:both;">
         <div id="changeHistoryPanelHeader" style="cursor:move;padding:8px 14px 8px 14px;background:#1976d2;color:#fff;font-weight:bold;border-radius:14px 14px 0 0;user-select:none;display:flex;align-items:center;justify-content:space-between;">
@@ -1342,8 +1256,7 @@ function renderMatrixExtraTable() {
             cell.innerHTML = '<br>';
         }
     });
-    // 복원 로그
-    console.log('matrix-extra-table 복원 셀 개수:', cells.length, '복원 데이터 개수:', Object.keys(matrixExtraTableData).length);
+    // 복원 완료
 }
 </script>
 <script>
