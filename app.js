@@ -4447,14 +4447,8 @@ function getCourseTooltipHTML(course) {
 // 교과목 블록 드래그 시작
 function handleCourseBlockDragStart(e) {
     // 수정모드가 아닌 경우 드래그 방지
-    // 현재 활성화된 탭에 따라 적절한 수정모드 버튼 확인
-    const curriculumEditModeButton = document.getElementById('editModeToggleCurriculum');
-    const commonValuesEditModeButton = document.getElementById('editModeToggleCommonValues');
-    
-    const isCurriculumEditMode = curriculumEditModeButton && curriculumEditModeButton.classList.contains('active');
-    const isCommonValuesEditMode = commonValuesEditModeButton && commonValuesEditModeButton.classList.contains('active');
-    
-    if (!isCurriculumEditMode && !isCommonValuesEditMode) {
+    // 전역 변수로 직접 수정모드 확인
+    if (!isEditModeCurriculum && !isEditModeCommonValues) {
         e.preventDefault();
         return;
     }
@@ -5178,15 +5172,9 @@ function updateCurriculumFontSize() {
 
 // 교과목 블록의 드래그 가능 여부 업데이트
 function updateCourseBlockDraggable(block) {
-    // 현재 활성화된 탭에 따라 적절한 수정모드 확인
-    const curriculumEditModeButton = document.getElementById('editModeToggleCurriculum');
-    const commonValuesEditModeButton = document.getElementById('editModeToggleCommonValues');
-    
-    const isCurriculumEditMode = curriculumEditModeButton && curriculumEditModeButton.classList.contains('active');
-    const isCommonValuesEditMode = commonValuesEditModeButton && commonValuesEditModeButton.classList.contains('active');
-    
+    // 전역 변수로 직접 수정모드 확인
     // 둘 중 하나라도 수정모드이면 드래그 가능
-    block.draggable = isCurriculumEditMode || isCommonValuesEditMode;
+    block.draggable = isEditModeCurriculum || isEditModeCommonValues;
 }
 
 // 모든 교과목 블록의 드래그 가능 여부 업데이트 (삭제/ghost 블록은 드래그 불가능)
@@ -7092,9 +7080,6 @@ function renderCommonValuesTable() {
                                 wrap.innerHTML = value;
                             }
                         }
-                    }
-                }
-            }
             tdValue1.addEventListener('dragover', handleCommonValuesDragOver);
             tdValue1.addEventListener('drop', handleCommonValuesDrop);
             if (isEditModeCommonValues) {
@@ -9426,6 +9411,7 @@ function toggleEditModeCommonValues() {
     }
     // 모든 교과목 블럭의 드래그 가능 여부 업데이트
     updateCommonValuesCourseBlocksDraggable();
+    updateAllCourseBlocksDraggable();
 }
 
 // 과목분류별 배지 클래스 반환
