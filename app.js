@@ -788,7 +788,6 @@ function init() {
     });
 
 }
-
 // UI 초기화 함수
 function initializeUI() {
     // id 보장
@@ -816,9 +815,13 @@ function initializeUI() {
     // 이수모형 버전 라벨 업데이트 (현재 버전 표시)
     updateCurriculumVersionLabel();
     renderMatrixExtraTable(); // matrix-extra-table 렌더링 추가
-    // 마지막에 열었던 탭에서 시작
-    const lastTab = localStorage.getItem('uosLastTab') || 'courses';
-    showTab(lastTab);
+    
+    // 공통가치대응 Value 컬럼 이벤트 시스템 초기화
+    initializeValueColumnEvents();
+    
+    // 공통가치대응 탭을 기본으로 시작
+    localStorage.setItem('uosLastTab', 'commonValues');
+    showTab('commonValues');
     updateCurrentVersionDisplay();
     updateAllVersionLabels();
     updateVersionNavigationButtons();
@@ -1541,7 +1544,6 @@ function cancelCellEdit(cell) {
     cell.classList.remove('editing-cell');
     cell.removeAttribute('data-original-content');
 }
-
 // 매트릭스 셀 편집 처리 (순환 편집)
 function handleMatrixCellEdit(cell, newValue, originalContent) {
     const row = cell.closest('tr');
@@ -2249,7 +2251,6 @@ function updateStats() {
     drawChart();
     drawSubjectTypeChart();
 }
-
 // 매트릭스 테이블 렌더링 (카테고리별 그룹화 반영, 학년-학기 순 정렬)
 function renderMatrix() {
     // 매트릭스 제목 업데이트
@@ -3011,7 +3012,6 @@ window.onload = function() {
         setMatrixTitleEditable(false);
     }
 };
-
 // 매트릭스에서 교과목 수정
 function editCourseFromMatrix(course) {
     // id 기준으로 editingIndex 찾기 (교과목명 변경에도 id 유지)
@@ -3769,7 +3769,6 @@ function initSortListeners() {
         });
     });
 }
-
 // 매트릭스 필터링
 function filterMatrix() {
     // 선택된 학년들 가져오기
@@ -4519,7 +4518,6 @@ function getCurriculumCellId(course) {
         return `cell-${requiredType}-${category}-${year}-${targetSemester}`;
     }
 }
-
 // 교과목 블록 생성 (diff/삭제/이동(ghost) 기반)
 function createCourseBlock(course, isDeleted = false, isGhost = false) {
     const block = document.createElement('div');
@@ -5219,7 +5217,6 @@ function setupBlockWrapDragEvents() {
         wrap.addEventListener('drop', handleBlockWrapDrop);
     });
 }
-
 // block-wrap 드래그 오버 - 밀림 효과 (깜박임 방지)
 function handleBlockWrapDragOver(e) {
     e.preventDefault();
@@ -5973,7 +5970,6 @@ function saveCurrentVersion() {
     
     showToast('현재 버전이 저장되었습니다.');
 }
-
 // 버전 저장/내보내기 모달 표시
 function saveVersion() {
     const modal = document.getElementById('versionSaveModal');
@@ -6771,12 +6767,10 @@ function getChangedCourseIds() {
     });
     return ids;
 }
-
 // 고유 id 생성 함수
 function generateUniqueId() {
     return 'c' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
 }
-
 // courses 배열의 모든 교과목에 id가 없으면 자동 부여
 function ensureCourseIds(arr) {
     arr.forEach(course => {
@@ -7257,6 +7251,7 @@ function renderCommonValuesTable() {
 
 // 폴리곤 선택 상태 관리 (전역)
 let selectedCommonValuesBlob = null;
+window.selectedCommonValuesBlob = null;
 const commonValuesBlobData = {};
 
 // 그룹명 사용자 지정 매핑
@@ -7265,7 +7260,6 @@ let commonValuesGroupNames = {
     value2: '미래기술의 활용',
     value3: '창의적 문제해결'
 };
-
 // VALUE별 교과목 id 목록 (전역)
 let valueCourseIds = { value1: [], value2: [], value3: [] };
 const valueKeys = ['value1', 'value2', 'value3'];
@@ -7375,8 +7369,16 @@ function renderCommonValuesNetworkGraph() {
                     // 그룹 라벨 위치 기준으로 노드 초기 위치 배치 (라벨 아래쪽, x축으로 분산)
                     let initX = undefined, initY = undefined;
                     if (typeof groupLabelPositions !== 'undefined' && groupLabelPositions[key]) {
-                        initX = groupLabelPositions[key].x + (idx * 60) - (30 * valueCourseIds[key].length);
-                        initY = groupLabelPositions[key].y + 80;
+                        // 더 나은 초기 배치: 원형 패턴으로 배치
+                        const totalNodes = valueCourseIds[key].length;
+                        const radius = Math.max(80, totalNodes * 15); // 노드 수에 따라 반지름 조정
+                        const angleStep = (2 * Math.PI) / totalNodes;
+                        const angle = idx * angleStep;
+                        
+                        // 원형 배치로 초기 위치 계산
+                        initX = groupLabelPositions[key].x + Math.cos(angle) * radius;
+                        initY = groupLabelPositions[key].y + 100 + Math.sin(angle) * radius;
+                        
                         // 속하지 않은 그룹 폴리곤(hull)과 일정 거리 이상 떨어지도록 위치 조정
                         valueKeys.forEach(otherKey => {
                             if (otherKey !== key && commonValuesBlobData[otherKey]) {
@@ -7389,18 +7391,18 @@ function renderCommonValuesNetworkGraph() {
                                     const dist = Math.sqrt(dx*dx + dy*dy);
                                     if (dist < minDist) minDist = dist;
                                 });
-                                // 만약 너무 가까우면(60px 미만) hull 바깥 방향으로 밀어냄
-                                if (minDist < 60) {
+                                // 만약 너무 가까우면(80px 미만) hull 바깥 방향으로 밀어냄
+                                if (minDist < 80) {
                                     // hull 중심 계산
                                     let hullCenterX = 0, hullCenterY = 0;
                                     hull.forEach(pt => { hullCenterX += pt.x; hullCenterY += pt.y; });
                                     hullCenterX /= hull.length; hullCenterY /= hull.length;
-                                    // 바깥 방향으로 60-minDist 만큼 이동
+                                    // 바깥 방향으로 80-minDist 만큼 이동
                                     const dx = initX - hullCenterX;
                                     const dy = initY - hullCenterY;
                                     const len = Math.sqrt(dx*dx + dy*dy) || 1;
-                                    initX += (dx/len) * (60-minDist);
-                                    initY += (dy/len) * (60-minDist);
+                                    initX += (dx/len) * (80-minDist);
+                                    initY += (dy/len) * (80-minDist);
                                 }
                             }
                         });
@@ -7416,7 +7418,9 @@ function renderCommonValuesNetworkGraph() {
                         },
                         x: initX,
                         y: initY,
-                        fixed: false
+                        fixed: false,
+                        subjectType: course.subjectType,
+                        category: course.category
                     });
                     nodeIdSet.add(id);
                     }
@@ -7446,9 +7450,17 @@ function renderCommonValuesNetworkGraph() {
                     let initX = undefined, initY = undefined;
                     if (typeof groupLabelPositions !== 'undefined' && groupLabelPositions[key]) {
                         const courseNodeCount = valueCourseIds[key].length;
-                        const extracurricularStartIdx = courseNodeCount + idx;
-                        initX = groupLabelPositions[key].x + (extracurricularStartIdx * 60) - (30 * (courseNodeCount + extracurricularTexts[key].length));
-                        initY = groupLabelPositions[key].y + 80;
+                        const totalExtracurricular = extracurricularTexts[key].length;
+                        const totalNodes = courseNodeCount + totalExtracurricular;
+                        
+                        // 원형 배치로 초기 위치 계산 (교과목 노드들 바깥쪽에 배치)
+                        const baseRadius = Math.max(80, courseNodeCount * 15);
+                        const radius = baseRadius + 40; // 교과목 노드들보다 바깥쪽에 배치
+                        const angleStep = (2 * Math.PI) / totalExtracurricular;
+                        const angle = idx * angleStep;
+                        
+                        initX = groupLabelPositions[key].x + Math.cos(angle) * radius;
+                        initY = groupLabelPositions[key].y + 100 + Math.sin(angle) * radius;
                     }
                     
                     nodes.push({
@@ -7616,7 +7628,7 @@ function renderCommonValuesNetworkGraph() {
                             dashes: true,  // 점선
                             width: 1.5,
                             color: { color: '#9e9e9e', opacity: 0.5 },
-                            title: `${subjectType} - ${node1ValueGroup} to ${node2ValueGroup}`,
+                            title: `${subjectType}`,
                             smooth: { type: 'curvedCW', roundness: 0.2 }
                         });
                     }
@@ -7646,7 +7658,7 @@ function renderCommonValuesNetworkGraph() {
                     } else {
                         // 기본 상태에서는 그룹별 색상 유지 (배경색은 그대로)
                         values.borderColor = values.color ? values.color.border : '#01579b';
-                        values.borderWidth = 2;
+                        values.borderWidth = 1;
                         if (values.font) {
                             values.font.color = values.color ? values.color.border : '#01579b';
                         }
@@ -7661,7 +7673,7 @@ function renderCommonValuesNetworkGraph() {
                 x: 2,
                 y: 2
             },
-            borderWidth: 2,
+            borderWidth: 1,
             borderWidthSelected: 4
         },
         // groups 설정 제거 - 노드별로 개별 색상 적용
@@ -7736,7 +7748,7 @@ function renderCommonValuesNetworkGraph() {
         
         // VALUE 그룹 소속 수에 따라 글씨 크기와 테두리 두께를 함께 조정
         const baseFontSize = 13;
-        const fontSizeStep = 2; // 그룹 하나당 2px 증가
+        const fontSizeStep = 3; // 그룹 하나당 2px 증가
         const adjustedFontSize = baseFontSize + valueGroupCount * fontSizeStep;
 
         // 테두리 두께도 그룹 수에 따라 증가 (기본 2 + 그룹당 1)
@@ -7801,7 +7813,7 @@ function renderCommonValuesNetworkGraph() {
     
     // 그룹 경계 반발력 시스템
     let boundaryForces = new Map(); // nodeId -> {x, y} force vectors
-    let repulsionSystemActive = false; // 반발력 시스템 비활성화
+    let repulsionSystemActive = true; // 반발력 시스템 활성화로 변경
     let repulsionInterval = null;
     let stabilityCheckCount = 0; // 안정화 체크 카운터
     let lastNodePositions = new Map(); // 이전 노드 위치 저장
@@ -7810,12 +7822,12 @@ function renderCommonValuesNetworkGraph() {
     // Directional force system for value groups
     let directionalForceInterval = null;
     let directionalForceActive = true;
-    const directionalForceMagnitude = 5.0; // 더 강한 힘으로 증가
+    const directionalForceMagnitude = 8.0; // 더 강한 힘으로 증가
     
     // Start directional force system
     function startDirectionalForceSystem() {
         if (directionalForceInterval) clearInterval(directionalForceInterval);
-        directionalForceInterval = setInterval(applyDirectionalForces, 50); // 50ms마다 실행 (20fps)
+        directionalForceInterval = setInterval(applyDirectionalForces, 30); // 30ms마다 실행 (33fps) - 더 빠른 반응
         directionalForceActive = true;
     }
     
@@ -7859,12 +7871,6 @@ function renderCommonValuesNetworkGraph() {
         
         // 디버깅용 로그 (첫 실행시에만)
         if (directionalForceInterval && !window.directionalForceLogged) {
-            console.log('Directional forces active:', {
-                magnitude: directionalForceMagnitude,
-                value1Count: nodes.filter(n => n.group === 'value1').length,
-                value2Count: nodes.filter(n => n.group === 'value2').length,
-                value3Count: nodes.filter(n => n.group === 'value3').length
-            });
             window.directionalForceLogged = true;
         }
     }
@@ -7878,18 +7884,14 @@ function renderCommonValuesNetworkGraph() {
         directionalForceActive = false;
     }
     
-    // Start the directional force system after stabilization
-    network.once('stabilized', function() {
-        setTimeout(() => {
-            startDirectionalForceSystem();
-        }, 1000); // Wait 1 second after stabilization to start
-    });
+    // Start the directional force system immediately after network creation
+    startDirectionalForceSystem();
     
     // 동적 제어점 시스템
     let dynamicControlPoints = new Map(); // groupKey -> [{x, y, vx, vy, originalX, originalY}]
     let controlPointForces = new Map(); // controlPointId -> {x, y} force vectors
     
-    // 반발력 시스템을 즉시 시작 (네트워크 안정화와 무관하게) - 비활성화됨
+    // 반발력 시스템을 즉시 시작 (네트워크 안정화와 무관하게) - 활성화됨
     
     // 스플라인 데이터가 없는 경우를 대비한 테스트 데이터 생성
     setTimeout(() => {
@@ -7910,22 +7912,18 @@ function renderCommonValuesNetworkGraph() {
                 // Test spline created
             });
         }
-        // startRepulsionSystem(); // 반발력 시스템 시작 비활성화
-    }, 500); // 0.5초 후 즉시 시작
+        startRepulsionSystem(); // 반발력 시스템 시작 - 노드와 그룹 제목 겹침 방지
+    }, 50); // 0.05초 후 즉시 시작 - 더 빠른 시작
     
-    // 네트워크 안정화 완료 후에도 다시 한번 확인 - 비활성화됨
+    // 네트워크 안정화 완료 후에도 다시 한번 확인 - 활성화됨
     network.on('stabilizationIterationsDone', function() {
-        // if (!repulsionInterval) {
-        //     startRepulsionSystem();
-        // }
+        startRepulsionSystem(); // 항상 반발력 시스템 시작
     });
     
-    // 최종 백업 - 2초 후 무조건 시작 - 비활성화됨
+    // 최종 백업 - 1초 후 무조건 시작 - 활성화됨
     setTimeout(() => {
-        // if (!repulsionInterval) {
-        //     startRepulsionSystem();
-        // }
-    }, 2000);
+        startRepulsionSystem(); // 확실히 반발력 시스템 시작
+    }, 1000);
     
     // 동적 제어점 초기화 및 업데이트 함수
     function updateDynamicControlPoints(groupKey, splineBoundary) {
@@ -7965,7 +7963,6 @@ function renderCommonValuesNetworkGraph() {
         
         dynamicControlPoints.set(groupKey, controlPoints);
     }
-    
     // 그룹 스플라인 침입 방지 및 밀어내기 함수
     function calculateBoundaryRepulsion() {
         boundaryForces.clear();
@@ -8600,22 +8597,59 @@ function renderCommonValuesNetworkGraph() {
                     });
                 }, 10);
             }
-            
-            // 디버깅을 위한 로그
-            // Update status
         } else if (stabilityInfo.isStable && stabilityInfo.checkCount >= 10) {
             // 완전히 안정화되었고 10번 이상 체크되었으면 주기를 늦춤 (성능 최적화)
             // 하지만 여전히 모니터링은 계속
         }
     }
     
-    // 반발력 시스템 시작 - 비활성화됨
+    // 반발력 시스템 시작 - 노드와 그룹 제목 겹침 방지
     function startRepulsionSystem() {
-        // 반발력 시스템이 비활성화되었습니다
-        return;
-        // if (repulsionInterval) clearInterval(repulsionInterval);
-        // repulsionInterval = setInterval(applyBoundaryRepulsion, 80); // 80ms마다 실행 (12.5fps) - 부드러운 속도
-        // repulsionSystemActive = true;
+        if (repulsionInterval) {
+            clearInterval(repulsionInterval);
+        }
+        repulsionInterval = setInterval(applyContinuousRepulsion, 16); // 60fps - 지속적 반발력
+        
+        // 물리 시뮬레이션을 완전히 비활성화하고 직접 제어
+        network.setOptions({
+            physics: {
+                enabled: false, // 물리 시뮬레이션 비활성화
+                stabilization: false
+            }
+        });
+        
+        // 직접 위치 업데이트를 위한 별도 인터벌
+        const directUpdateInterval = setInterval(() => {
+            const allNodes = network.body.data.nodes.get();
+            let hasMovement = false;
+            
+            allNodes.forEach(node => {
+                const networkNode = network.body.nodes[node.id];
+                if (networkNode && (networkNode.vx || networkNode.vy)) {
+                    // 속도가 있으면 위치 업데이트
+                    networkNode.x += (networkNode.vx || 0) * 0.1;
+                    networkNode.y += (networkNode.vy || 0) * 0.1;
+                    
+                    // 속도 감쇠
+                    networkNode.vx *= 0.95;
+                    networkNode.vy *= 0.95;
+                    
+                    hasMovement = true;
+                }
+            });
+            
+            // 움직임이 있으면 캔버스 다시 그리기
+            if (hasMovement) {
+                network.canvas.frame.canvas.style.display = 'none';
+                network.canvas.frame.canvas.style.display = 'block';
+            }
+        }, 16); // 60fps
+        
+        // 인터벌 정리를 위해 저장
+        if (window.directUpdateInterval) {
+            clearInterval(window.directUpdateInterval);
+        }
+        window.directUpdateInterval = directUpdateInterval;
     }
     
     // 반발력 시스템 중지
@@ -8624,6 +8658,20 @@ function renderCommonValuesNetworkGraph() {
             clearInterval(repulsionInterval);
             repulsionInterval = null;
         }
+        
+        // 직접 업데이트 인터벌도 정리
+        if (window.directUpdateInterval) {
+            clearInterval(window.directUpdateInterval);
+            window.directUpdateInterval = null;
+        }
+        
+        // 물리 시뮬레이션 다시 활성화
+        network.setOptions({
+            physics: {
+                enabled: true,
+                stabilization: false
+            }
+        });
     }
 
     // 제거된 침입 노드 추적 시스템
@@ -8669,7 +8717,6 @@ function renderCommonValuesNetworkGraph() {
         
         return totalVertexForce;
     }
-
     // 지속적으로 부드럽게 노드들을 그룹 경계 밖으로 밀어내는 함수 (스플라인 버텍스 반발력 포함)
     function applyContinuousRepulsion() {
         if (!commonValuesBlobData || Object.keys(commonValuesBlobData).length === 0) {
@@ -8685,6 +8732,10 @@ function renderCommonValuesNetworkGraph() {
         const springK = 0.08; // 스프링 상수(조절 가능)
         const minDistanceFromBoundary = 600; // 경계에서 더 가까운 거리
         const boundaryOffset = 150; // 경계 확장 오프셋 (줄임)
+        const labelRepulsionForce = 200; // 그룹 제목 반발력 (줄임)
+        const labelRepulsionRadius = 150; // 그룹 제목 반발력 반경 (150px로 줄임)
+        const nodeRepulsionForce = 150; // 노드 간 반발력 (강화)
+        const nodeRepulsionRadius = 100; // 노드 간 반발력 반경 (강화)
         let totalForceApplied = 0;
         let detectedIntruders = [];
         
@@ -8694,6 +8745,55 @@ function renderCommonValuesNetworkGraph() {
             if (!node) return;
             
             const nodePosition = { x: node.x, y: node.y };
+            
+            // 노드 간 반발력 적용 (모든 다른 노드와의 거리 확인)
+            Object.keys(network.body.nodes).forEach(otherNodeId => {
+                if (nodeId === otherNodeId) return; // 자기 자신은 제외
+                
+                const otherNode = network.body.nodes[otherNodeId];
+                if (!otherNode) return;
+                
+                const dx = nodePosition.x - otherNode.x;
+                const dy = nodePosition.y - otherNode.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // 노드 간 반발력 반경 내에 있는 경우
+                if (distance > 0 && distance < nodeRepulsionRadius) {
+                    const dirX = dx / distance;
+                    const dirY = dy / distance;
+                    
+                    // 거리에 반비례하는 반발력 (가까울수록 강함)
+                    const forceMultiplier = Math.max(0.1, (nodeRepulsionRadius - distance) / nodeRepulsionRadius);
+                    const repulsionForce = nodeRepulsionForce * forceMultiplier * 0.02; // 강화된 반발력
+                    
+                    // 노드에 반발력 적용
+                    node.vx = (node.vx || 0) + dirX * repulsionForce;
+                    node.vy = (node.vy || 0) + dirY * repulsionForce;
+                    totalForceApplied += repulsionForce;
+                }
+            });
+            
+            // 그룹 제목과 노드 간의 반발력 적용
+            groupLabelPositions.forEach((labelPos, groupKey) => {
+                const dx = nodePosition.x - labelPos.x;
+                const dy = nodePosition.y - labelPos.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // 그룹 제목 반발력 반경 내에 있는 경우
+                if (distance > 0 && distance < labelRepulsionRadius) {
+                    const dirX = dx / distance;
+                    const dirY = dy / distance;
+                    
+                    // 거리에 반비례하는 반발력 (가까울수록 강함)
+                    const forceMultiplier = Math.max(0.1, (labelRepulsionRadius - distance) / labelRepulsionRadius);
+                    const repulsionForce = labelRepulsionForce * forceMultiplier * 0.01;
+                    
+                    // 노드에 반발력 적용
+                    node.vx = (node.vx || 0) + dirX * repulsionForce;
+                    node.vy = (node.vy || 0) + dirY * repulsionForce;
+                    totalForceApplied += repulsionForce;
+                }
+            });
             
             // 각 그룹에 대해 확인
             valueKeys.forEach(groupKey => {
@@ -8841,23 +8941,90 @@ function renderCommonValuesNetworkGraph() {
         //     }
         // });
         
-        if (nodeUpdates.length > 0) {
-            try {
-                network.body.data.nodes.update(nodeUpdates);
-            } catch (error) {
-            }
-        }
+        // nodeUpdates 변수가 정의되지 않았으므로 제거
+        // if (nodeUpdates.length > 0) {
+        //     try {
+        //         network.body.data.nodes.update(nodeUpdates);
+        //     } catch (error) {
+        //     }
+        // }
         
         // 힘이 적용되었다면 물리 시뮬레이션 활성화
-        if (totalForceApplied > 0 && network.physics) {
-            if (!network.physics.options.enabled) {
-                network.setOptions({
-                    physics: {
-                        enabled: true,
-                        stabilization: false
-                    }
+        if (totalForceApplied > 0) {
+            network.startSimulation();
+        } else {
+            // 모든 노드가 안정화되었는지 확인 (더 관대한 기준)
+            const allNodes = network.body.data.nodes.get();
+            let allStable = true;
+            let totalSpeed = 0;
+            
+            allNodes.forEach(node => {
+                const speed = Math.sqrt((node.vx || 0) ** 2 + (node.vy || 0) ** 2);
+                totalSpeed += speed;
+                if (speed > 1.0) { // 속도 기준을 0.5에서 1.0으로 더 완화
+                    allStable = false;
+                }
+            });
+            
+            // 평균 속도도 확인
+            const avgSpeed = totalSpeed / allNodes.length;
+            if (avgSpeed > 0.5) { // 평균 속도 기준을 0.2에서 0.5로 완화
+                allStable = false;
+            }
+            
+            // 시뮬레이션을 계속 실행하도록 유지 (stopSimulation 제거)
+            // 모든 노드가 서로 200px 이상 떨어져 있는지 확인
+            let allNodesFarEnough = true;
+            
+            for (let i = 0; i < allNodes.length; i++) {
+                for (let j = i + 1; j < allNodes.length; j++) {
+                    const node1 = allNodes[i];
+                    const node2 = allNodes[j];
+                    const dx = node1.x - node2.x;
+                    const dy = node1.y - node2.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                                            if (distance < 300) { // 300px 미만이면 아직 안정화되지 않음
+                            allNodesFarEnough = false;
+                            break;
+                        }
+                }
+                if (!allNodesFarEnough) break;
+            }
+            
+            // 추가로 그룹 제목과의 거리도 확인
+            if (allNodesFarEnough) {
+                allNodes.forEach(node => {
+                    groupLabelPositions.forEach((labelPos, groupKey) => {
+                        const dx = node.x - labelPos.x;
+                        const dy = node.y - labelPos.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        if (distance < 300) { // 300px 미만이면 아직 안정화되지 않음
+                            allNodesFarEnough = false;
+                        }
+                    });
                 });
             }
+            
+                    // 조건을 만족하지 않으면 직접 노드 위치 업데이트
+        if (!allNodesFarEnough) {
+            // vis-network 물리 시뮬레이션 대신 직접 위치 업데이트
+            allNodes.forEach(node => {
+                const networkNode = network.body.nodes[node.id];
+                if (networkNode) {
+                    // 현재 속도에 따라 위치 업데이트
+                    networkNode.x += (networkNode.vx || 0) * 0.1;
+                    networkNode.y += (networkNode.vy || 0) * 0.1;
+                    
+                    // 속도 감쇠
+                    networkNode.vx *= 0.95;
+                    networkNode.vy *= 0.95;
+                }
+            });
+            
+            // 강제로 시뮬레이션 재시작
+            network.startSimulation();
+        }
         }
         
         return detectedIntruders.length === 0; // 모든 침입 노드가 제거되었는지 반환
@@ -8992,11 +9159,11 @@ function renderCommonValuesNetworkGraph() {
         value3: '#388e3c', // 진한 녹색
     };
 
-    // 배경용 연한 색상
+    // 배경용 진한 색상
     const groupBgColors = {
-        value1: 'rgba(33,150,243,0.08)',
-        value2: 'rgba(233,30,99,0.08)', 
-        value3: 'rgba(56,142,60,0.16)', // 녹색 배경
+        value1: 'rgba(33,150,243,0.15)',
+        value2: 'rgba(233,30,99,0.15)', 
+        value3: 'rgba(56,142,60,0.15)', // 녹색 배경
     };
 
     // blob 형태의 부드러운 커브 영역 그리기 함수
@@ -9145,7 +9312,6 @@ function renderCommonValuesNetworkGraph() {
         }
         ctx.closePath();
     }
-
 // ... 기존 코드 ...
     // 노드 외곽점 샘플링 함수 (더 부드러운 스플라인을 위해 더 많은 점 생성)
     // 그룹별로 겹침을 최소화하기 위해 offset을 더 크게 적용
@@ -9189,115 +9355,134 @@ function renderCommonValuesNetworkGraph() {
     // 네트워크가 그려진 후 그룹 blob을 그림
     network.on('beforeDrawing', function(ctx) {
         // 1. blob 영역 먼저 그림 (노드/엣지 아래)
+        // 선택되지 않은 스플라인들을 먼저 그리기
         valueKeys.forEach(key => {
-            const ids = valueCourseIds[key];
-            if (!ids.length) {
-                return;
+            if (window.selectedCommonValuesBlob === key || window.hoveredBlob === key) {
+                return; // 선택된 스플라인과 호버된 스플라인은 나중에 그리기
             }
-            let outlinePoints = [];
-            ids.forEach(id => {
-                const points = getNodeOutlinePoints(network, id, 100); // offset을 크게 적용
-                outlinePoints = outlinePoints.concat(points);
-            });
-            
-            outlinePoints.forEach((pt, idx) => {
-                
-            });
-            
-            if (outlinePoints.length < 3) {
-                return;
-            }
-            let hull = convexHull(outlinePoints);
-            // 스플라인 버텍스 포인트 개수 증가
-            hull = increaseSplineVertices(hull);
-            // 더 부드러운 스플라인을 위해 스무싱 활성화
-            for (let i = 0; i < 3; i++) hull = smoothHull(hull); // smoothing 3회
-            commonValuesBlobData[key] = hull;
-            
-            // blob 색상 및 강조 효과 개선
-            ctx.save();
-            
-            // 선택/호버 상태에 따른 투명도 설정
-            let alpha = 0.56; // 기본
-            if (selectedCommonValuesBlob === key) {
-                alpha = 0.82; // 선택됨
-            } else if (hoveredBlob === key) {
-                alpha = 0.7; // 호버됨
-            }
-            ctx.globalAlpha = alpha;
-            ctx.fillStyle = groupBgColors[key] || 'rgba(33,150,243,0.16)';
-
-            // 선택/호버 상태에 따른 테두리 설정
-            const strokeColor = groupColors[key] || '#666';
-            ctx.strokeStyle = strokeColor;
-            let lineWidth = 2; // 기본
-            if (selectedCommonValuesBlob === key) {
-                lineWidth = 4; // 선택됨
-            } else if (hoveredBlob === key) {
-                lineWidth = 3; // 호버됨
-            }
-            ctx.lineWidth = lineWidth;
-            // 점선 제거
-            // ctx.setLineDash([6, 2]); // 점선 패턴 제거
-            drawSmoothCurve(ctx, hull);
-            ctx.fill();
-            ctx.stroke();
-            // ctx.setLineDash([]); // 점선 패턴 초기화 제거
-            ctx.restore();
-
-            
-            // 그룹명 라벨 표시 (중앙)
-            if (ids.length > 0) {
-                // 중앙점 계산
-                let centerX = 0, centerY = 0;
-                ids.forEach(id => {
-                    const pos = network.getPosition(id);
-                    centerX += pos.x; centerY += pos.y;
-                });
-                centerX /= ids.length; centerY /= ids.length;
-                ctx.save();
-                ctx.globalAlpha = 1;
-                // 선택/호버 상태에 따른 폰트 스타일 설정
-                let fontSize = 26;
-                if (hoveredLabel === key) {
-                    fontSize = 32; // 호버 시 폰트 크기 증가
-                }
-                ctx.font = `bold ${fontSize}px Noto Sans KR, sans-serif`;
-                
-                let textColor;
-                if (selectedCommonValuesBlob === key) {
-                    textColor = groupColors[key] || '#333'; // 선택됨
-                } else if (hoveredBlob === key || hoveredLabel === key) {
-                    textColor = 'rgba(85, 85, 85, 0.8)'; // 호버됨
-                } else {
-                    textColor = 'rgba(127, 127, 127, 0.29)'; // 기본 (회색)
-                }
-                ctx.fillStyle = textColor;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.strokeStyle = 'white';
-                ctx.lineWidth = 5;
-                const groupLabel = commonValuesGroupNames[key] || key;
-                
-                // 라벨 텍스트 크기 측정 및 위치 저장
-                const textMetrics = ctx.measureText(groupLabel);
-                const labelWidth = textMetrics.width;
-                const labelHeight = 30; // 폰트 크기 26px 기준으로 약간 여유 있게
-                
-                // 캔버스 좌표계로 저장 (DOM 좌표로 변환하지 않음)
-                groupLabelPositions.set(key, {
-                    x: centerX,
-                    y: centerY,
-                    width: labelWidth,
-                    height: labelHeight
-                });
-                
-                ctx.strokeText(groupLabel, centerX, centerY);
-                ctx.fillText(groupLabel, centerX, centerY);
-                ctx.restore();
-            }
+            drawSplineForGroup(ctx, key);
         });
+        
+        // 2. 선택된 스플라인을 그리기 (레이어 상단)
+        if (window.selectedCommonValuesBlob) {
+            drawSplineForGroup(ctx, window.selectedCommonValuesBlob);
+        }
+        
+        // 3. 호버된 스플라인을 가장 마지막에 그리기 (최상단)
+        if (window.hoveredBlob && window.hoveredBlob !== window.selectedCommonValuesBlob) {
+            drawSplineForGroup(ctx, window.hoveredBlob);
+        }
     });
+    
+    // 스플라인 그리기 함수
+    function drawSplineForGroup(ctx, key) {
+        const ids = valueCourseIds[key];
+        if (!ids.length) {
+            return;
+        }
+        let outlinePoints = [];
+        ids.forEach(id => {
+            const points = getNodeOutlinePoints(network, id, 100); // offset을 크게 적용
+            outlinePoints = outlinePoints.concat(points);
+        });
+        
+        outlinePoints.forEach((pt, idx) => {
+            
+        });
+        
+        if (outlinePoints.length < 3) {
+            return;
+        }
+        let hull = convexHull(outlinePoints);
+        // 스플라인 버텍스 포인트 개수 증가
+        hull = increaseSplineVertices(hull);
+        // 더 부드러운 스플라인을 위해 스무싱 활성화
+        for (let i = 0; i < 3; i++) hull = smoothHull(hull); // smoothing 3회
+        commonValuesBlobData[key] = hull;
+        
+        // blob 색상 및 강조 효과 개선
+        ctx.save();
+        
+        // 선택/호버 상태에 따른 투명도 설정
+        let alpha = 0.56; // 기본
+        if (window.selectedCommonValuesBlob === key) {
+            alpha = 1.95; // 선택됨 (더 진하게)
+        } else if (window.hoveredBlob === key) {
+            alpha = 0.65; // 호버됨 (선택과 동일하게 진하게)
+        }
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = groupBgColors[key] || 'rgba(33,150,243,0.16)';
+
+        // 선택/호버 상태에 따른 테두리 설정
+        const strokeColor = groupColors[key] || '#666';
+        ctx.strokeStyle = strokeColor;
+        let lineWidth = 2; // 기본
+        if (window.selectedCommonValuesBlob === key) {
+            lineWidth = 4; // 선택됨
+        } else if (hoveredBlob === key) {
+            lineWidth = 3; // 호버됨
+        }
+        ctx.lineWidth = lineWidth;
+        // 점선 제거
+        // ctx.setLineDash([6, 2]); // 점선 패턴 제거
+        drawSmoothCurve(ctx, hull);
+        ctx.fill();
+        ctx.stroke();
+        // ctx.setLineDash([]); // 점선 패턴 초기화 제거
+        ctx.restore();
+
+        
+        // 그룹명 라벨 표시 (중앙)
+        if (ids.length > 0) {
+            // 중앙점 계산
+            let centerX = 0, centerY = 0;
+            ids.forEach(id => {
+                const pos = network.getPosition(id);
+                centerX += pos.x; centerY += pos.y;
+            });
+            centerX /= ids.length; centerY /= ids.length;
+            ctx.save();
+            ctx.globalAlpha = 1;
+            // 선택/호버 상태에 따른 폰트 스타일 설정
+            let fontSize = 26;
+            if (hoveredLabel === key) {
+                fontSize = 32; // 호버 시 폰트 크기 증가
+            }
+            ctx.font = `bold ${fontSize}px Noto Sans KR, sans-serif`;
+            
+            let textColor;
+            if (window.selectedCommonValuesBlob === key) {
+                textColor = groupColors[key] || '#333'; // 선택됨
+            } else if (hoveredBlob === key || hoveredLabel === key) {
+                textColor = 'rgba(85, 85, 85, 0.8)'; // 호버됨
+            } else {
+                textColor = 'rgba(127, 127, 127, 0.29)'; // 기본 (회색)
+            }
+            ctx.fillStyle = textColor;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 5;
+            const groupLabel = commonValuesGroupNames[key] || key;
+            
+            // 라벨 텍스트 크기 측정 및 위치 저장
+            const textMetrics = ctx.measureText(groupLabel);
+            const labelWidth = textMetrics.width;
+            const labelHeight = 30; // 폰트 크기 26px 기준으로 약간 여유 있게
+            
+            // 캔버스 좌표계로 저장 (DOM 좌표로 변환하지 않음)
+            groupLabelPositions.set(key, {
+                x: centerX,
+                y: centerY,
+                width: labelWidth,
+                height: labelHeight
+            });
+            
+            ctx.strokeText(groupLabel, centerX, centerY);
+            ctx.fillText(groupLabel, centerX, centerY);
+            ctx.restore();
+        }
+    }
 
     // 점이 폴리곤 내부에 있는지 확인하는 함수
     function isPointInPolygon(point, polygon) {
@@ -9325,8 +9510,8 @@ function renderCommonValuesNetworkGraph() {
     network.on('click', function(params) {
         // 노드 클릭 시 스플라인 선택 해제
         if (params.nodes.length > 0) {
-            if (selectedCommonValuesBlob) {
-                selectedCommonValuesBlob = null;
+            if (window.selectedCommonValuesBlob) {
+                window.selectedCommonValuesBlob = null;
                 updateNodeHighlight();
                 network.redraw();
             }
@@ -9358,7 +9543,7 @@ function renderCommonValuesNetworkGraph() {
             
             if (clickedLabel) {
                 // 라벨 클릭 시 해당 그룹 선택/선택해제
-                selectedCommonValuesBlob = selectedCommonValuesBlob === clickedLabel ? null : clickedLabel;
+                window.selectedCommonValuesBlob = window.selectedCommonValuesBlob === clickedLabel ? null : clickedLabel;
                 updateNodeHighlight();
                 network.redraw();
                 return;
@@ -9375,13 +9560,13 @@ function renderCommonValuesNetworkGraph() {
             
             if (clickedBlob) {
                 // 같은 그룹 클릭 시 선택해제, 다른 그룹 클릭 시 선택 변경
-                selectedCommonValuesBlob = selectedCommonValuesBlob === clickedBlob ? null : clickedBlob;
+                window.selectedCommonValuesBlob = window.selectedCommonValuesBlob === clickedBlob ? null : clickedBlob;
                 updateNodeHighlight();
                 network.redraw();
             } else {
                 // 빈 영역 클릭 시 선택 해제
-                if (selectedCommonValuesBlob) {
-                    selectedCommonValuesBlob = null;
+                if (window.selectedCommonValuesBlob) {
+                    window.selectedCommonValuesBlob = null;
                     updateNodeHighlight();
                     network.redraw();
                 }
@@ -9391,13 +9576,11 @@ function renderCommonValuesNetworkGraph() {
 
     // 마우스 호버 시 스플라인 하이라이트
     let hoveredBlob = null;
+    window.hoveredBlob = null; // 전역 변수로 설정
     let hoveredLabel = null; // 호버된 라벨 추적
     network.on('hoverNode', function(params) {
-        // 노드 호버 시에는 스플라인 호버 해제
-        if (hoveredBlob) {
-            hoveredBlob = null;
-            network.redraw();
-        }
+        // 노드 호버 시에도 스플라인 호버 상태 유지
+        // 스플라인 호버 해제하지 않음
     });
     
     // 직접 마우스 이벤트로 드래그 처리
@@ -9457,7 +9640,7 @@ function renderCommonValuesNetworkGraph() {
                 // 그룹 드래그 중에도 반발력 시스템 계속 작동
                 
                 container.style.cursor = 'grabbing';
-                selectedCommonValuesBlob = key;
+                window.selectedCommonValuesBlob = key;
                 updateNodeHighlight();
                 
                 event.preventDefault();
@@ -9737,40 +9920,145 @@ function renderCommonValuesNetworkGraph() {
         }
     });
     
-    // 노드 하이라이트 업데이트 함수
-    function updateNodeHighlight() {
+    // 노드 하이라이트 업데이트 함수를 전역으로 이동
+    window.updateNodeHighlight = function() {
+        if (!window.network) return;
+        
         // 먼저 모든 선택 해제
-        network.unselectAll();
+        window.network.unselectAll();
         
         const nodeUpdate = [];
         // 현재 네트워크의 실제 노드 데이터를 가져옵니다
-        const currentNodes = network.body.data.nodes.get();
+        const currentNodes = window.network.body.data.nodes.get();
+        
+        // 선택된 그룹의 노드들 수집
+        let selectedGroupNodeIds = [];
+        if (window.selectedCommonValuesBlob && valueCourseIds[window.selectedCommonValuesBlob]) {
+            selectedGroupNodeIds = valueCourseIds[window.selectedCommonValuesBlob];
+        }
+        
+        // 같은 과목분류별로 노드들을 그룹화
+        const subjectTypeGroups = {};
+        selectedGroupNodeIds.forEach(nodeId => {
+            const course = courses.find(c => c.id === nodeId);
+            if (course && course.subjectType) {
+                if (!subjectTypeGroups[course.subjectType]) {
+                    subjectTypeGroups[course.subjectType] = [];
+                }
+                subjectTypeGroups[course.subjectType].push(nodeId);
+            }
+        });
+        
+        // 같은 과목분류 내에서 화살표 연결을 위한 엣지 생성
+        const subjectTypeEdges = [];
+        Object.values(subjectTypeGroups).forEach(nodeIds => {
+            if (nodeIds.length > 1) {
+                // 그룹 테마 색상 가져오기
+                const groupColor = {
+                    value1: '#1976d2',
+                    value2: '#d81b60',
+                    value3: '#388e3c'
+                }[window.selectedCommonValuesBlob] || '#1d1d1d';
+                
+                // 같은 과목분류 내의 모든 노드 쌍을 연결
+                for (let i = 0; i < nodeIds.length; i++) {
+                    for (let j = i + 1; j < nodeIds.length; j++) {
+                        subjectTypeEdges.push({
+                            from: nodeIds[i],
+                            to: nodeIds[j],
+                            color: { color: groupColor, highlight: groupColor },
+                            width: 2,
+                            dashes: false,
+                            arrows: { to: { enabled: true, scaleFactor: 0.35 } },
+                            smooth: { type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.4 },
+                            title: '같은 과목분류 연결',
+                            zIndex: 10
+                        });
+                    }
+                }
+            }
+        });
+        
+        // 기존 엣지 데이터 가져오기
+        const currentEdges = window.network.body.data.edges.get();
+        
+        // 과목분류 연결 엣지들을 기존 엣지에 추가하거나 업데이트
+        const existingSubjectTypeEdgeIds = new Set();
+        
+        // 기존 과목분류 연결 엣지들 제거 (선택 해제 시)
+        currentEdges.forEach(edge => {
+            if (edge.title === '같은 과목분류 연결') {
+                existingSubjectTypeEdgeIds.add(edge.id);
+            }
+        });
+        
+        // 기존 과목분류 연결 엣지들 제거
+        if (existingSubjectTypeEdgeIds.size > 0) {
+            window.network.body.data.edges.remove(Array.from(existingSubjectTypeEdgeIds));
+        }
+        
+        // 새로운 과목분류 연결 엣지들 추가
+        if (window.selectedCommonValuesBlob && subjectTypeEdges.length > 0) {
+            window.network.body.data.edges.add(subjectTypeEdges);
+        }
+        
+        // 나머지 엣지들을 원래 스타일로 복원
+        const edgeUpdateArray = [];
+        currentEdges.forEach(edge => {
+            if (edge.title !== '같은 과목분류 연결') {
+                if (window.selectedCommonValuesBlob) {
+                    // 그룹 선택 중일 때는 투명도 적용
+                    edgeUpdateArray.push({
+                        id: edge.id,
+                        color: { 
+                            color: edge.dashes ? 'rgba(158, 158, 158, 0.3)' : 'rgba(189, 189, 189, 0.3)',
+                            highlight: edge.dashes ? 'rgba(158, 158, 158, 0.3)' : 'rgba(189, 189, 189, 0.3)',
+                            hover: edge.dashes ? 'rgba(158, 158, 158, 0.3)' : 'rgba(189, 189, 189, 0.3)'
+                        },
+                        width: edge.dashes ? 1.5 : 3,
+                        opacity: 0.3
+                    });
+                } else {
+                    // 그룹 선택 해제 시 원래 스타일로 완전 복원
+                    edgeUpdateArray.push({
+                        id: edge.id,
+                        color: { 
+                            color: edge.dashes ? '#9e9e9e' : '#bdbdbd',
+                            highlight: edge.dashes ? '#9e9e9e' : '#bdbdbd',
+                            hover: edge.dashes ? '#9e9e9e' : '#bdbdbd'
+                        },
+                        width: edge.dashes ? 1.5 : 3,
+                        opacity: edge.dashes ? 0.5 : 1
+                    });
+                }
+            }
+        });
+        
+        if (edgeUpdateArray.length > 0) {
+            window.network.body.data.edges.update(edgeUpdateArray);
+        }
         
         currentNodes.forEach(currentNode => {
             const nodeId = currentNode.id;
             let isInSelectedGroup = false;
-            if (selectedCommonValuesBlob && valueCourseIds[selectedCommonValuesBlob]) {
-                isInSelectedGroup = valueCourseIds[selectedCommonValuesBlob].includes(nodeId);
+            if (window.selectedCommonValuesBlob && valueCourseIds[window.selectedCommonValuesBlob]) {
+                isInSelectedGroup = valueCourseIds[window.selectedCommonValuesBlob].includes(nodeId);
             }
             
             // 업데이트할 노드 객체 생성 (id는 필수)
             const updatedNode = { id: nodeId };
             
-            if (selectedCommonValuesBlob && isInSelectedGroup) {
-                // 하이라이트되는 노드의 테두리를 그룹 색상으로
-                const groupColor = {
-                    value1: '#1976d2',
-                    value2: '#d81b60',
-                    value3: '#388e3c'
-                }[selectedCommonValuesBlob] || '#1d1d1dff';
+            if (window.selectedCommonValuesBlob && isInSelectedGroup) {
+                // 하이라이트되는 노드의 테두리를 원래 색상으로 유지
+                const originalBorderColor = currentNode.color ? currentNode.color.border : '#bdbdbd';
                 
                 // 하이라이트 스타일 적용 - 현재 노드의 색상 유지
                 updatedNode.color = {
                     background: currentNode.color ? currentNode.color.background : '#f8f9fa',
-                    border: groupColor,
+                    border: originalBorderColor,
                     highlight: {
                         background: currentNode.color ? currentNode.color.background : '#f8f9fa',
-                        border: groupColor
+                        border: originalBorderColor
                     }
                 };
                 updatedNode.borderWidth = 3; // 선택된 노드는 테두리 두껍게
@@ -9784,7 +10072,7 @@ function renderCommonValuesNetworkGraph() {
                 let originalBorderColor = '#bdbdbd'; // 기본값
                 
                 // 선택 해제 시에만 원래 색상 찾기
-                if (!selectedCommonValuesBlob) {
+                if (!window.selectedCommonValuesBlob) {
                     const { subjectTypeColors, categoryColors } = generateColorLegend();
                     // 노드의 과목 찾기
                     const course = courses.find(c => c.id === nodeId);
@@ -9831,7 +10119,7 @@ function renderCommonValuesNetworkGraph() {
                 updatedNode.borderWidth = 2; // 기본 테두리 두께
                 
                 // 선택 해제 시 투명도도 복원
-                if (!selectedCommonValuesBlob) {
+                if (!window.selectedCommonValuesBlob) {
                     updatedNode.opacity = 1;
                     updatedNode.font = {
                         ...currentNode.font,
@@ -9852,13 +10140,11 @@ function renderCommonValuesNetworkGraph() {
         
         // 노드 스타일만 update()로 적용 (네트워크 전체 재생성/물리효과 X)
         try {
-            network.body.data.nodes.update(nodeUpdate);
-            console.log('노드 하이라이트 업데이트 완료:', selectedCommonValuesBlob);
+            window.network.body.data.nodes.update(nodeUpdate);
         } catch (error) {
             console.error('노드 업데이트 오류:', error);
         }
-    }
-    
+    };
     // 마우스 노드 호버 효과 (연결된 요소 포함)
     let nodeHoverOriginalStyles = new Map();
     let edgeHoverOriginalStyles = new Map();
@@ -9892,17 +10178,17 @@ function renderCommonValuesNetworkGraph() {
                 // 호버된 노드 - 강한 하이라이트 (자동으로 chosen 스타일 적용됨)
                 network.selectNodes([hoveredNodeId]);
             } else if (connectedNodeIds.includes(node.id)) {
-                // 연결된 노드 - 중간 하이라이트 (배경색은 유지, 테두리만 강조)
+                // 연결된 노드 - 중간 하이라이트 (배경색과 테두리 색상 모두 유지)
                 nodeUpdateArray.push({
                     id: node.id,
-                    opacity: 0.8,
-                    borderWidth: 2,
+                    opacity: 1.0,  // 더 선명하게 (0.8에서 0.9로 변경)
+                    borderWidth: 3,  // 테두리 더 두껍게
                     color: {
                         background: node.color ? node.color.background : '#f8f9fa',
-                        border: '#000000',
+                        border: node.color ? node.color.border : '#bdbdbd',
                         highlight: {
                             background: node.color ? node.color.background : '#f8f9fa',
-                            border: '#000000'
+                            border: node.color ? node.color.border : '#bdbdbd'
                         }
                     },
                     font: {
@@ -9914,7 +10200,7 @@ function renderCommonValuesNetworkGraph() {
                 // 나머지 노드 - 흐리게 (배경색은 유지, 투명도만 조정)
                 nodeUpdateArray.push({
                     id: node.id,
-                    opacity: 0.5,  // 엣지 호버와 동일한 투명도
+                    opacity: 0.3,  // 더 흐리게 (0.5에서 0.3으로 변경)
                     color: {
                         background: node.color ? node.color.background : '#f8f9fa',
                         border: node.color ? node.color.border : '#bdbdbd',
@@ -9925,7 +10211,7 @@ function renderCommonValuesNetworkGraph() {
                     },
                     font: {
                         ...node.font,
-                        color: 'rgba(73, 80, 87, 0.3)'  // 폰트도 같은 투명도로
+                        color: 'rgba(73, 80, 87, 0.2)'  // 폰트도 더 흐리게
                     }
                 });
             }
@@ -10032,9 +10318,6 @@ function renderCommonValuesNetworkGraph() {
         const edgeId = params.edge;
         const edge = network.body.data.edges.get(edgeId);
         if (edge && edge.title) {
-            // yearSemester 텍스트가 title에 있음
-            const yearSemester = edge.title;
-            // 해당 yearSemester의 모든 노드 id 찾기
             const highlightNodeIds = [];
             const dimNodeIds = [];
             const nodeUpdateArray = [];
@@ -10042,31 +10325,181 @@ function renderCommonValuesNetworkGraph() {
             // 현재 네트워크의 모든 노드 가져오기
             const allCurrentNodes = network.body.data.nodes.get();
             
-            // 모든 노드의 원래 상태 저장 및 업데이트 준비
-            allCurrentNodes.forEach(currentNode => {
-                
-                // 원래 스타일 저장 (처음 호버 시에만)
-                if (!edgeHoverOriginalNodeStyles.has(currentNode.id)) {
-                    edgeHoverOriginalNodeStyles.set(currentNode.id, {
-                        opacity: currentNode.opacity || 1,
-                        font: { ...currentNode.font },
-                        color: currentNode.color ? { ...currentNode.color } : undefined
+            // 점선 엣지인지 확인 (같은 과목분류 연결)
+            if (edge.dashes === true) {
+                // 점선 엣지: 과목분류 기반 하이라이트
+                // title에서 과목분류 추출 (예: "설계 - VALUE1 to VALUE2")
+                const subjectTypeMatch = edge.title.match(/^([^\-]+)\s*-/);
+                if (subjectTypeMatch) {
+                    const subjectType = subjectTypeMatch[1].trim();
+                    
+                    // 같은 과목분류를 가진 모든 노드 찾기
+                    allCurrentNodes.forEach(currentNode => {
+                        // 원래 스타일 저장 (처음 호버 시에만)
+                        if (!edgeHoverOriginalNodeStyles.has(currentNode.id)) {
+                            edgeHoverOriginalNodeStyles.set(currentNode.id, {
+                                opacity: currentNode.opacity || 1,
+                                font: { ...currentNode.font },
+                                color: currentNode.color ? { ...currentNode.color } : undefined,
+                                borderWidth: currentNode.borderWidth || 2
+                            });
+                        }
+                        
+                        const course = courses.find(c => c.id === currentNode.id);
+                        if (course && course.subjectType === subjectType) {
+                            highlightNodeIds.push(currentNode.id);
+                        } else {
+                            dimNodeIds.push(currentNode.id);
+                            // 디밍할 노드 업데이트 배열에 추가
+                            nodeUpdateArray.push({
+                                id: currentNode.id,
+                                opacity: 0.3,  // 더 강한 투명도 적용
+                                font: { 
+                                    ...currentNode.font,
+                                    color: 'rgba(73, 80, 87, 0.3)'  // 폰트도 같은 투명도로
+                                },
+                                color: {
+                                    background: currentNode.color ? currentNode.color.background : '#f8f9fa',
+                                    border: currentNode.color ? currentNode.color.border : '#bdbdbd',
+                                    highlight: {
+                                        background: currentNode.color ? currentNode.color.background : '#f8f9fa',
+                                        border: currentNode.color ? currentNode.color.border : '#bdbdbd'
+                                    }
+                                }
+                            });
+                        }
                     });
+                    
+                    // 하이라이트할 노드들도 업데이트 배열에 추가 (색상 체계 유지)
+                    highlightNodeIds.forEach(nodeId => {
+                        const currentNode = network.body.data.nodes.get(nodeId);
+                        nodeUpdateArray.push({
+                            id: nodeId,
+                            opacity: 1,
+                            borderWidth: 3,
+                            color: {
+                                background: currentNode.color ? currentNode.color.background : '#f8f9fa',
+                                border: currentNode.color ? currentNode.color.border : '#bdbdbd',
+                                highlight: {
+                                    background: currentNode.color ? currentNode.color.background : '#f8f9fa',
+                                    border: currentNode.color ? currentNode.color.border : '#bdbdbd'
+                                }
+                            },
+                            font: {
+                                ...currentNode.font,
+                                color: '#000000ff'
+                            }
+                        });
+                    });
+                    
+                    // 모든 엣지들 처리
+                    const allEdges = network.body.data.edges.get();
+                    const edgeUpdateArray = [];
+                    
+                    allEdges.forEach(e => {
+                        // 원래 스타일 저장 (처음 호버 시에만)
+                        if (!edgeHoverOriginalEdgeStyles.has(e.id)) {
+                            edgeHoverOriginalEdgeStyles.set(e.id, {
+                                color: e.color || { color: '#bdbdbd', highlight: '#bdbdbd' },
+                                width: e.width || 1,
+                                dashes: e.dashes || false
+                            });
+                        }
+                        
+                        // 같은 과목분류의 점선 엣지인지 확인
+                        if (e.dashes === true && e.title && e.title.includes(subjectType)) {
+                            // 과목분류별 테마 색상 가져오기
+                            const subjectTypeColors = {
+                                '설계': '#9e9e9e',
+                                '디지털': '#a1887f',
+                                '역사': '#d84315',
+                                '이론': '#00897b',
+                                '도시': '#c2185b',
+                                '사회': '#5e35b1',
+                                '기술': '#ef6c00',
+                                '실무': '#43a047',
+                                '비교과': '#757575'
+                            };
+                            
+                            const themeColor = subjectTypeColors[subjectType] || '#2e7d32';
+                            
+                            // 같은 과목분류의 점선들은 과목분류 테마색으로 하이라이트
+                            edgeUpdateArray.push({
+                                id: e.id,
+                                color: { 
+                                    color: themeColor, 
+                                    highlight: themeColor,
+                                    hover: themeColor
+                                },
+                                width: 2.5,
+                                dashes: true
+                            });
+                        } else {
+                            // 다른 엣지들은 투명도 적용
+                            edgeUpdateArray.push({
+                                id: e.id,
+                                color: { 
+                                    color: 'rgba(189, 189, 189, 0.2)', 
+                                    highlight: 'rgba(189, 189, 189, 0.2)',
+                                    hover: 'rgba(189, 189, 189, 0.2)'
+                                },
+                                width: 1
+                            });
+                        }
+                    });
+                    
+                    // 배치로 업데이트
+                    if (edgeUpdateArray.length > 0) {
+                        network.body.data.edges.update(edgeUpdateArray);
+                    }
                 }
+            } else {
+                // 기존 yearSemester 엣지 처리
+                const yearSemester = edge.title;
                 
-                const course = courses.find(c => c.id === currentNode.id);
-                if (course && course.yearSemester === yearSemester) {
-                    highlightNodeIds.push(currentNode.id);
-                } else {
-                    dimNodeIds.push(currentNode.id);
-                    // 디밍할 노드 업데이트 배열에 추가
+                // 모든 노드의 원래 상태 저장 및 업데이트 준비
+                allCurrentNodes.forEach(currentNode => {
+                    // 원래 스타일 저장 (처음 호버 시에만)
+                    if (!edgeHoverOriginalNodeStyles.has(currentNode.id)) {
+                        edgeHoverOriginalNodeStyles.set(currentNode.id, {
+                            opacity: currentNode.opacity || 1,
+                            font: { ...currentNode.font },
+                            color: currentNode.color ? { ...currentNode.color } : undefined
+                        });
+                    }
+                    
+                    const course = courses.find(c => c.id === currentNode.id);
+                    if (course && course.yearSemester === yearSemester) {
+                        highlightNodeIds.push(currentNode.id);
+                    } else {
+                        dimNodeIds.push(currentNode.id);
+                        // 디밍할 노드 업데이트 배열에 추가
+                        nodeUpdateArray.push({
+                            id: currentNode.id,
+                            opacity: 0.3,  // 더 강한 투명도 적용
+                            font: { 
+                                ...currentNode.font,
+                                color: 'rgba(73, 80, 87, 0.3)'  // 폰트도 같은 투명도로
+                            },
+                            color: {
+                                background: currentNode.color ? currentNode.color.background : '#f8f9fa',
+                                border: currentNode.color ? currentNode.color.border : '#bdbdbd',
+                                highlight: {
+                                    background: currentNode.color ? currentNode.color.background : '#f8f9fa',
+                                    border: currentNode.color ? currentNode.color.border : '#bdbdbd'
+                                }
+                            }
+                        });
+                    }
+                });
+                
+                // 하이라이트할 노드들도 업데이트 배열에 추가 (색상 체계 유지)
+                highlightNodeIds.forEach(nodeId => {
+                    const currentNode = network.body.data.nodes.get(nodeId);
                     nodeUpdateArray.push({
-                        id: currentNode.id,
-                        opacity: 0.3,  // 더 강한 투명도 적용
-                        font: { 
-                            ...currentNode.font,
-                            color: 'rgba(73, 80, 87, 0.3)'  // 폰트도 같은 투명도로
-                        },
+                        id: nodeId,
+                        opacity: 1,
+                        borderWidth: 3,
                         color: {
                             background: currentNode.color ? currentNode.color.background : '#f8f9fa',
                             border: currentNode.color ? currentNode.color.border : '#bdbdbd',
@@ -10074,79 +10507,61 @@ function renderCommonValuesNetworkGraph() {
                                 background: currentNode.color ? currentNode.color.background : '#f8f9fa',
                                 border: currentNode.color ? currentNode.color.border : '#bdbdbd'
                             }
+                        },
+                        font: {
+                            ...currentNode.font,
+                            color: '#000000ff'
                         }
                     });
-                }
-            });
-            
-            // 하이라이트할 노드들도 업데이트 배열에 추가 (색상 체계 유지)
-            highlightNodeIds.forEach(nodeId => {
-                const currentNode = network.body.data.nodes.get(nodeId);
-                nodeUpdateArray.push({
-                    id: nodeId,
-                    opacity: 1,
-                    borderWidth: 3,
-                    color: {
-                        background: currentNode.color ? currentNode.color.background : '#f8f9fa',
-                        border: '#454545ff',
-                        highlight: {
-                            background: currentNode.color ? currentNode.color.background : '#f8f9fa',
-                            border: '#454545ff'
-                        }
-                    },
-                    font: {
-                        ...currentNode.font,
-                        color: '#000000ff'
+                });
+                
+                // 모든 엣지들 처리
+                const allEdges = network.body.data.edges.get();
+                const edgeUpdateArray = [];
+                
+                allEdges.forEach(e => {
+                    // 원래 스타일 저장 (처음 호버 시에만)
+                    if (!edgeHoverOriginalEdgeStyles.has(e.id)) {
+                        edgeHoverOriginalEdgeStyles.set(e.id, {
+                            color: e.color || { color: '#bdbdbd', highlight: '#bdbdbd' },
+                            width: e.width || 1
+                        });
+                    }
+                    
+                    // 엣지의 title이 같은 yearSemester인지 확인
+                    if (e.title === yearSemester) {
+                        // 같은 학년학기의 모든 엣지는 검은색으로
+                        edgeUpdateArray.push({
+                            id: e.id,
+                            color: { 
+                                color: '#525252ff', 
+                                highlight: '#313131ff',
+                                hover: '#333333ff'
+                            },
+                            width: 3
+                        });
+                    } else {
+                        // 다른 엣지들은 투명도 적용
+                        edgeUpdateArray.push({
+                            id: e.id,
+                            color: { 
+                                color: 'rgba(189, 189, 189, 0.2)', 
+                                highlight: 'rgba(189, 189, 189, 0.2)',
+                                hover: 'rgba(189, 189, 189, 0.2)'
+                            },
+                            width: 1
+                        });
                     }
                 });
-            });
+                
+                // 배치로 업데이트
+                network.body.data.edges.update(edgeUpdateArray);
+            }
             
             // 모든 노드들 업데이트 (배치 처리)
             if (nodeUpdateArray.length > 0) {
                 network.body.data.nodes.update(nodeUpdateArray);
             }
-            
-            // 모든 엣지들 처리
-            const allEdges = network.body.data.edges.get();
-            const edgeUpdateArray = [];
-            
-            allEdges.forEach(e => {
-                // 원래 스타일 저장 (처음 호버 시에만)
-                if (!edgeHoverOriginalEdgeStyles.has(e.id)) {
-                    edgeHoverOriginalEdgeStyles.set(e.id, {
-                        color: e.color || { color: '#bdbdbd', highlight: '#bdbdbd' },
-                        width: e.width || 1
-                    });
-                }
-                
-                // 엣지의 title이 같은 yearSemester인지 확인
-                if (e.title === yearSemester) {
-                    // 같은 학년학기의 모든 엣지는 검은색으로
-                    edgeUpdateArray.push({
-                        id: e.id,
-                        color: { 
-                            color: '#525252ff', 
-                            highlight: '#313131ff',
-                            hover: '#333333ff'
-                        },
-                        width: 3
-                    });
-                } else {
-                    // 다른 엣지들은 투명도 적용
-                    edgeUpdateArray.push({
-                        id: e.id,
-                        color: { 
-                            color: 'rgba(189, 189, 189, 0.2)', 
-                            highlight: 'rgba(189, 189, 189, 0.2)',
-                            hover: 'rgba(189, 189, 189, 0.2)'
-                        },
-                        width: 1
-                    });
-                }
-            });
-            
-            // 배치로 업데이트
-            network.body.data.edges.update(edgeUpdateArray);
         }
         document.body.style.cursor = 'pointer';
     });
@@ -10168,6 +10583,11 @@ function renderCommonValuesNetworkGraph() {
                 restoreData.color = originalStyle.color;
             }
             
+            // borderWidth 속성이 있으면 추가
+            if (originalStyle.borderWidth !== undefined) {
+                restoreData.borderWidth = originalStyle.borderWidth;
+            }
+            
             nodeRestoreArray.push(restoreData);
         });
         
@@ -10178,11 +10598,18 @@ function renderCommonValuesNetworkGraph() {
         // 모든 엣지 원래 상태로 복원
         const edgeRestoreArray = [];
         edgeHoverOriginalEdgeStyles.forEach((originalStyle, edgeId) => {
-            edgeRestoreArray.push({
+            const restoreData = {
                 id: edgeId,
                 color: originalStyle.color,
                 width: originalStyle.width
-            });
+            };
+            
+            // dashes 속성이 있으면 추가
+            if (originalStyle.dashes !== undefined) {
+                restoreData.dashes = originalStyle.dashes;
+            }
+            
+            edgeRestoreArray.push(restoreData);
         });
         
         if (edgeRestoreArray.length > 0) {
@@ -10194,6 +10621,14 @@ function renderCommonValuesNetworkGraph() {
         edgeHoverOriginalEdgeStyles.clear();
         document.body.style.cursor = 'default';
     });
+    
+    // window.network에 할당하여 전역에서 접근 가능하게 함
+    window.network = network;
+    
+    // Value 컬럼 이벤트 시스템 설정 (네트워크 생성 후)
+    setTimeout(() => {
+        setupValueColumnEvents();
+    }, 200);
 }
 // ... existing code ...
 
@@ -10957,10 +11392,8 @@ function updateCommonValuesCourseBlocksDraggable() {
         block.draggable = isEditMode;
     });
 }
-
 // 색상 기준 전환 상태 변수 (true: 과목분류, false: 구분)
 let colorModeBySubjectType = true;
-
 // 색상 기준 전환 함수
 function toggleColorMode() {
     colorModeBySubjectType = !colorModeBySubjectType;
@@ -10993,35 +11426,52 @@ function toggleColorMode() {
         }
         
         // 네트워크 그래프의 노드 색상 업데이트
-        if (typeof network !== 'undefined' && network && network.body && network.body.data && network.body.data.nodes) {
-            const allNodes = network.body.data.nodes.get();
+        if (window.network && window.network.body && window.network.body.data && window.network.body.data.nodes) {
+            const allNodes = window.network.body.data.nodes.get();
             const nodeUpdateArray = [];
             
             allNodes.forEach(node => {
-                // 학년-학기 노드는 스킵
-                if (node.group === 'semester') return;
+                // 학년-학기 노드나 비교과 노드는 스킵
+                if (node.group === 'semester' || node.isExtracurricular) return;
                 
                 // 노드의 과목 정보 찾기
                 const course = courses.find(c => c.id === node.id);
                 if (!course) return;
                 
                 // 색상 범례 가져오기
-                const colorLegend = generateColorLegend();
+                const { subjectTypeColors, categoryColors } = generateColorLegend();
                 let newColor = '#f8f9fa'; // 기본색
                 let borderColor = '#bdbdbd'; // 기본 테두리색
                 
                 if (colorModeBySubjectType) {
-                    // 과목분류 모드
-                    if (course.subjectType && colorLegend.subjectTypes && colorLegend.subjectTypes[course.subjectType]) {
-                        newColor = colorLegend.subjectTypes[course.subjectType];
-                        borderColor = colorLegend.subjectTypes[course.subjectType];
-                    }
+                    // 과목분류별 색상
+                    newColor = subjectTypeColors[course.subjectType] || '#f5f5f5';
+                    // 테두리는 배경색보다 진한 색으로
+                    const borderColors = {
+                        '설계': '#9e9e9e',
+                        '디지털': '#a1887f',
+                        '역사': '#d84315',
+                        '이론': '#00897b',
+                        '도시': '#c2185b',
+                        '사회': '#5e35b1',
+                        '기술': '#ef6c00',
+                        '실무': '#43a047',
+                        '비교과': '#757575'
+                    };
+                    borderColor = borderColors[course.subjectType] || '#757575';
                 } else {
-                    // 구분 모드
-                    if (course.category && colorLegend.categories && colorLegend.categories[course.category]) {
-                        newColor = colorLegend.categories[course.category];
-                        borderColor = colorLegend.categories[course.category];
-                    }
+                    // 구분별 색상
+                    newColor = categoryColors[course.category] || '#f8f9fa';
+                    // 테두리는 배경색보다 진한 색으로
+                    const borderColors = {
+                        '교양': '#6c757d',
+                        '건축적사고': '#1976d2',
+                        '설계': '#c62828',
+                        '기술': '#f57c00',
+                        '실무': '#388e3c',
+                        '기타': '#7b1fa2'
+                    };
+                    borderColor = borderColors[course.category] || '#6c757d';
                 }
                 
                 // 노드 색상 업데이트
@@ -11040,7 +11490,8 @@ function toggleColorMode() {
             
             // 업데이트 적용
             if (nodeUpdateArray.length > 0) {
-                network.body.data.nodes.update(nodeUpdateArray);
+                window.network.body.data.nodes.update(nodeUpdateArray);
+                console.log(`🎨 네트워크 그래프 노드 색상 업데이트 완료: ${nodeUpdateArray.length}개 노드`);
             }
         } else {
             // 네트워크가 없으면 전체 그래프 재렌더링
@@ -11153,11 +11604,81 @@ function toggleColorModeCurriculum() {
         }
     }
 
-    // 공통가치대응 탭의 네트워크 그래프도 함께 갱신
-    if (typeof renderCommonValuesNetworkGraph === 'function') {
-        const commonValuesTab = document.getElementById('commonValues');
-        if (commonValuesTab && commonValuesTab.classList.contains('active')) {
-            renderCommonValuesNetworkGraph();
+    // 공통가치대응 탭의 네트워크 그래프 노드 색상 업데이트
+    if (window.network && window.network.body && window.network.body.data && window.network.body.data.nodes) {
+        const allNodes = window.network.body.data.nodes.get();
+        const nodeUpdateArray = [];
+        
+        allNodes.forEach(node => {
+            // 학년-학기 노드나 비교과 노드는 스킵
+            if (node.group === 'semester' || node.isExtracurricular) return;
+            
+            // 노드의 과목 정보 찾기
+            const course = courses.find(c => c.id === node.id);
+            if (!course) return;
+            
+            // 색상 범례 가져오기
+            const { subjectTypeColors, categoryColors } = generateColorLegend();
+            let newColor = '#f8f9fa'; // 기본색
+            let borderColor = '#bdbdbd'; // 기본 테두리색
+            
+            if (colorModeBySubjectTypeCurriculum) {
+                // 과목분류별 색상
+                newColor = subjectTypeColors[course.subjectType] || '#f5f5f5';
+                // 테두리는 배경색보다 진한 색으로
+                const borderColors = {
+                    '설계': '#9e9e9e',
+                    '디지털': '#a1887f',
+                    '역사': '#d84315',
+                    '이론': '#00897b',
+                    '도시': '#c2185b',
+                    '사회': '#5e35b1',
+                    '기술': '#ef6c00',
+                    '실무': '#43a047',
+                    '비교과': '#757575'
+                };
+                borderColor = borderColors[course.subjectType] || '#757575';
+            } else {
+                // 구분별 색상
+                newColor = categoryColors[course.category] || '#f8f9fa';
+                // 테두리는 배경색보다 진한 색으로
+                const borderColors = {
+                    '교양': '#6c757d',
+                    '건축적사고': '#1976d2',
+                    '설계': '#c62828',
+                    '기술': '#f57c00',
+                    '실무': '#388e3c',
+                    '기타': '#7b1fa2'
+                };
+                borderColor = borderColors[course.category] || '#6c757d';
+            }
+            
+            // 노드 색상 업데이트
+            nodeUpdateArray.push({
+                id: node.id,
+                color: {
+                    background: newColor,
+                    border: borderColor,
+                    highlight: {
+                        background: newColor,
+                        border: borderColor
+                    }
+                }
+            });
+        });
+        
+        // 업데이트 적용
+        if (nodeUpdateArray.length > 0) {
+            window.network.body.data.nodes.update(nodeUpdateArray);
+            console.log(`🎨 네트워크 그래프 노드 색상 업데이트 완료: ${nodeUpdateArray.length}개 노드`);
+        }
+    } else {
+        // 네트워크가 없으면 전체 그래프 재렌더링
+        if (typeof renderCommonValuesNetworkGraph === 'function') {
+            const commonValuesTab = document.getElementById('commonValues');
+            if (commonValuesTab && commonValuesTab.classList.contains('active')) {
+                renderCommonValuesNetworkGraph();
+            }
         }
     }
 }
@@ -11692,7 +12213,6 @@ function cancelCommonValuesCellEdit(cell) {
         }
     }
 }
-
 // 공통가치대응 테이블 엑셀 내보내기 (실제 엑셀 파일로 내보내기, 표 구조 보존)
 function exportCommonValuesToExcel() {
     const table = document.querySelector('.common-values-table');
@@ -12397,10 +12917,8 @@ function debugCommonValuesCells() {
     
     return data;
 }
-
 // 글로벌 함수로 등록 (콘솔에서 사용 가능)
 window.debugCommonValuesCells = debugCommonValuesCells;
-
 // 공통가치대응 탭의 현재 셀 데이터를 수집하는 함수
 function collectCommonValuesTableData() {
     const table = document.querySelector('#commonValuesTable');
@@ -12824,6 +13342,272 @@ document.addEventListener('click', function(event) {
     }
 });
 
+// ========================================
+// 공통가치대응 Value 컬럼 그래프 하이라이트 시스템
+// ========================================
+
+// 선택된 value 그룹 상태 관리
+let selectedValueGroup = null;
+let originalValueGroupStyles = new Map();
+
+// Value 컬럼 그래프 하이라이트 이벤트 시스템
+function setupValueColumnEvents() {
+    console.log('🎯 Value 컬럼 그래프 하이라이트 시스템 시작');
+    
+    // 공통가치대응 테이블이 있는지 확인
+    const table = document.getElementById('commonValuesTable');
+    if (!table) {
+        console.error('❌ commonValuesTable을 찾을 수 없음');
+        return;
+    }
+    
+    // 모든 헤더 요소 확인 및 이벤트 추가
+    const allHeaders = table.querySelectorAll('thead th');
+    console.log(`📋 전체 헤더 개수: ${allHeaders.length}`);
+    
+    // Value 헤더 매핑
+    const valueHeaderMap = {
+        '환경의 지속가능성': { valueKey: 'value1', color: '#1976d2' },
+        '미래기술의 활용': { valueKey: 'value2', color: '#d81b60' },
+        '창의적 문제해결': { valueKey: 'value3', color: '#388e3c' }
+    };
+    
+    allHeaders.forEach((header, index) => {
+        const text = header.textContent.trim();
+        
+        // value 헤더인지 확인
+        for (const [keyword, config] of Object.entries(valueHeaderMap)) {
+            if (text.includes(keyword)) {
+                console.log(`✅ Value 헤더 발견: ${config.valueKey} (${keyword})`);
+                
+                // 이미 이벤트가 추가된 경우 스킵
+                if (header.hasAttribute('data-value-events-added')) {
+                    console.log(`⚠️ 이미 이벤트가 추가된 헤더: ${config.valueKey}`);
+                    continue;
+                }
+                header.setAttribute('data-value-events-added', 'true');
+                header.setAttribute('data-value-key', config.valueKey);
+                
+                // 헤더 기본 스타일은 CSS에서 관리
+                
+                // 호버 이벤트
+                header.addEventListener('mouseenter', function() {
+                    console.log(`🖱️ ${keyword} 헤더 호버 시작`);
+                    highlightValueGroupInGraph(config.valueKey, true);
+                    
+                    // 스플라인 호버 상태 설정
+                    window.hoveredBlob = config.valueKey;
+                    
+                    // 헤더 시각적 효과는 CSS에서 관리
+                    header.style.cursor = 'pointer';
+                });
+                
+                header.addEventListener('mouseleave', function() {
+                    console.log(`🖱️ ${keyword} 헤더 호버 끝`);
+                    if (selectedValueGroup !== config.valueKey) {
+                        unhighlightValueGroupInGraph();
+                    }
+                    
+                    // 스플라인 호버 상태 해제
+                    window.hoveredBlob = null;
+                    
+                    // 헤더 시각적 효과는 CSS에서 관리
+                });
+                
+                // 클릭 이벤트
+                header.addEventListener('click', function() {
+                    console.log(`🖱️ ${keyword} 헤더 클릭됨`);
+                    
+                    if (selectedValueGroup === config.valueKey) {
+                        // 선택 해제
+                        selectedValueGroup = null;
+                        unhighlightValueGroupInGraph();
+                        updateHeaderSelectionState();
+                        showToast(`${keyword} 그룹 선택이 해제되었습니다.`);
+                    } else {
+                        // 새로운 그룹 선택
+                        selectedValueGroup = config.valueKey;
+                        highlightValueGroupInGraph(config.valueKey, false);
+                        updateHeaderSelectionState();
+                        showToast(`${keyword} 그룹이 선택되었습니다.`);
+                    }
+                });
+                
+                break; // 첫 번째 매칭만 처리
+            }
+        }
+    });
+    
+    // Value 셀들 이벤트 추가
+    const valueCells = table.querySelectorAll('.col-value1, .col-value2, .col-value3');
+    console.log(`📊 Value 셀 개수: ${valueCells.length}`);
+    
+    valueCells.forEach((cell, index) => {
+        // 이미 이벤트가 추가된 경우 스킵
+        if (cell.hasAttribute('data-value-events-added')) return;
+        cell.setAttribute('data-value-events-added', 'true');
+        
+        const valueKey = cell.classList.contains('col-value1') ? 'value1' : 
+                        cell.classList.contains('col-value2') ? 'value2' : 'value3';
+        
+        console.log(`Value 셀 ${index + 1}: ${valueKey}`);
+        
+        // 호버 이벤트
+        cell.addEventListener('mouseenter', function() {
+            console.log(`🖱️ ${valueKey} 셀 호버 시작`);
+            if (selectedValueGroup !== valueKey) {
+                highlightValueGroupInGraph(valueKey, true);
+            }
+            
+            // 셀 시각적 효과
+            cell.style.backgroundColor = 'rgba(100, 255, 218, 0.1)';
+            cell.style.transition = 'background-color 0.2s ease, transform 0.2s ease';
+            cell.style.transform = 'scale(1.01)';
+        });
+        
+        cell.addEventListener('mouseleave', function() {
+            console.log(`🖱️ ${valueKey} 셀 호버 끝`);
+            if (selectedValueGroup !== valueKey) {
+                unhighlightValueGroupInGraph();
+            }
+            
+            // 셀 시각적 효과 복원
+            if (selectedValueGroup !== valueKey) {
+                cell.style.backgroundColor = '';
+                cell.style.transform = 'scale(1)';
+            }
+        });
+    });
+    
+    console.log('✅ Value 컬럼 이벤트 시스템 초기화 완료');
+}
+
+// 그래프에서 value 그룹 하이라이트
+function highlightValueGroupInGraph(valueKey, isTemporary = false) {
+    console.log(`🎨 그래프 하이라이트 시작: ${valueKey}`);
+    
+    if (!window.network) {
+        console.log('⚠️ window.network가 아직 초기화되지 않음 - 네트워크 그래프 생성 대기 중');
+        return;
+    }
+    
+    try {
+        // value 스플라인 선택과 동일한 효과 적용
+        // 전역 변수 selectedCommonValuesBlob에 접근
+        const originalSelectedBlob = window.selectedCommonValuesBlob || null;
+        window.selectedCommonValuesBlob = valueKey;
+        
+        // updateNodeHighlight 함수 호출하여 동일한 효과 적용
+        if (typeof window.updateNodeHighlight === 'function') {
+            window.updateNodeHighlight();
+        } else {
+            console.error('updateNodeHighlight 함수가 정의되지 않음');
+        }
+        
+        // 임시 호버인 경우 타이머 설정
+        if (isTemporary) {
+            setTimeout(() => {
+                // 원래 상태로 복원
+                window.selectedCommonValuesBlob = originalSelectedBlob;
+                if (typeof window.updateNodeHighlight === 'function') {
+                    window.updateNodeHighlight();
+                }
+            }, 100); // 짧은 지연으로 부드러운 전환
+        }
+        
+        console.log(`✨ ${valueKey} 그룹 하이라이트 완료 (value 스플라인 선택과 동일한 효과)`);
+        
+    } catch (error) {
+        console.error('그래프 하이라이트 오류:', error);
+    }
+}
+
+// 그래프 하이라이트 해제
+function unhighlightValueGroupInGraph() {
+    console.log('🔄 그래프 하이라이트 해제');
+    
+    if (!window.network) {
+        console.log('⚠️ window.network가 아직 초기화되지 않음 - 네트워크 그래프 생성 대기 중');
+        return;
+    }
+    
+    try {
+        // value 스플라인 선택 해제와 동일한 효과 적용
+        // 전역 변수 selectedCommonValuesBlob을 null로 설정하여 선택 해제
+        const originalSelectedBlob = window.selectedCommonValuesBlob || null;
+        window.selectedCommonValuesBlob = null;
+        
+        // updateNodeHighlight 함수 호출하여 동일한 효과 적용
+        if (typeof window.updateNodeHighlight === 'function') {
+            window.updateNodeHighlight();
+        } else {
+            console.error('updateNodeHighlight 함수가 정의되지 않음');
+        }
+        
+        console.log('🔄 그래프 하이라이트 해제 완료 (value 스플라인 선택 해제와 동일한 효과)');
+        
+    } catch (error) {
+        console.error('❌ 그래프 하이라이트 해제 중 오류:', error);
+    }
+}
+
+// 헤더 선택 상태 UI 업데이트
+function updateHeaderSelectionState() {
+    console.log(`🔄 헤더 선택 상태 업데이트: ${selectedValueGroup}`);
+    
+    const table = document.getElementById('commonValuesTable');
+    if (!table) return;
+    
+    const allHeaders = table.querySelectorAll('thead th[data-value-key]');
+    allHeaders.forEach(header => {
+        const valueKey = header.getAttribute('data-value-key');
+        
+        if (selectedValueGroup === valueKey) {
+            // 선택된 헤더 - CSS 클래스 사용
+            header.classList.add('selected');
+        } else {
+            // 선택되지 않은 헤더 - CSS 클래스 제거
+            header.classList.remove('selected');
+        }
+    });
+    
+    // 셀들도 업데이트
+    const valueCells = table.querySelectorAll('.col-value1, .col-value2, .col-value3');
+    valueCells.forEach(cell => {
+        const valueKey = cell.classList.contains('col-value1') ? 'value1' : 
+                        cell.classList.contains('col-value2') ? 'value2' : 'value3';
+        
+        if (selectedValueGroup === valueKey) {
+            cell.classList.add('selected-group');
+        } else {
+            cell.classList.remove('selected-group');
+        }
+    });
+}
+
+// 공통가치대응 탭 활성화 시 이벤트 설정
+function initializeValueColumnEvents() {
+    // 공통가치대응 탭 감시 (네트워크 그래프가 생성된 후에만 이벤트 설정)
+    const commonValuesTab = document.querySelector('a[href="#commonValues"]');
+    if (commonValuesTab) {
+        commonValuesTab.addEventListener('click', function() {
+            console.log('🎯 공통가치대응 탭 클릭됨');
+            // 네트워크 그래프가 생성된 후에 이벤트가 설정되므로 여기서는 추가 설정 불필요
+        });
+    }
+    
+    // 페이지 로드 시 공통가치대응 탭이 이미 활성화된 경우
+    const commonValuesContent = document.getElementById('commonValues');
+    if (commonValuesContent && commonValuesContent.classList.contains('active')) {
+        // 네트워크 그래프가 생성된 후에 이벤트가 설정되므로 여기서는 추가 설정 불필요
+    }
+}
+
+// 전역 함수로 노출
+window.setupValueColumnEvents = setupValueColumnEvents;
+window.highlightValueGroupInGraph = highlightValueGroupInGraph;
+window.unhighlightValueGroupInGraph = unhighlightValueGroupInGraph;
+
 // 파일 끝에서 init 함수를 전역으로 노출
 window.init = init;
 
@@ -12836,4 +13620,3 @@ if (document.readyState === 'loading') {
     // DOM이 이미 로드된 경우 즉시 실행
     init();
 }
-

@@ -2761,6 +2761,153 @@ th, td, .matrix-table th, .matrix-table td {
     outline: none;
 }
 
+/* 공통가치대응 Value 컬럼 선택 상태 스타일 */
+.selected-value-group {
+    background: linear-gradient(135deg, #64FFDA 0%, #00BCD4 100%) !important;
+    color: #000 !important;
+    font-weight: bold !important;
+    box-shadow: 0 0 20px rgba(100, 255, 218, 0.6) !important;
+    transform: scale(1.02) !important;
+    transition: all 0.3s ease !important;
+    position: relative !important;
+    z-index: 10 !important;
+}
+
+.selected-value-group::after {
+    content: '✓';
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #000;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.selected-group {
+    background: rgba(100, 255, 218, 0.15) !important;
+    border: 2px solid #64FFDA !important;
+    box-shadow: inset 0 0 10px rgba(100, 255, 218, 0.2) !important;
+    transform: scale(1.01) !important;
+    transition: all 0.3s ease !important;
+    position: relative !important;
+}
+
+.selected-group::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, transparent 30%, rgba(100, 255, 218, 0.1) 50%, transparent 70%);
+    animation: shimmer 2s infinite;
+    pointer-events: none;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* 공통가치대응 Value 헤더 호버 효과 */
+.common-values-table th[data-value-key="value1"]:hover {
+    background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%) !important;
+    color: white !important;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
+    cursor: pointer !important;
+    transform: scale(1.01) !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 8px rgba(25, 118, 210, 0.3) !important;
+}
+
+.common-values-table th[data-value-key="value2"]:hover {
+    background: linear-gradient(135deg, #d81b60 0%, #c2185b 100%) !important;
+    color: white !important;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
+    cursor: pointer !important;
+    transform: scale(1.01) !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 8px rgba(216, 27, 96, 0.3) !important;
+}
+
+.common-values-table th[data-value-key="value3"]:hover {
+    background: linear-gradient(135deg, #388e3c 0%, #2e7d32 100%) !important;
+    color: white !important;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
+    cursor: pointer !important;
+    transform: scale(1.01) !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 8px rgba(56, 142, 60, 0.3) !important;
+}
+
+/* 공통가치대응 Value 헤더 선택 상태 (호버와 동일) */
+.common-values-table th[data-value-key="value1"].selected {
+    background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%) !important;
+    color: white !important;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
+    cursor: pointer !important;
+    transform: scale(1.01) !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 8px rgba(25, 118, 210, 0.3) !important;
+}
+
+.common-values-table th[data-value-key="value2"].selected {
+    background: linear-gradient(135deg, #d81b60 0%, #c2185b 100%) !important;
+    color: white !important;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
+    cursor: pointer !important;
+    transform: scale(1.01) !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 8px rgba(216, 27, 96, 0.3) !important;
+}
+
+.common-values-table th[data-value-key="value3"].selected {
+    background: linear-gradient(135deg, #388e3c 0%, #2e7d32 100%) !important;
+    color: white !important;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
+    cursor: pointer !important;
+    transform: scale(1.01) !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 8px rgba(56, 142, 60, 0.3) !important;
+}
+
+/* 공통가치대응 Value 셀 호버 효과 */
+.common-values-table .col-value1:hover,
+.common-values-table .col-value2:hover,
+.common-values-table .col-value3:hover {
+    background: rgba(100, 255, 218, 0.1) !important;
+    cursor: pointer !important;
+    transform: scale(1.01) !important;
+    transition: all 0.2s ease !important;
+    box-shadow: inset 0 0 5px rgba(100, 255, 218, 0.3) !important;
+}
+
+/* 공통가치대응 Value 컬럼 헤더 기본 스타일 */
+.common-values-table th[data-value-key="value1"] {
+    background: rgba(25, 118, 210, 0.2) !important;
+    color: #1976d2 !important;
+    text-shadow: none !important;
+}
+
+.common-values-table th[data-value-key="value2"] {
+    background: rgba(216, 27, 96, 0.2) !important;
+    color: #d81b60 !important;
+    text-shadow: none !important;
+}
+
+.common-values-table th[data-value-key="value3"] {
+    background: rgba(56, 142, 60, 0.2) !important;
+    color: #388e3c !important;
+    text-shadow: none !important;
+}
+
 /* 색상 범례 스타일 */
 .color-legend {
     display: flex;
