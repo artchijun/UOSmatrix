@@ -15614,7 +15614,7 @@ function highlightEdgeType(edgeType) {
             
             edgeUpdateArray.push({
                 id: edge.id,
-                width: edge.dashes ? 2 : 3, // 점선은 2px, 실선은 3px
+                width: edge.dashes ? 2 : 2, // 점선은 2px, 실선은 3px
                 color: { 
                     color: edge.dashes ? highlightColor : '#595959ff', // 점선은 과목분류 색상, 실선은 검은색
                     opacity: 0.8
