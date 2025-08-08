@@ -3921,8 +3921,102 @@ th, td, .matrix-table th, .matrix-table td {
 }
 
 .vis-network .vis-node.box.selected {
-    box-shadow: 0 4px 12px rgba(25, 118, 210, 0.4) !important;
-    border: 2px solid #1976d2 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+    border: 2px solid #000000 !important;
+}
+
+/* vis-network 기본 하이라이트 스타일 완전 오버라이드 */
+.vis-network .vis-node.hover,
+.vis-network .vis-node.vis-hover {
+    border-color: #e11111 !important;
+    border-width: 2px !important;
+    background-color: inherit !important;
+    color: inherit !important;
+}
+
+.vis-network .vis-node.vis-selected,
+.vis-network .vis-node.selected {
+    border-color: #237736 !important;
+    border-width: 2px !important;
+    background-color: inherit !important;
+    color: inherit !important;
+}
+
+.vis-network .vis-edge.hover,
+.vis-network .vis-edge.vis-hover {
+    stroke: #0d30be !important;
+    stroke-width: 2px !important;
+    color: #0d30be !important;
+}
+
+.vis-network .vis-edge.vis-selected,
+.vis-network .vis-edge.selected {
+    stroke: #0bb5af !important;
+    stroke-width: 2px !important;
+    color: #0bb5af !important;
+}
+
+/* vis-network 기본 스타일 완전 제거 */
+.vis-network .vis-node {
+    border-color: inherit !important;
+    background-color: inherit !important;
+    color: inherit !important;
+}
+
+.vis-network .vis-edge {
+    stroke: inherit !important;
+    color: inherit !important;
+}
+
+/* 모든 vis-network 요소에 대한 기본 스타일 재정의 */
+.vis-network * {
+    border-color: inherit !important;
+    background-color: inherit !important;
+    color: inherit !important;
+}
+
+/* vis-network 기본 스타일 완전 무력화 */
+.vis-network .vis-node,
+.vis-network .vis-node *,
+.vis-network .vis-edge,
+.vis-network .vis-edge * {
+    border: none !important;
+    background: none !important;
+    color: inherit !important;
+    stroke: inherit !important;
+    fill: inherit !important;
+}
+
+/* vis-network 라이브러리의 모든 기본 스타일 오버라이드 */
+.vis-network .vis-manipulation,
+.vis-network .vis-edit-mode,
+.vis-network .vis-navigation,
+.vis-network .vis-button,
+.vis-network .vis-button:hover,
+.vis-network .vis-button:active {
+    border: none !important;
+    background: none !important;
+    color: inherit !important;
+}
+
+/* vis-network의 모든 상태별 스타일 강제 적용 */
+.vis-network .vis-node.vis-hover,
+.vis-network .vis-node.vis-selected,
+.vis-network .vis-node.vis-dragCenter,
+.vis-network .vis-node.vis-dragLeft,
+.vis-network .vis-node.vis-dragRight {
+    border: 2px solid !important;
+    background-color: inherit !important;
+    color: inherit !important;
+}
+
+.vis-network .vis-edge.vis-hover,
+.vis-network .vis-edge.vis-selected,
+.vis-network .vis-edge.vis-dragCenter,
+.vis-network .vis-edge.vis-dragLeft,
+.vis-network .vis-edge.vis-dragRight {
+    stroke-width: 2px !important;
+    color: inherit !important;
 }
 
 /* 체크박스 필터 드롭다운 스타일 */
@@ -4026,30 +4120,3 @@ th, td, .matrix-table th, .matrix-table td {
     border-radius: 3px;
     display: inline-block;
 }
-
-/* 화살표 하이라이트 스타일 */
-.course-block.arrow-highlight {
-    color: #000000 !important;
-    border: 2px solid #000000 !important;
-    font-weight: bold !important;
-    border-width: 2px !important;
-    border-style: solid !important;
-    border-color: #000000 !important;
-    background-color: inherit !important;
-    outline: none !important;
-    box-shadow: none !important;
-}
-
-/* 모든 다른 스타일을 덮어쓰는 최우선 스타일 */
-.course-block[style*="color: #000000"] {
-    color: #000000 !important;
-    border: 2px solid #000000 !important;
-    font-weight: bold !important;
-    border-width: 2px !important;
-    border-style: solid !important;
-    border-color: #000000 !important;
-    background-color: inherit !important;
-    outline: none !important;
-    box-shadow: none !important;
-}
-

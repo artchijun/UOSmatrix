@@ -6984,155 +6984,7 @@ function drawArrowBetweenCells(svgContainer, fromCell, toCell, index, moveInfo) 
     animate.setAttribute('repeatCount', 'indefinite');
     path.appendChild(animate);
     
-    // 화살표 호버링 이벤트 추가
-    path.addEventListener('mouseenter', function() {
-        // 화살표 하이라이트
-        path.setAttribute('stroke', '#000000');
-        path.setAttribute('stroke-width', '2.5');
-        path.setAttribute('opacity', '1');
-        
-        // 화살표 머리 하이라이트
-        arrowHead.setAttribute('fill', '#000000');
-        arrowHead.setAttribute('opacity', '1');
-        
-        // 같은 학년학기 노드들 하이라이트 (화살표 시작점과 끝점 모두 고려)
-        const startYearSemester = moveInfo.initialCourse.yearSemester;
-        const endYearSemester = moveInfo.currentCourse.yearSemester;
-        const sameYearSemesterBlocks = document.querySelectorAll('.course-block');
-        sameYearSemesterBlocks.forEach(block => {
-            const blockCourseName = block.dataset.courseName;
-            const blockCourse = courses.find(c => c.courseName === blockCourseName);
-            if (blockCourse && (blockCourse.yearSemester === startYearSemester || blockCourse.yearSemester === endYearSemester)) {
-                // 인라인 스타일을 직접 설정하여 최우선 적용
-                block.setAttribute('style', `
-                    color: #000000 !important;
-                    border: 2px solid #000000 !important;
-                    font-weight: bold !important;
-                    border-width: 2px !important;
-                    border-style: solid !important;
-                    border-color: #000000 !important;
-                    background-color: inherit !important;
-                    outline: none !important;
-                    box-shadow: none !important;
-                `);
-                
-                // 추가로 클래스 추가
-                block.classList.add('arrow-highlight');
-            }
-        });
-    });
-    
-    path.addEventListener('mouseleave', function() {
-        // 화살표 원래 상태로 복원
-        path.setAttribute('stroke', '#bdbdbd');
-        path.setAttribute('stroke-width', '1.2');
-        path.setAttribute('opacity', '0.85');
-        
-        // 화살표 머리 원래 상태로 복원
-        arrowHead.setAttribute('fill', '#bdbdbd');
-        arrowHead.setAttribute('opacity', '0.95');
-        
-        // 노드들 원래 상태로 복원
-        const startYearSemester = moveInfo.initialCourse.yearSemester;
-        const endYearSemester = moveInfo.currentCourse.yearSemester;
-        const sameYearSemesterBlocks = document.querySelectorAll('.course-block');
-        sameYearSemesterBlocks.forEach(block => {
-            const blockCourseName = block.dataset.courseName;
-            const blockCourse = courses.find(c => c.courseName === blockCourseName);
-            if (blockCourse && (blockCourse.yearSemester === startYearSemester || blockCourse.yearSemester === endYearSemester)) {
-                // 클래스 제거
-                block.classList.remove('arrow-highlight');
-                // 인라인 스타일 완전 제거
-                block.removeAttribute('style');
-            }
-        });
-    });
-    
-    svgContainer.appendChild(path);
 
-    // 화살표 머리(삼각형)
-    const arrowSize = 8;
-    const angle = Math.atan2(toY - fromY, toX - fromX);
-    
-    // 화살표 머리를 블럭 테두리에 정확히 위치
-    const arrowX = toEdge.x - containerRect.left;
-    const arrowY = toEdge.y - containerRect.top;
-    
-    const x1 = arrowX - arrowSize * Math.cos(angle - Math.PI / 6);
-    const y1 = arrowY - arrowSize * Math.sin(angle - Math.PI / 6);
-    const x2 = arrowX - arrowSize * Math.cos(angle + Math.PI / 6);
-    const y2 = arrowY - arrowSize * Math.sin(angle + Math.PI / 6);
-    
-    const arrowHead = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-    arrowHead.setAttribute('points', `${arrowX},${arrowY} ${x1},${y1} ${x2},${y2}`);
-    arrowHead.setAttribute('fill', '#bdbdbd');
-    arrowHead.setAttribute('opacity', '0.95');
-    arrowHead.style.filter = 'drop-shadow(0 1px 2px #bdbdbdaa)';
-    arrowHead.style.cursor = 'pointer';
-    
-    // 화살표 머리 호버링 이벤트 추가
-    arrowHead.addEventListener('mouseenter', function() {
-        // 화살표 하이라이트
-        path.setAttribute('stroke', '#000000');
-        path.setAttribute('stroke-width', '2.5');
-        path.setAttribute('opacity', '1');
-        
-        // 화살표 머리 하이라이트
-        arrowHead.setAttribute('fill', '#000000');
-        arrowHead.setAttribute('opacity', '1');
-        
-        // 같은 학년학기 노드들 하이라이트 (화살표 시작점과 끝점 모두 고려)
-        const startYearSemester = moveInfo.initialCourse.yearSemester;
-        const endYearSemester = moveInfo.currentCourse.yearSemester;
-        const sameYearSemesterBlocks = document.querySelectorAll('.course-block');
-        sameYearSemesterBlocks.forEach(block => {
-            const blockCourseName = block.dataset.courseName;
-            const blockCourse = courses.find(c => c.courseName === blockCourseName);
-            if (blockCourse && (blockCourse.yearSemester === startYearSemester || blockCourse.yearSemester === endYearSemester)) {
-                // 인라인 스타일을 직접 설정하여 최우선 적용
-                block.setAttribute('style', `
-                    color: #000000 !important;
-                    border: 2px solid #000000 !important;
-                    font-weight: bold !important;
-                    border-width: 2px !important;
-                    border-style: solid !important;
-                    border-color: #000000 !important;
-                    background-color: inherit !important;
-                    outline: none !important;
-                    box-shadow: none !important;
-                `);
-                
-                // 추가로 클래스 추가
-                block.classList.add('arrow-highlight');
-            }
-        });
-    });
-    
-    arrowHead.addEventListener('mouseleave', function() {
-        // 화살표 원래 상태로 복원
-        path.setAttribute('stroke', '#bdbdbd');
-        path.setAttribute('stroke-width', '1.2');
-        path.setAttribute('opacity', '0.85');
-        
-        // 화살표 머리 원래 상태로 복원
-        arrowHead.setAttribute('fill', '#bdbdbd');
-        arrowHead.setAttribute('opacity', '0.95');
-        
-        // 노드들 원래 상태로 복원
-        const startYearSemester = moveInfo.initialCourse.yearSemester;
-        const endYearSemester = moveInfo.currentCourse.yearSemester;
-        const sameYearSemesterBlocks = document.querySelectorAll('.course-block');
-        sameYearSemesterBlocks.forEach(block => {
-            const blockCourseName = block.dataset.courseName;
-            const blockCourse = courses.find(c => c.courseName === blockCourseName);
-            if (blockCourse && (blockCourse.yearSemester === startYearSemester || blockCourse.yearSemester === endYearSemester)) {
-                // 클래스 제거
-                block.classList.remove('arrow-highlight');
-                // 인라인 스타일 완전 제거
-                block.removeAttribute('style');
-            }
-        });
-    });
     
     svgContainer.appendChild(arrowHead);
 }
@@ -7730,17 +7582,30 @@ function renderCommonValuesNetworkGraph() {
     //     }
     // });
 
-    // 네트워크 옵션 (개별 노드 스타일을 덮어쓰지 않도록 최소화)
+    // 네트워크 옵션 (vis-network 기본 스타일 완전 제어)
     const options = {
         nodes: {
             chosen: {
                 node: function(values, id, selected, hovering) {
+                    // 기본 스타일 유지
                     if (selected) {
-                        values.borderColor = '#000000';
+                        values.borderColor = '#454545ff';  // 초록색으로 선택 상태 표시
                         values.borderWidth = 3;
-                        // values.color를 변경하지 않음 - 배경색 유지
                         if (values.font) {
-                            values.font.color = '#000000';
+                            values.font.color = '#be2626ff';
+                        }
+                    } else if (hovering) {
+                        values.borderColor = '#e11111';  // 빨간색으로 호버 상태 표시
+                        values.borderWidth = 2;
+                        if (values.font) {
+                            values.font.color = '#e11111';
+                        }
+                    } else {
+                        // 기본 상태에서는 그룹별 색상 유지
+                        values.borderColor = values.color ? values.color.border : '#01579b';
+                        values.borderWidth = 2;
+                        if (values.font) {
+                            values.font.color = values.color ? values.color.border : '#01579b';
                         }
                     }
                 }
@@ -7773,9 +7638,27 @@ function renderCommonValuesNetworkGraph() {
                 shape: 'box'
             }
         },
-        //노트네트워그_jun
+        // 엣지 설정 (vis-network 기본 스타일 완전 제어)
         edges: {
-            color: { color: '#bdbdbd', highlight: '#1976d2' },
+            color: { 
+                color: '#bdbdbd', 
+                highlight: '#0d30be',  // 호버 시 파란색
+                hover: '#0d30be'       // 호버 시 파란색
+            },
+            chosen: {
+                edge: function(values, id, selected, hovering) {
+                    if (selected) {
+                        values.color = '#545454ff';  // 선택 시 청록색
+                        values.width = 3;
+                    } else if (hovering) {
+                        values.color = '#0d30be';  // 호버 시 파란색
+                        values.width = 2;
+                    } else {
+                        values.color = '#bdbdbd';  // 기본 회색
+                        values.width = 1;
+                    }
+                }
+            },
             arrows: { to: { enabled: true, scaleFactor: 0.35 } },
             smooth: { type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.4 },
             length: 220 // 엣지 길이 더 길게
@@ -7799,7 +7682,7 @@ function renderCommonValuesNetworkGraph() {
                 enabled: true,
                 updateInterval: 50
             },
-            adaptiveTimestep: true, // 적응형 시간 간격
+            adaptiveTimestep: true // 적응형 시간 간격
         },
         interaction: {
             hover: true,
@@ -7896,6 +7779,84 @@ function renderCommonValuesNetworkGraph() {
     let stabilityCheckCount = 0; // 안정화 체크 카운터
     let lastNodePositions = new Map(); // 이전 노드 위치 저장
     const stabilityThreshold = 0.5; // 안정화 임계값 (픽셀 단위)
+    
+    // Directional force system for value groups
+    let directionalForceInterval = null;
+    let directionalForceActive = true;
+    const directionalForceMagnitude = 5.0; // 더 강한 힘으로 증가
+    
+    // Start directional force system
+    function startDirectionalForceSystem() {
+        if (directionalForceInterval) clearInterval(directionalForceInterval);
+        directionalForceInterval = setInterval(applyDirectionalForces, 50); // 50ms마다 실행 (20fps)
+        directionalForceActive = true;
+    }
+    
+    // Apply directional forces to nodes based on their value group
+    function applyDirectionalForces() {
+        if (!directionalForceActive) return;
+        
+        // 물리 엔진이 안정화되어 멈추지 않도록 유지
+        network.startSimulation();
+        
+        const nodeIds = nodes.map(n => n.id);
+        const positions = network.getPositions(nodeIds);
+        
+        // 물리 엔진의 body에 직접 힘을 적용
+        nodes.forEach(node => {
+            if (node.group && positions[node.id]) {
+                const body = network.body.nodes[node.id];
+                if (!body || !body.options.physics) return;
+                
+                let forceX = 0;
+                let forceY = 0;
+                
+                if (node.group === 'value1') {
+                    // Apply leftward force
+                    forceX = -directionalForceMagnitude;
+                } else if (node.group === 'value2') {
+                    // Apply rightward force
+                    forceX = directionalForceMagnitude;
+                } else if (node.group === 'value3') {
+                    // Apply upward force
+                    forceY = -directionalForceMagnitude;
+                }
+                
+                if (forceX !== 0 || forceY !== 0) {
+                    // 물리 엔진 body에 직접 힘 적용
+                    body.vx += forceX * 0.01; // 속도에 힘을 적용
+                    body.vy += forceY * 0.01;
+                }
+            }
+        });
+        
+        // 디버깅용 로그 (첫 실행시에만)
+        if (directionalForceInterval && !window.directionalForceLogged) {
+            console.log('Directional forces active:', {
+                magnitude: directionalForceMagnitude,
+                value1Count: nodes.filter(n => n.group === 'value1').length,
+                value2Count: nodes.filter(n => n.group === 'value2').length,
+                value3Count: nodes.filter(n => n.group === 'value3').length
+            });
+            window.directionalForceLogged = true;
+        }
+    }
+    
+    // Stop directional force system
+    function stopDirectionalForceSystem() {
+        if (directionalForceInterval) {
+            clearInterval(directionalForceInterval);
+            directionalForceInterval = null;
+        }
+        directionalForceActive = false;
+    }
+    
+    // Start the directional force system after stabilization
+    network.once('stabilized', function() {
+        setTimeout(() => {
+            startDirectionalForceSystem();
+        }, 1000); // Wait 1 second after stabilization to start
+    });
     
     // 동적 제어점 시스템
     let dynamicControlPoints = new Map(); // groupKey -> [{x, y, vx, vy, originalX, originalY}]
@@ -8809,49 +8770,49 @@ function renderCommonValuesNetworkGraph() {
             });
         });
         
-        // 시각적 표시 업데이트
-        const nodeUpdates = [];
-        nodes.forEach(node => {
-            const isIntruder = detectedIntruders.includes(node.id);
-            const isExpelled = expelledNodes.has(node.id);
+        // // 시각적 표시 업데이트
+        // const nodeUpdates = [];
+        // nodes.forEach(node => {
+        //     const isIntruder = detectedIntruders.includes(node.id);
+        //     const isExpelled = expelledNodes.has(node.id);
             
-            if (isIntruder) {
-                // 현재 침입 중인 노드 - 빨간 테두리
-                nodeUpdates.push({
-                    id: node.id,
-                    color: {
-                        ...node.color,
-                        border: '#00ff3cff', // 빨간 테두리 (침입 중)
-                        highlight: {
-                            border: '#FF0000',
-                            background: '#FFEEEE'
-                        }
-                    }
-                });
-            } else if (isExpelled) {
-                // 추방된 노드 - 회색 테두리로 표시
-                nodeUpdates.push({
-                    id: node.id,
-                    color: {
-                        ...node.color,
-                        border: '#888888', // 회색 테두리 (추방됨)
-                        highlight: {
-                            border: '#888888',
-                            background: '#F5F5F5'
-                        }
-                    }
-                });
-            } else if (node.color && (node.color.border === '#FF0000' || node.color.border === '#888888')) {
-                // 이전에 특별한 테두리였던 노드 복원
-                nodeUpdates.push({
-                    id: node.id,
-                    color: {
-                        ...node.color,
-                        border: node.originalBorder || '#1d1d1dff'
-                    }
-                });
-            }
-        });
+        //     if (isIntruder) {
+        //         // 현재 침입 중인 노드 - 빨간 테두리
+        //         nodeUpdates.push({
+        //             id: node.id,
+        //             color: {
+        //                 ...node.color,
+        //                 border: '#00ff3cff', // 빨간 테두리 (침입 중)
+        //                 highlight: {
+        //                     border: '#FF0000',
+        //                     background: '#FFEEEE'
+        //                 }
+        //             }
+        //         });
+        //     } else if (isExpelled) {
+        //         // 추방된 노드 - 회색 테두리로 표시
+        //         nodeUpdates.push({
+        //             id: node.id,
+        //             color: {
+        //                 ...node.color,
+        //                 border: '#888888', // 회색 테두리 (추방됨)
+        //                 highlight: {
+        //                     border: '#888888',
+        //                     background: '#F5F5F5'
+        //                 }
+        //             }
+        //         });
+        //     } else if (node.color && (node.color.border === '#FF0000' || node.color.border === '#888888')) {
+        //         // 이전에 특별한 테두리였던 노드 복원
+        //         nodeUpdates.push({
+        //             id: node.id,
+        //             color: {
+        //                 ...node.color,
+        //                 border: node.originalBorder || '#1d1d1dff'
+        //             }
+        //         });
+        //     }
+        // });
         
         if (nodeUpdates.length > 0) {
             try {
@@ -9843,7 +9804,7 @@ function renderCommonValuesNetworkGraph() {
                     opacity: 0.8,
                     font: {
                         ...node.font,
-                        color: '#542b2bff'
+                        color: '#000000'
                     }
                 });
             } else {
