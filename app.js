@@ -6196,6 +6196,12 @@ async function saveVersionData(event) {
                     JSON.parse(JSON.stringify(commonValuesCellTexts)) : {},
                 commonValuesCopiedBlocks: typeof commonValuesCopiedBlocks === 'object' ? 
                     JSON.parse(JSON.stringify(commonValuesCopiedBlocks)) : {},
+                extracurricularTexts: typeof extracurricularTexts === 'object' ? 
+                    JSON.parse(JSON.stringify(extracurricularTexts)) : {},
+                extracurricularBlocks: typeof extracurricularBlocks === 'object' ? 
+                    JSON.parse(JSON.stringify(extracurricularBlocks)) : {},
+                extracurricularMergedTexts: Array.isArray(extracurricularMergedTexts) ? 
+                    JSON.parse(JSON.stringify(extracurricularMergedTexts)) : [],
                 commonValuesTitleText: localStorage.getItem('commonValuesTitleText') || ''
             },
             settings: {
@@ -6589,6 +6595,25 @@ function restoreVersion(versionName) {
             } else {
                 // 기존 구조 호환성을 위해 빈 객체로 초기화
                 commonValuesCopiedBlocks = {};
+            }
+            
+            // 비교과 데이터 복원
+            if (versionData.commonValuesTab.extracurricularTexts) {
+                extracurricularTexts = JSON.parse(JSON.stringify(versionData.commonValuesTab.extracurricularTexts));
+            } else {
+                extracurricularTexts = { value1: [], value2: [], value3: [] };
+            }
+            
+            if (versionData.commonValuesTab.extracurricularBlocks) {
+                extracurricularBlocks = JSON.parse(JSON.stringify(versionData.commonValuesTab.extracurricularBlocks));
+            } else {
+                extracurricularBlocks = { value1: [], value2: [], value3: [] };
+            }
+            
+            if (versionData.commonValuesTab.extracurricularMergedTexts) {
+                extracurricularMergedTexts = JSON.parse(JSON.stringify(versionData.commonValuesTab.extracurricularMergedTexts));
+            } else {
+                extracurricularMergedTexts = [];
             }
         
             if (versionData.commonValuesTab.commonValuesTitleText) {
@@ -7343,6 +7368,8 @@ function renderCommonValuesNetworkGraph() {
                             border: nodeColor.border
                         },
                         fixed: false,
+                        subjectType: '비교과',
+                        category: '기타',
                         isExtracurricular: true // 비교과 노드 표시
                     });
                     nodeIdSet.add(id);
@@ -7495,6 +7522,8 @@ function renderCommonValuesNetworkGraph() {
                         x: initX,
                         y: initY,
                         fixed: false,
+                        subjectType: '비교과',
+                        category: '기타',
                         isExtracurricular: true // 비교과 노드 표시
                     });
                     nodeIdSet.add(nodeId);
@@ -7993,7 +8022,13 @@ function renderCommonValuesNetworkGraph() {
         let validNodes = 0;
         
         nodeIds.forEach(nodeId => {
-            const pos = network.getPosition(nodeId);
+            let pos;
+            try {
+                pos = network.getPosition(nodeId);
+            } catch (e) {
+                // 노드가 존재하지 않는 경우 무시
+                return;
+            }
             if (pos) {
                 sumX += pos.x;
                 sumY += pos.y;
@@ -9130,7 +9165,13 @@ function renderCommonValuesNetworkGraph() {
                 if (!nodeInThisGroup && !nodeInsideOriginalBoundary && !nodeInsideExpandedBoundary) {
                     if (detectedIntruders.includes(nodeId)) {
                         setTimeout(() => {
-                            const currentNodePosition = network.getPosition(nodeId);
+                            let currentNodePosition;
+                            try {
+                                currentNodePosition = network.getPosition(nodeId);
+                            } catch (e) {
+                                // 노드가 존재하지 않는 경우 무시
+                                return;
+                            }
                             if (currentNodePosition && 
                                 !isPointInPolygon(currentNodePosition, groupBoundary) &&
                                 !isPointInPolygon(currentNodePosition, expandedBoundary)) {
@@ -9351,8 +9392,8 @@ function renderCommonValuesNetworkGraph() {
         let visualHull = [...hull];
         for (let i = 0; i < 3; i++) visualHull = smoothHull(visualHull);
         
-        // 🔧 클릭 감지 경계: 시각적 스플라인과 유사하게 만들되 약간만 확장
-        let clickBoundary = expandPolygon(visualHull, 3); // 3픽셀만 확장
+        // 🎯 고정밀 클릭 감지 경계: 시각적 스플라인의 실제 곡선을 정밀하게 추적
+        let clickBoundary = generatePreciseSplineBoundary(visualHull, 2); // 정밀한 경계 생성
         
         // 시각적 렌더링을 위한 데이터는 별도 저장
         if (!window.commonValuesVisualData) {
@@ -9581,7 +9622,13 @@ function renderCommonValuesNetworkGraph() {
     // 노드 외곽점 샘플링 함수 (더 부드러운 스플라인을 위해 더 많은 점 생성)
     // 그룹별로 겹침을 최소화하기 위해 offset을 더 크게 적용
     function getNodeOutlinePoints(network, nodeId, offset = 48) {
-        const pos = network.getPosition(nodeId);
+        let pos;
+        try {
+            pos = network.getPosition(nodeId);
+        } catch (e) {
+            // 노드가 존재하지 않는 경우 빈 배열 반환
+            return [];
+        }
         const node = network.body.nodes[nodeId];
         if (!pos || !node) return [];
         const width = (node.shapeObj && node.shapeObj.width) || 60;
@@ -9718,12 +9765,27 @@ function renderCommonValuesNetworkGraph() {
             // 그룹명 라벨 표시 (중앙)
             if (ids.length > 0) {
                 // 중앙점 계산
-                let centerX = 0, centerY = 0;
+                let centerX = 0, centerY = 0, validNodeCount = 0;
                 ids.forEach(id => {
-                    const pos = network.getPosition(id);
-                    centerX += pos.x; centerY += pos.y;
+                    let pos;
+                    try {
+                        pos = network.getPosition(id);
+                    } catch (e) {
+                        // 노드가 존재하지 않는 경우 무시
+                        return;
+                    }
+                    if (pos) {
+                        centerX += pos.x; centerY += pos.y;
+                        validNodeCount++;
+                    }
                 });
-                centerX /= ids.length; centerY /= ids.length;
+                if (validNodeCount > 0) {
+                    centerX /= validNodeCount; 
+                    centerY /= validNodeCount;
+                } else {
+                    // 유효한 노드가 없으면 라벨 표시 안함
+                    return;
+                }
                 ctx.save();
                 ctx.globalAlpha = 1;
                 // 선택/호버 상태에 따른 폰트 스타일 설정
@@ -9767,6 +9829,103 @@ function renderCommonValuesNetworkGraph() {
             }
     }
 
+    // 🎯 정밀한 스플라인 경계 생성 함수 - 시각적 스플라인의 실제 곡선을 정밀 추적
+    function generatePreciseSplineBoundary(visualHull, tolerance = 2) {
+        if (!visualHull || visualHull.length < 3) return visualHull;
+        
+        const precisePoints = [];
+        const samplesPerSegment = 8; // 세그먼트당 샘플 수 증가
+        
+        for (let i = 0; i < visualHull.length; i++) {
+            const current = visualHull[i];
+            const next = visualHull[(i + 1) % visualHull.length];
+            
+            // 🔍 각 세그먼트를 세밀하게 샘플링
+            for (let j = 0; j < samplesPerSegment; j++) {
+                const t = j / samplesPerSegment;
+                
+                // 🌟 곡선 보간 (부드러운 스플라인 효과)
+                const prevPoint = visualHull[(i - 1 + visualHull.length) % visualHull.length];
+                const nextNext = visualHull[(i + 2) % visualHull.length];
+                
+                // Catmull-Rom 곡선 보간으로 부드러운 곡선 생성
+                const interpolatedPoint = catmullRomInterpolation(prevPoint, current, next, nextNext, t);
+                
+                // 🎯 곡률에 따른 적응형 확장
+                const curvature = calculateCurvature(prevPoint, current, next);
+                const adaptiveTolerance = tolerance * (1 + curvature * 0.5); // 곡선 부분은 더 많이 확장
+                
+                // 법선 벡터 계산 (곡선에 수직)
+                const tangent = {
+                    x: next.x - current.x,
+                    y: next.y - current.y
+                };
+                const tangentLength = Math.sqrt(tangent.x * tangent.x + tangent.y * tangent.y) || 1;
+                const normal = {
+                    x: -tangent.y / tangentLength,
+                    y: tangent.x / tangentLength
+                };
+                
+                // 🌟 정밀한 경계점 생성 (안쪽과 바깥쪽)
+                precisePoints.push({
+                    x: interpolatedPoint.x + normal.x * adaptiveTolerance,
+                    y: interpolatedPoint.y + normal.y * adaptiveTolerance
+                });
+            }
+        }
+        
+        // 🔧 중복점 제거 및 최적화
+        const optimizedPoints = precisePoints.filter((point, index) => {
+            if (index === 0) return true;
+            const prev = precisePoints[index - 1];
+            const distance = Math.sqrt((point.x - prev.x) ** 2 + (point.y - prev.y) ** 2);
+            return distance > 1; // 1픽셀 이상 떨어진 점만 유지
+        });
+        
+        return optimizedPoints.length > 3 ? optimizedPoints : visualHull;
+    }
+    
+    // 🌟 Catmull-Rom 스플라인 보간 함수
+    function catmullRomInterpolation(p0, p1, p2, p3, t) {
+        const t2 = t * t;
+        const t3 = t2 * t;
+        
+        // Catmull-Rom 공식
+        const x = 0.5 * (
+            2 * p1.x +
+            (-p0.x + p2.x) * t +
+            (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+            (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3
+        );
+        
+        const y = 0.5 * (
+            2 * p1.y +
+            (-p0.y + p2.y) * t +
+            (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+            (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3
+        );
+        
+        return { x, y };
+    }
+    
+    // 🔍 곡률 계산 함수 - 곡선의 굽힘 정도 측정
+    function calculateCurvature(p1, p2, p3) {
+        // 세 점으로 이루어진 각도의 곡률 계산
+        const v1 = { x: p2.x - p1.x, y: p2.y - p1.y };
+        const v2 = { x: p3.x - p2.x, y: p3.y - p2.y };
+        
+        const v1Length = Math.sqrt(v1.x * v1.x + v1.y * v1.y) || 1;
+        const v2Length = Math.sqrt(v2.x * v2.x + v2.y * v2.y) || 1;
+        
+        // 정규화된 벡터
+        const nv1 = { x: v1.x / v1Length, y: v1.y / v1Length };
+        const nv2 = { x: v2.x / v2Length, y: v2.y / v2Length };
+        
+        // 외적으로 곡률 계산 (0: 직선, 1: 최대 곡선)
+        const crossProduct = Math.abs(nv1.x * nv2.y - nv1.y * nv2.x);
+        return Math.min(crossProduct, 1);
+    }
+
     // 점이 폴리곤 내부에 있는지 확인하는 함수 (개선된 경계 처리)
     function isPointInPolygon(point, polygon) {
         if (!point || !polygon || polygon.length < 3) {
@@ -9779,8 +9938,10 @@ function renderCommonValuesNetworkGraph() {
             return false;
         }
         
-        // 🌟 개선된 ray casting 알고리즘
+        // 🎯 고정밀 ray casting 알고리즘 - 부동소수점 정확도 개선
         let inside = false;
+        const epsilon = 1e-10; // 부동소수점 오차 허용범위
+        
         for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
             const pi = polygon[i];
             const pj = polygon[j];
@@ -9792,14 +9953,211 @@ function renderCommonValuesNetworkGraph() {
                 continue;
             }
             
-            if (((pi.y > point.y) !== (pj.y > point.y)) &&
-                (point.x < (pj.x - pi.x) * (point.y - pi.y) / (pj.y - pi.y) + pi.x)) {
-                inside = !inside;
+            // 🌟 정밀한 경계 판정 - 부동소수점 오차 고려
+            const yiCondition = (pi.y > point.y + epsilon);
+            const yjCondition = (pj.y > point.y + epsilon);
+            
+            // 🎯 더 정확한 교점 계산
+            if (yiCondition !== yjCondition) {
+                const denominator = pj.y - pi.y;
+                if (Math.abs(denominator) > epsilon) { // 0으로 나누기 방지
+                    const intersectX = (pj.x - pi.x) * (point.y - pi.y) / denominator + pi.x;
+                    
+                    // 🔧 경계선 위의 점 처리 개선
+                    if (Math.abs(point.x - intersectX) < epsilon) {
+                        return true; // 경계선 위의 점은 내부로 간주
+                    }
+                    
+                    if (point.x < intersectX - epsilon) {
+                        inside = !inside;
+                    }
+                }
             }
         }
         
         return inside;
     }
+    
+    // 🎯 보완적 스플라인 영역 검사 함수 - 거리 기반 추가 검증
+    function isPointInSplineRegion(point, visualHull, clickBoundary, tolerance = 5) {
+        // 1차: 기본 폴리곤 검사
+        const insideClickBoundary = isPointInPolygon(point, clickBoundary);
+        
+        if (insideClickBoundary) {
+            return true;
+        }
+        
+        // 2차: 시각적 스플라인과의 거리 기반 검증 (경계 근처에서 정밀 검사)
+        let minDistanceToSpline = Infinity;
+        
+        for (let i = 0; i < visualHull.length; i++) {
+            const current = visualHull[i];
+            const next = visualHull[(i + 1) % visualHull.length];
+            
+            // 🔍 선분과 점 사이의 최단거리 계산
+            const distance = distanceToLineSegment(point, current, next);
+            minDistanceToSpline = Math.min(minDistanceToSpline, distance);
+        }
+        
+        // 🎯 스플라인과의 거리가 허용 범위 내이고, 대략적으로 내부 영역인 경우 true
+        if (minDistanceToSpline <= tolerance) {
+            // 중심점 계산
+            const center = calculatePolygonCenter(visualHull);
+            const distanceToCenter = Math.sqrt((point.x - center.x) ** 2 + (point.y - center.y) ** 2);
+            const maxRadius = calculateMaxRadius(visualHull, center);
+            
+            // 중심에서 최대 반지름의 120% 내부에 있으면 스플라인 영역으로 간주
+            return distanceToCenter <= maxRadius * 1.2;
+        }
+        
+        return false;
+    }
+    
+    // 🔧 점과 선분 사이의 최단거리 계산
+    function distanceToLineSegment(point, lineStart, lineEnd) {
+        const A = point.x - lineStart.x;
+        const B = point.y - lineStart.y;
+        const C = lineEnd.x - lineStart.x;
+        const D = lineEnd.y - lineStart.y;
+        
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+        
+        if (lenSq === 0) {
+            // 선분의 길이가 0 (점과 점)
+            return Math.sqrt(A * A + B * B);
+        }
+        
+        const param = dot / lenSq;
+        
+        let xx, yy;
+        if (param < 0) {
+            xx = lineStart.x;
+            yy = lineStart.y;
+        } else if (param > 1) {
+            xx = lineEnd.x;
+            yy = lineEnd.y;
+        } else {
+            xx = lineStart.x + param * C;
+            yy = lineStart.y + param * D;
+        }
+        
+        const dx = point.x - xx;
+        const dy = point.y - yy;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+    
+    // 🌟 폴리곤 중심점 계산
+    function calculatePolygonCenter(polygon) {
+        let centerX = 0, centerY = 0;
+        for (const point of polygon) {
+            centerX += point.x;
+            centerY += point.y;
+        }
+        return {
+            x: centerX / polygon.length,
+            y: centerY / polygon.length
+        };
+    }
+    
+    // 🔍 중심점에서 폴리곤 경계까지의 최대 반지름 계산
+    function calculateMaxRadius(polygon, center) {
+        let maxRadius = 0;
+        for (const point of polygon) {
+            const distance = Math.sqrt((point.x - center.x) ** 2 + (point.y - center.y) ** 2);
+            maxRadius = Math.max(maxRadius, distance);
+        }
+        return maxRadius;
+    }
+    
+    // 🔧 스플라인 영역 감지 성능 최적화 - 캐시 시스템
+    const splineRegionCache = new Map();
+    let lastCacheUpdateTime = 0;
+    const CACHE_LIFETIME = 1000; // 1초 캐시
+    
+    function isPointInSplineRegionOptimized(point, groupKey, tolerance = 3) {
+        const now = Date.now();
+        const cacheKey = `${groupKey}_${Math.round(point.x)}_${Math.round(point.y)}_${tolerance}`;
+        
+        // 🚀 캐시 체크
+        if (now - lastCacheUpdateTime < CACHE_LIFETIME && splineRegionCache.has(cacheKey)) {
+            return splineRegionCache.get(cacheKey);
+        }
+        
+        // 캐시 만료 시 정리
+        if (now - lastCacheUpdateTime >= CACHE_LIFETIME) {
+            splineRegionCache.clear();
+            lastCacheUpdateTime = now;
+        }
+        
+        // 실제 계산
+        const clickBoundary = commonValuesBlobData[groupKey];
+        const visualHull = window.commonValuesVisualData && window.commonValuesVisualData[groupKey] 
+                         ? window.commonValuesVisualData[groupKey] 
+                         : clickBoundary;
+        
+        if (!clickBoundary || !visualHull) {
+            splineRegionCache.set(cacheKey, false);
+            return false;
+        }
+        
+        const result = isPointInSplineRegion(point, visualHull, clickBoundary, tolerance);
+        splineRegionCache.set(cacheKey, result);
+        return result;
+    }
+    
+    // 🎯 스플라인 영역 디버깅 도구
+    window.debugSplineRegion = function(groupKey, showBoundaries = true) {
+        console.log(`🔍 Debugging spline region for group: ${groupKey}`);
+        
+        const clickBoundary = commonValuesBlobData[groupKey];
+        const visualHull = window.commonValuesVisualData && window.commonValuesVisualData[groupKey];
+        
+        if (!clickBoundary) {
+            console.log('❌ No click boundary found');
+            return;
+        }
+        
+        console.log('📊 Spline region info:', {
+            groupKey,
+            clickBoundaryPoints: clickBoundary.length,
+            visualHullPoints: visualHull ? visualHull.length : 0,
+            clickBoundary: clickBoundary.slice(0, 5).map(p => `(${Math.round(p.x)}, ${Math.round(p.y)})`),
+            visualHull: visualHull ? visualHull.slice(0, 5).map(p => `(${Math.round(p.x)}, ${Math.round(p.y)})`) : null
+        });
+        
+        // 경계 시각화 (개발자 도구용)
+        if (showBoundaries && window.network) {
+            const canvas = container.querySelector('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // 클릭 경계 (빨간색)
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            clickBoundary.forEach((point, i) => {
+                const canvasPoint = network.canvasToDOM(point);
+                if (i === 0) ctx.moveTo(canvasPoint.x, canvasPoint.y);
+                else ctx.lineTo(canvasPoint.x, canvasPoint.y);
+            });
+            ctx.closePath();
+            ctx.stroke();
+            
+            // 시각적 경계 (파란색)
+            if (visualHull) {
+                ctx.strokeStyle = 'blue';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                visualHull.forEach((point, i) => {
+                    const canvasPoint = network.canvasToDOM(point);
+                    if (i === 0) ctx.moveTo(canvasPoint.x, canvasPoint.y);
+                    else ctx.lineTo(canvasPoint.x, canvasPoint.y);
+                });
+                ctx.closePath();
+                ctx.stroke();
+            }
+        }
+    };
     
     // 폴리곤을 지정한 거리만큼 확장하는 함수
     function expandPolygon(polygon, expandDistance) {
@@ -9912,9 +10270,16 @@ function renderCommonValuesNetworkGraph() {
             // 라벨이 클릭되지 않은 경우 기존 스플라인 클릭 체크
             let clickedBlob = null;
             for (const key of valueKeys) {
-                if (commonValuesBlobData[key] && isPointInPolygon(canvasPosition, commonValuesBlobData[key])) {
-                    clickedBlob = key;
-                    break;
+                if (commonValuesBlobData[key]) {
+                    // 🎯 정밀한 스플라인 영역 검사 사용
+                    const visualHull = window.commonValuesVisualData && window.commonValuesVisualData[key] 
+                                     ? window.commonValuesVisualData[key] 
+                                     : commonValuesBlobData[key];
+                    
+                    if (isPointInSplineRegion(canvasPosition, visualHull, commonValuesBlobData[key], 3)) {
+                        clickedBlob = key;
+                        break;
+                    }
                 }
             }
             
@@ -9942,11 +10307,17 @@ function renderCommonValuesNetworkGraph() {
                 if (window.DEBUG_SPLINE_CLICKS) {
                     console.log('Empty area clicked:', {
                         clickPos: canvasPosition,
-                        checkedPolygons: valueKeys.map(k => ({
-                            key: k,
-                            polygon: commonValuesBlobData[k],
-                            isInside: commonValuesBlobData[k] ? isPointInPolygon(canvasPosition, commonValuesBlobData[k]) : false
-                        }))
+                        checkedPolygons: valueKeys.map(k => {
+                            const visualHull = window.commonValuesVisualData && window.commonValuesVisualData[k] 
+                                             ? window.commonValuesVisualData[k] 
+                                             : commonValuesBlobData[k];
+                            return {
+                                key: k,
+                                polygon: commonValuesBlobData[k],
+                                visualHull: visualHull,
+                                isInside: commonValuesBlobData[k] ? isPointInSplineRegion(canvasPosition, visualHull, commonValuesBlobData[k], 3) : false
+                            };
+                        })
                     });
                 }
                 
@@ -9992,9 +10363,14 @@ function renderCommonValuesNetworkGraph() {
         // vis.js 캔버스 좌표계로 직접 변환
         const canvasPos = network.DOMtoCanvas(canvasPosition);
         
-        // 폴리곤 내부 클릭 확인
+        // 🎯 정밀한 스플라인 영역 내부 클릭 확인
         for (const key of valueKeys) {
-            if (commonValuesBlobData[key] && isPointInPolygon(canvasPos, commonValuesBlobData[key])) {
+            if (commonValuesBlobData[key]) {
+                const visualHull = window.commonValuesVisualData && window.commonValuesVisualData[key] 
+                                 ? window.commonValuesVisualData[key] 
+                                 : commonValuesBlobData[key];
+                
+                if (isPointInSplineRegion(canvasPos, visualHull, commonValuesBlobData[key], 3)) {
                 isMouseDown = true;
                 mouseDownPosition = canvasPos;
                 isDraggingGroup = true;
@@ -10005,11 +10381,29 @@ function renderCommonValuesNetworkGraph() {
                 groupOriginalPositions = {};
                 const groupNodeIds = valueCourseIds[key];
                 
-                if (groupNodeIds && groupNodeIds.length > 0) {
-                    groupNodeIds.forEach(nodeId => {
-                        const nodePosition = network.getPosition(nodeId);
-                        if (nodePosition && typeof nodePosition.x === 'number' && typeof nodePosition.y === 'number') {
-                            groupOriginalPositions[nodeId] = { x: nodePosition.x, y: nodePosition.y };
+                // 🔍 데이터 일치성 검증 - 네트워크에 실제 존재하는 노드만 필터링
+                const validGroupNodeIds = groupNodeIds ? groupNodeIds.filter(nodeId => {
+                    try {
+                        network.getPosition(nodeId);
+                        return true;
+                    } catch (e) {
+                        console.warn(`Filtering out invalid node: ${nodeId} from group ${key}`);
+                        return false;
+                    }
+                }) : [];
+                
+                if (validGroupNodeIds && validGroupNodeIds.length > 0) {
+                    validGroupNodeIds.forEach(nodeId => {
+                        let nodePosition;
+                        try {
+                            nodePosition = network.getPosition(nodeId);
+                            if (nodePosition && typeof nodePosition.x === 'number' && typeof nodePosition.y === 'number') {
+                                groupOriginalPositions[nodeId] = { x: nodePosition.x, y: nodePosition.y };
+                            }
+                        } catch (e) {
+                            // 🚨 노드가 존재하지 않는 경우 무시 (데이터 불일치 상황)
+                            console.warn(`Node ${nodeId} not found in network but exists in data structure`);
+                            return;
                         }
                     });
                 }
@@ -10031,6 +10425,7 @@ function renderCommonValuesNetworkGraph() {
                 
                 event.preventDefault();
                 break;
+                }
             }
         }
     });
@@ -10124,11 +10519,17 @@ function renderCommonValuesNetworkGraph() {
                 if (newHoveredLabel) {
                     newHoveredBlob = newHoveredLabel;
                 } else {
-                    // 라벨 호버가 없는 경우 스플라인 호버 체크
+                    // 🎯 라벨 호버가 없는 경우 정밀한 스플라인 호버 체크
                     for (const key of valueKeys) {
-                        if (commonValuesBlobData[key] && isPointInPolygon(canvasPos, commonValuesBlobData[key])) {
-                            newHoveredBlob = key;
-                            break;
+                        if (commonValuesBlobData[key]) {
+                            const visualHull = window.commonValuesVisualData && window.commonValuesVisualData[key] 
+                                             ? window.commonValuesVisualData[key] 
+                                             : commonValuesBlobData[key];
+                            
+                            if (isPointInSplineRegion(canvasPos, visualHull, commonValuesBlobData[key], 3)) {
+                                newHoveredBlob = key;
+                                break;
+                            }
                         }
                     }
                 }
@@ -15724,8 +16125,11 @@ function highlightEdgeType(edgeType) {
                         opacity: 0.5
                     };
                 } else {
-                    // 실선 엣지는 기본 vis-network 색상 (null로 저장하여 나중에 기본값 사용)
-                    edge.originalColor = null;
+                    // 실선 엣지의 기본 원본 그래프 색상 (#bdbdbd)
+                    edge.originalColor = {
+                        color: '#bdbdbd',
+                        opacity: 1
+                    };
                 }
                 
                 // 🎯 원본 그래프의 정확한 width 저장
@@ -15734,7 +16138,7 @@ function highlightEdgeType(edgeType) {
             
             edgeUpdateArray.push({
                 id: edge.id,
-                width: edge.dashes ? 3 : 3, // 점선은 2px, 실선은 3px
+                width: edge.dashes ? 2 : 3, // 점선은 2px, 실선은 3px
                 color: { 
                     color: edge.dashes ? highlightColor : '#595959ff', // 점선은 과목분류 색상, 실선은 검은색
                     opacity: 0.8
@@ -15748,10 +16152,7 @@ function highlightEdgeType(edgeType) {
             };
             
             // 🎯 원본 그래프의 정확한 색상 복원
-            if (edge.originalColor === null) {
-                // 실선 엣지는 기본 vis-network 스타일 사용
-                delete originalStyle.color;
-            } else if (edge.originalColor && typeof edge.originalColor === 'object') {
+            if (edge.originalColor && typeof edge.originalColor === 'object') {
                 originalStyle.color = {
                     color: edge.originalColor.color,
                     opacity: edge.originalColor.opacity !== undefined ? edge.originalColor.opacity : 1
@@ -15764,7 +16165,11 @@ function highlightEdgeType(edgeType) {
                         opacity: 0.5
                     };
                 } else {
-                    delete originalStyle.color;
+                    // 실선 엣지는 원본 그래프 기본 색상 (#bdbdbd)
+                    originalStyle.color = {
+                        color: '#bdbdbd',
+                        opacity: 1
+                    };
                 }
             }
             
@@ -15809,25 +16214,25 @@ function unhighlightEdgeType() {
         }
         
         // 🌟 저장된 원본 color 복원 또는 정확한 원본 그래프 기본값 사용
-        if (edge.originalColor === null) {
-            // 실선 엣지는 기본 vis-network 스타일 (color 속성 제거하여 기본값 사용)
-            delete originalStyle.color;
-        } else if (edge.originalColor && typeof edge.originalColor === 'object') {
+        if (edge.originalColor && typeof edge.originalColor === 'object') {
             // 원본 색상이 저장되어 있으면 완전히 복원
             originalStyle.color = {
                 color: edge.originalColor.color,
                 opacity: edge.originalColor.opacity !== undefined ? edge.originalColor.opacity : 1
             };
         } else {
-            // 🎯 원본 그래프의 정확한 색상: 점선은 회색 0.5 투명도, 실선은 기본
+            // 🎯 원본 그래프의 정확한 색상: 점선은 회색 0.5 투명도, 실선은 #bdbdbd
             if (edge.dashes) {
                 originalStyle.color = {
                     color: '#9e9e9e',
                     opacity: 0.5
                 };
             } else {
-                // 실선 엣지는 기본 vis-network 스타일 (color 속성 제거하여 기본값 사용)
-                delete originalStyle.color;
+                // 실선 엣지는 원본 그래프 기본 색상 (#bdbdbd)
+                originalStyle.color = {
+                    color: '#bdbdbd',
+                    opacity: 1
+                };
             }
         }
         
