@@ -9073,7 +9073,6 @@ function renderCommonValuesNetworkGraph() {
         try {
             canvasPos = network.DOMtoCanvas(canvasPosition);
         } catch (e) {
-            console.warn('캔버스 좌표 변환 중 오류:', e.message);
             return;
         }
         
@@ -9130,6 +9129,11 @@ function renderCommonValuesNetworkGraph() {
 
     // 마우스 이동 이벤트 (호버 + 드래그)
     container.addEventListener('mousemove', function(event) {
+        // network 객체 유효성 검사를 먼저 수행
+        if (!network || typeof network.DOMtoCanvas !== 'function') {
+            return;
+        }
+        
         const rect = container.getBoundingClientRect();
         const canvasPosition = {
             x: event.clientX - rect.left,
@@ -9137,11 +9141,11 @@ function renderCommonValuesNetworkGraph() {
         };
         
         // vis.js 캔버스 좌표계로 직접 변환
+        
         let canvasPos;
         try {
             canvasPos = network.DOMtoCanvas(canvasPosition);
         } catch (e) {
-            console.warn('캔버스 좌표 변환 중 오류 (mousemove):', e.message);
             return;
         }
         
