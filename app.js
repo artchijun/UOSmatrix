@@ -7803,12 +7803,17 @@ function renderCommonValuesNetworkGraph() {
         boundaryForces.clear();
         
         // 네트워크 객체 존재 확인
-        if (!window.commonValuesNetwork) {
+        if (!network || typeof network.getPositions !== 'function') {
             return;
         }
         
         // 모든 노드에 대해 반발력 계산
-        const allNodes = window.commonValuesNetwork.getPositions();
+        let allNodes;
+        try {
+            allNodes = network.getPositions();
+        } catch (e) {
+            return;
+        }
         let totalNodesProcessed = 0;
         let nodesWithForces = 0;
         
@@ -8069,11 +8074,20 @@ function renderCommonValuesNetworkGraph() {
     
     // 노드 위치 안정화 상태 체크 함수
     function checkStability() {
+        // network 객체 유효성 검사
+        if (!network || typeof network.getPositions !== 'function') {
+            return { 
+                isStable: false, 
+                maxMovement: 0, 
+                checkCount: 0, 
+                hasIntruders: false 
+            };
+        }
+        
         let currentPositions;
         try {
             currentPositions = network.getPositions();
         } catch (e) {
-            console.warn('네트워크에서 노드 위치를 가져오는 중 오류 발생:', e.message);
             return { 
                 isStable: false, 
                 maxMovement: 0, 
@@ -8142,6 +8156,11 @@ function renderCommonValuesNetworkGraph() {
     // 지속적 반발력 적용 함수
     function applyBoundaryRepulsion() {
         if (!repulsionSystemActive) return;
+        
+        // network 객체 유효성 검사
+        if (!network || typeof network.getPositions !== 'function') {
+            return;
+        }
         
         calculateBoundaryRepulsion();
         
@@ -8240,6 +8259,11 @@ function renderCommonValuesNetworkGraph() {
     
     // 반발력 시스템 시작
     function startRepulsionSystem() {
+        // network 객체 유효성 검사
+        if (!network || typeof network.getPositions !== 'function') {
+            return;
+        }
+        
         if (repulsionInterval) clearInterval(repulsionInterval);
         repulsionInterval = setInterval(applyBoundaryRepulsion, 80); // 80ms마다 실행 (12.5fps) - 부드러운 속도
         repulsionSystemActive = true;
