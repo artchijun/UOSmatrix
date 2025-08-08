@@ -12,20 +12,16 @@
         function testInit() {
             const output = document.getElementById('test-output');
             
-            console.log('Testing init function availability...');
             output.innerHTML += '<p>Testing init function availability...</p>';
             
             if (typeof window.init === 'function') {
                 output.innerHTML += '<p style="color: green;">✓ window.init function is available</p>';
-                console.log('✓ window.init function is available');
                 return true;
             } else if (typeof init === 'function') {
                 output.innerHTML += '<p style="color: green;">✓ init function is available</p>';
-                console.log('✓ init function is available');
                 return true;
             } else {
                 output.innerHTML += '<p style="color: red;">❌ init function not found</p>';
-                console.error('❌ init function not found');
                 return false;
             }
         }

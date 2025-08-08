@@ -7868,7 +7868,7 @@ function renderCommonValuesNetworkGraph() {
     let directionalForceInterval = null;
     let directionalForceActive = true;
     const directionalForceMagnitude = 8.0; // 더 강한 힘으로 증가
-    
+     
     // Start directional force system
     function startDirectionalForceSystem() {
         if (directionalForceInterval) clearInterval(directionalForceInterval);
@@ -7931,7 +7931,6 @@ function renderCommonValuesNetworkGraph() {
     
     // 🌟 스플라인 클릭 시 물리 효과 트리거 함수
     function triggerSplinePhysicsEffect(groupKey, clickPosition) {
-        console.log(`🎆 스플라인 물리 효과 시작: ${groupKey}`, clickPosition);
         
         // 클릭된 그룹의 노드들 찾기
         const groupNodeIds = valueCourseIds[groupKey];
@@ -7988,7 +7987,7 @@ function renderCommonValuesNetworkGraph() {
         // 3. 자기장 효과: 그룹 노드들을 원형으로 정렬하려는 힘
         const magneticInterval = setInterval(() => {
             const centerPos = calculateGroupCenter(groupNodeIds);
-            const targetRadius = 120; // 목표 반지름
+            const targetRadius = 220; // 목표 반지름
             
             groupNodeIds.forEach((nodeId, index) => {
                 const body = network.body.nodes[nodeId];
@@ -8027,7 +8026,6 @@ function renderCommonValuesNetworkGraph() {
         setTimeout(() => {
             clearInterval(waveInterval);
             clearInterval(magneticInterval);
-            console.log('🎆 스플라인 물리 효과 종료');
         }, explosionDuration);
     }
     
@@ -8072,41 +8070,15 @@ function renderCommonValuesNetworkGraph() {
             { x: 0, y: 0 };
     }
     
-    // 전체 네트워크 중심점 유지 시스템
+    // 전체 네트워크 중심점 유지 시스템 (비활성화)
     function maintainGlobalNetworkCenter() {
-        if (!globalNetworkCenter || !networkCenterStabilized) return;
-        
-        const currentCenter = calculateGlobalNetworkCenter();
-        const offsetX = globalNetworkCenter.x - currentCenter.x;
-        const offsetY = globalNetworkCenter.y - currentCenter.y;
-        
-        // 중심점이 5px 이상 이동했을 때만 보정
-        const displacement = Math.sqrt(offsetX * offsetX + offsetY * offsetY);
-        if (displacement > 5) {
-            const allPositions = network.getPositions();
-            const updatePositions = {};
-            
-            // 모든 노드를 원래 중심점으로 되돌리기 위해 오프셋 적용
-            Object.keys(allPositions).forEach(nodeId => {
-                const pos = allPositions[nodeId];
-                if (pos) {
-                    updatePositions[nodeId] = {
-                        x: pos.x + offsetX * 0.3, // 부드럽게 보정 (30%씩)
-                        y: pos.y + offsetY * 0.3
-                    };
-                }
-            });
-            
-            // 배치 업데이트로 성능 최적화
-            if (Object.keys(updatePositions).length > 0) {
-                network.setPositions(updatePositions);
-            }
-        }
+        // 중심점 자동 보정 기능 비활성화
+        // 노드들의 왼쪽 위 이동 현상을 방지하기 위해 주석 처리
+        return;
     }
     
     // 🌟 페이지 로딩시 자동으로 물리효과 시작하는 함수
     function triggerInitialPhysicsEffects() {
-        console.log('🎆 페이지 로딩시 자동 물리효과 시작');
         
         // 모든 그룹에 대해 순차적으로 물리효과 적용
         valueKeys.forEach((groupKey, index) => {
@@ -8127,7 +8099,6 @@ function renderCommonValuesNetworkGraph() {
                 // 기존 물리효과 함수 호출 (강도는 조금 약하게)
                 triggerSplinePhysicsEffectGentle(groupKey, clickPosition);
                 
-                console.log(`🎆 그룹 ${groupKey} 자동 물리효과 적용`);
             }, index * 500); // 각 그룹마다 0.5초씩 지연
         });
     }
@@ -8222,7 +8193,7 @@ function renderCommonValuesNetworkGraph() {
             clearInterval(magneticInterval);
         }, explosionDuration);
     }
-    
+
     // Start the directional force system immediately after network creation
             startDirectionalForceSystem();
     
@@ -8261,7 +8232,6 @@ function renderCommonValuesNetworkGraph() {
         // 🔧 네트워크 안정화 완료 후 전체 중심점 고정
         globalNetworkCenter = calculateGlobalNetworkCenter();
         networkCenterStabilized = true;
-        console.log('🎯 전체 네트워크 중심점 고정:', globalNetworkCenter);
         
         // 🌟 페이지 로딩시 자동으로 물리효과 시작 (안정화 완료 후)
         setTimeout(() => {
@@ -8277,7 +8247,6 @@ function renderCommonValuesNetworkGraph() {
         if (!networkCenterStabilized) {
             globalNetworkCenter = calculateGlobalNetworkCenter();
             networkCenterStabilized = true;
-            console.log('🎯 백업: 전체 네트워크 중심점 고정:', globalNetworkCenter);
         }
         
         // 🌟 백업용 물리효과 시작 (안정화가 완료되지 않은 경우 대비)
@@ -8286,7 +8255,6 @@ function renderCommonValuesNetworkGraph() {
     
     // 🌟 페이지 로딩시 자동으로 스플라인 물리효과 시작 (클릭 없이)
     setTimeout(() => {
-        console.log('🎆 페이지 로딩시 자동 스플라인 물리효과 시작');
         
         // 모든 그룹에 대해 순차적으로 물리효과 적용
         valueKeys.forEach((groupKey, index) => {
@@ -8307,7 +8275,6 @@ function renderCommonValuesNetworkGraph() {
                 // 기존 물리효과 함수 호출
                 triggerSplinePhysicsEffect(groupKey, clickPosition);
                 
-                console.log(`🎆 그룹 ${groupKey} 자동 스플라인 물리효과 적용`);
             }, index * 1000); // 각 그룹마다 1초씩 지연
         });
     }, 2000); // 2초 후 시작
@@ -10624,7 +10591,6 @@ function renderCommonValuesNetworkGraph() {
         try {
             window.network.body.data.nodes.update(nodeUpdate);
         } catch (error) {
-            console.error('노드 업데이트 오류:', error);
         }
     };
     // 마우스 노드 호버 효과 (연결된 요소 포함)
@@ -10838,7 +10804,6 @@ function renderCommonValuesNetworkGraph() {
       network.on('hoverEdge', function(params) {
         const edgeId = params.edge;
         const edge = network.body.data.edges.get(edgeId);
-        console.log('🎯 [hoverEdge 시작] edgeId:', edgeId, 'Map 크기:', edgeHoverOriginalNodeStyles.size, edgeHoverOriginalEdgeStyles.size);
           if (edge && edge.title) {
               const highlightNodeIds = [];
             const dimNodeIds = [];
@@ -10849,30 +10814,23 @@ function renderCommonValuesNetworkGraph() {
             
             // 점선 엣지인지 확인 (같은 과목분류 연결)
             if (edge.dashes === true) {
-                console.log('점선 엣지 호버 감지:', edge.title);
                 // 점선 엣지: 과목분류 기반 하이라이트
                 // title에서 과목분류 추출 (예: "설계 - VALUE1 to VALUE2" 또는 단순히 "설계")
                 let subjectType;
                 const subjectTypeMatch = edge.title.match(/^([^\-]+)\s*-/);
                 if (subjectTypeMatch) {
                     subjectType = subjectTypeMatch[1].trim();
-                    console.log('과목분류 추출 (하이픈 형태):', subjectType);
                 } else {
                     // 하이픈이 없으면 전체 title을 과목분류로 사용
                     subjectType = edge.title.trim();
-                    console.log('과목분류 추출 (단순 형태):', subjectType);
                 }
                 
                 if (subjectType) {
                     
                     // 같은 과목분류를 가진 모든 노드 찾기
-                    console.log('전체 courses 배열:', courses.length, '개');
-                    console.log('전체 노드:', allCurrentNodes.length, '개');
-                    console.log('찾는 과목분류:', subjectType);
             allCurrentNodes.forEach(currentNode => {
                         // 원래 스타일 저장 (처음 호버 시에만)
                         if (!edgeHoverOriginalNodeStyles.has(currentNode.id)) {
-                            console.log('💾 노드 원본 스타일 저장:', currentNode.id);
                             edgeHoverOriginalNodeStyles.set(currentNode.id, {
                                 opacity: currentNode.opacity || 1,
                                 font: { ...currentNode.font },
@@ -10880,13 +10838,10 @@ function renderCommonValuesNetworkGraph() {
                                 borderWidth: currentNode.borderWidth || 2
                             });
                         } else {
-                            console.log('⏭️ 노드 원본 스타일 이미 저장됨:', currentNode.id);
                         }
                         
                         const course = courses.find(c => c.id === currentNode.id);
-                        console.log('노드ID:', currentNode.id, '→ course:', course ? course.subjectType : '없음');
                         if (course && course.subjectType === subjectType) {
-                            console.log('✅ 매칭된 노드:', currentNode.id, course.subjectType);
                             highlightNodeIds.push(currentNode.id);
                         } else {
                             dimNodeIds.push(currentNode.id);
@@ -10911,10 +10866,8 @@ function renderCommonValuesNetworkGraph() {
                     });
                     
                     // 하이라이트할 노드들도 업데이트 배열에 추가 (교과목 테마 컬러로 하이라이트)
-                    console.log('하이라이트할 노드들:', highlightNodeIds.length, '개');
                     highlightNodeIds.forEach(nodeId => {
                         const currentNode = network.body.data.nodes.get(nodeId);
-                        console.log('하이라이트 노드 처리:', nodeId, currentNode ? '존재' : '없음');
                         
                         // 과목분류별 테마 색상 가져오기
                                 const subjectTypeColors = {
@@ -10954,25 +10907,20 @@ function renderCommonValuesNetworkGraph() {
                     // 모든 엣지들 처리
                     const allEdges = network.body.data.edges.get();
                     const edgeUpdateArray = [];
-                    console.log('전체 엣지들:', allEdges.length, '개');
                     
                     allEdges.forEach(e => {
                         // 원래 스타일 저장 (처음 호버 시에만)
                         if (!edgeHoverOriginalEdgeStyles.has(e.id)) {
-                            console.log('💾 엣지 원본 스타일 저장:', e.id);
                             edgeHoverOriginalEdgeStyles.set(e.id, {
                                 color: e.color || { color: '#bdbdbd', highlight: '#bdbdbd' },
                                 width: e.width || 1,
                                 dashes: e.dashes || false
                             });
                         } else {
-                            console.log('⏭️ 엣지 원본 스타일 이미 저장됨:', e.id);
                         }
                         
                         // 같은 과목분류의 점선 엣지인지 확인
-                        console.log('엣지 확인:', e.id, '점선:', e.dashes, 'title:', e.title);
                         if (e.dashes === true && e.title && e.title.includes(subjectType)) {
-                            console.log('✅ 매칭된 엣지:', e.id, e.title);
                             // 과목분류별 테마 색상 가져오기
                                 const subjectTypeColors = {
                                     '설계': '#9e9e9e',
@@ -11001,7 +10949,6 @@ function renderCommonValuesNetworkGraph() {
                             });
                         } else {
                             // 다른 엣지들은 투명도 적용
-                            console.log('❌ 디밍 엣지:', e.id);
                             edgeUpdateArray.push({
                                 id: e.id,
                                 color: { 
@@ -11015,19 +10962,13 @@ function renderCommonValuesNetworkGraph() {
                     });
                     
                     // 배치로 업데이트
-                    console.log('엣지 업데이트 배열:', edgeUpdateArray.length, '개');
                     if (edgeUpdateArray.length > 0) {
-                        console.log('엣지 업데이트 적용 중...');
                         network.body.data.edges.update(edgeUpdateArray);
-                        console.log('엣지 업데이트 완료');
                     }
                     
                     // 노드 업데이트 적용
-                    console.log('노드 업데이트 배열:', nodeUpdateArray.length, '개');
                     if (nodeUpdateArray.length > 0) {
-                        console.log('노드 업데이트 적용:', nodeUpdateArray.length, '개 노드');
                         network.body.data.nodes.update(nodeUpdateArray);
-                        console.log('노드 업데이트 완료');
                     }
                 }
             } else {
@@ -11144,7 +11085,6 @@ function renderCommonValuesNetworkGraph() {
     });
 
           network.on('blurEdge', function(params) {
-          console.log('🔚 [blurEdge 시작] Map 크기:', edgeHoverOriginalNodeStyles.size, edgeHoverOriginalEdgeStyles.size);
           // 지속성 모드가 아닐 때만 선택 해제
           if (!window.splineSelectionPersistent) {
               network.unselectAll();
@@ -11200,7 +11140,6 @@ function renderCommonValuesNetworkGraph() {
         // 저장된 원래 스타일 초기화
         edgeHoverOriginalNodeStyles.clear();
         edgeHoverOriginalEdgeStyles.clear();
-        console.log('✅ [blurEdge 완료] Map 초기화 완료, 크기:', edgeHoverOriginalNodeStyles.size, edgeHoverOriginalEdgeStyles.size);
         document.body.style.cursor = 'default';
     });
     
@@ -12073,7 +12012,6 @@ function toggleColorMode() {
             // 업데이트 적용
             if (nodeUpdateArray.length > 0) {
                 window.network.body.data.nodes.update(nodeUpdateArray);
-                console.log(`🎨 네트워크 그래프 노드 색상 업데이트 완료: ${nodeUpdateArray.length}개 노드`);
             }
         } else {
             // 네트워크가 없으면 전체 그래프 재렌더링
@@ -12252,7 +12190,6 @@ function toggleColorModeCurriculum() {
         // 업데이트 적용
         if (nodeUpdateArray.length > 0) {
             window.network.body.data.nodes.update(nodeUpdateArray);
-            console.log(`🎨 네트워크 그래프 노드 색상 업데이트 완료: ${nodeUpdateArray.length}개 노드`);
         }
     } else {
         // 네트워크가 없으면 전체 그래프 재렌더링
@@ -13934,18 +13871,15 @@ let originalValueGroupStyles = new Map();
 
 // Value 컬럼 그래프 하이라이트 이벤트 시스템
 function setupValueColumnEvents() {
-    console.log('🎯 Value 컬럼 그래프 하이라이트 시스템 시작');
     
     // 공통가치대응 테이블이 있는지 확인
     const table = document.getElementById('commonValuesTable');
     if (!table) {
-        console.error('❌ commonValuesTable을 찾을 수 없음');
         return;
     }
     
     // 모든 헤더 요소 확인 및 이벤트 추가
     const allHeaders = table.querySelectorAll('thead th');
-    console.log(`📋 전체 헤더 개수: ${allHeaders.length}`);
     
     // Value 헤더 매핑
     const valueHeaderMap = {
@@ -13960,11 +13894,9 @@ function setupValueColumnEvents() {
         // value 헤더인지 확인
         for (const [keyword, config] of Object.entries(valueHeaderMap)) {
             if (text.includes(keyword)) {
-                console.log(`✅ Value 헤더 발견: ${config.valueKey} (${keyword})`);
                 
                 // 이미 이벤트가 추가된 경우 스킵
                 if (header.hasAttribute('data-value-events-added')) {
-                    console.log(`⚠️ 이미 이벤트가 추가된 헤더: ${config.valueKey}`);
                     continue;
                 }
                 header.setAttribute('data-value-events-added', 'true');
@@ -13974,7 +13906,6 @@ function setupValueColumnEvents() {
                 
                 // 호버 이벤트
                 header.addEventListener('mouseenter', function() {
-                    console.log(`🖱️ ${keyword} 헤더 호버 시작`);
                     highlightValueGroupInGraph(config.valueKey, true); // 호버 효과
                     
                     // 스플라인 호버 상태 설정
@@ -13985,7 +13916,6 @@ function setupValueColumnEvents() {
                 });
                 
                 header.addEventListener('mouseleave', function() {
-                    console.log(`🖱️ ${keyword} 헤더 호버 끝`);
                     if (selectedValueGroup !== config.valueKey) {
                         unhighlightValueGroupInGraph();
                     }
@@ -13998,7 +13928,6 @@ function setupValueColumnEvents() {
                 
                 // 클릭 이벤트
                 header.addEventListener('click', function() {
-                    console.log(`🖱️ ${keyword} 헤더 클릭됨`);
                     
                     if (selectedValueGroup === config.valueKey) {
                         // 선택 해제
@@ -14038,7 +13967,6 @@ function setupValueColumnEvents() {
     
     // Value 셀들 이벤트 추가
     const valueCells = table.querySelectorAll('.col-value1, .col-value2, .col-value3');
-    console.log(`📊 Value 셀 개수: ${valueCells.length}`);
     
     valueCells.forEach((cell, index) => {
         // 이미 이벤트가 추가된 경우 스킵
@@ -14048,11 +13976,9 @@ function setupValueColumnEvents() {
         const valueKey = cell.classList.contains('col-value1') ? 'value1' : 
                         cell.classList.contains('col-value2') ? 'value2' : 'value3';
         
-        console.log(`Value 셀 ${index + 1}: ${valueKey}`);
         
         // 호버 이벤트
         cell.addEventListener('mouseenter', function() {
-            console.log(`🖱️ ${valueKey} 셀 호버 시작`);
             if (selectedValueGroup !== valueKey) {
                 highlightValueGroupInGraph(valueKey, true); // 호버 효과
             }
@@ -14064,7 +13990,6 @@ function setupValueColumnEvents() {
         });
         
         cell.addEventListener('mouseleave', function() {
-            console.log(`🖱️ ${valueKey} 셀 호버 끝`);
             if (selectedValueGroup !== valueKey) {
                 unhighlightValueGroupInGraph();
             }
@@ -14077,15 +14002,12 @@ function setupValueColumnEvents() {
         });
     });
     
-    console.log('✅ Value 컬럼 이벤트 시스템 초기화 완료');
 }
 
 // 그래프에서 value 그룹 하이라이트 (호버용)
 function highlightValueGroupInGraph(valueKey, isTemporary = false) {
-    console.log(`🎨 그래프 하이라이트 시작: ${valueKey}`);
     
     if (!window.network) {
-        console.log('⚠️ window.network가 아직 초기화되지 않음 - 네트워크 그래프 생성 대기 중');
         return;
     }
     
@@ -14101,7 +14023,6 @@ function highlightValueGroupInGraph(valueKey, isTemporary = false) {
         if (typeof window.updateNodeHighlight === 'function') {
             window.updateNodeHighlight();
         } else {
-            console.error('updateNodeHighlight 함수가 정의되지 않음');
         }
         
         // 그래프 즉시 다시 그리기
@@ -14109,19 +14030,15 @@ function highlightValueGroupInGraph(valueKey, isTemporary = false) {
             window.network.redraw();
         }
         
-        console.log(`✨ ${valueKey} 그룹 하이라이트 완료 (호버 효과)`);
         
     } catch (error) {
-        console.error('그래프 하이라이트 오류:', error);
     }
 }
 
 // 그래프 하이라이트 해제 (호버 상태 복원)
 function unhighlightValueGroupInGraph() {
-    console.log('🔄 그래프 하이라이트 해제');
     
     if (!window.network) {
-        console.log('⚠️ window.network가 아직 초기화되지 않음 - 네트워크 그래프 생성 대기 중');
         return;
     }
     
@@ -14140,7 +14057,6 @@ function unhighlightValueGroupInGraph() {
         if (typeof window.updateNodeHighlight === 'function') {
             window.updateNodeHighlight();
         } else {
-            console.error('updateNodeHighlight 함수가 정의되지 않음');
         }
         
         // 그래프 즉시 다시 그리기
@@ -14148,10 +14064,8 @@ function unhighlightValueGroupInGraph() {
             window.network.redraw();
         }
         
-        console.log('🔄 그래프 하이라이트 해제 완료 (호버 상태 복원)');
         
     } catch (error) {
-        console.error('❌ 그래프 하이라이트 해제 중 오류:', error);
     }
 }
 
@@ -14190,12 +14104,10 @@ function syncSplineWithTableHeaders() {
         }
     });
     
-    console.log(`🔗 스플라인-헤더 동기화 완료: ${selectedBlob || '선택 없음'}`);
 }
 
 // 헤더 선택 상태 UI 업데이트
 function updateHeaderSelectionState() {
-    console.log(`🔄 헤더 선택 상태 업데이트: ${selectedValueGroup}`);
     
     const table = document.getElementById('commonValuesTable');
     if (!table) return;
@@ -14233,7 +14145,6 @@ function initializeValueColumnEvents() {
     const commonValuesTab = document.querySelector('a[href="#commonValues"]');
     if (commonValuesTab) {
         commonValuesTab.addEventListener('click', function() {
-            console.log('🎯 공통가치대응 탭 클릭됨');
             // 네트워크 그래프가 생성된 후에 이벤트가 설정되므로 여기서는 추가 설정 불필요
         });
     }
