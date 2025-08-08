@@ -8284,6 +8284,34 @@ function renderCommonValuesNetworkGraph() {
         triggerInitialPhysicsEffects();
     }, 1000);
     
+    // 🌟 페이지 로딩시 자동으로 스플라인 물리효과 시작 (클릭 없이)
+    setTimeout(() => {
+        console.log('🎆 페이지 로딩시 자동 스플라인 물리효과 시작');
+        
+        // 모든 그룹에 대해 순차적으로 물리효과 적용
+        valueKeys.forEach((groupKey, index) => {
+            const groupNodeIds = valueCourseIds[groupKey];
+            if (!groupNodeIds || groupNodeIds.length === 0) return;
+            
+            // 각 그룹마다 시간차를 두고 효과 적용 (1초씩 간격)
+            setTimeout(() => {
+                // 그룹 중심점을 클릭 위치로 사용
+                const centerPos = calculateGroupCenter(groupNodeIds);
+                
+                // 약간의 랜덤 오프셋 추가하여 자연스러움 연출
+                const clickPosition = {
+                    x: centerPos.x + (Math.random() - 0.5) * 80,
+                    y: centerPos.y + (Math.random() - 0.5) * 80
+                };
+                
+                // 기존 물리효과 함수 호출
+                triggerSplinePhysicsEffect(groupKey, clickPosition);
+                
+                console.log(`🎆 그룹 ${groupKey} 자동 스플라인 물리효과 적용`);
+            }, index * 1000); // 각 그룹마다 1초씩 지연
+        });
+    }, 2000); // 2초 후 시작
+    
     // 동적 제어점 초기화 및 업데이트 함수
     function updateDynamicControlPoints(groupKey, splineBoundary) {
         if (!splineBoundary || splineBoundary.length < 3) return;
@@ -9914,18 +9942,12 @@ function renderCommonValuesNetworkGraph() {
     let groupOriginalPositions = {};
 
     // 스플라인 선택 지속성 설정 (전역 변수)
-    window.splineSelectionPersistent = true; // 기본값: 지속성 모드
+    window.splineSelectionPersistent = false; // 기본값: 일반 모드 (한 번 클릭으로 선택/해제)
     
     // blob 커브 클릭 및 드래그 이벤트 처리
     network.on('click', function(params) {
-        // 노드 클릭 시 스플라인 선택 해제 (지속성 모드일 때는 유지)
+        // 노드 클릭 시에는 스플라인 선택을 유지
         if (params.nodes.length > 0) {
-            // 지속성 모드가 아닐 때만 자동 해제
-            if (window.selectedCommonValuesBlob && !window.splineSelectionPersistent) {
-                window.selectedCommonValuesBlob = null;
-                updateNodeHighlight();
-                network.redraw();
-            }
             return;
         }
         
@@ -9979,16 +10001,11 @@ function renderCommonValuesNetworkGraph() {
                 updateNodeHighlight();
                 network.redraw();
             } else {
-                // 빈 영역 클릭 시 선택 해제 (지속성 모드에서는 더블클릭 시만 해제)
+                // 빈 영역 클릭 시 선택 해제
                 if (window.selectedCommonValuesBlob) {
-                    // 지속성 모드일 때는 더블클릭 시만 해제
-                    if (!window.splineSelectionPersistent || 
-                        (window.splineSelectionPersistent && window.lastClickTime && Date.now() - window.lastClickTime < 300)) {
-                        window.selectedCommonValuesBlob = null;
-                        updateNodeHighlight();
-                        network.redraw();
-                    }
-                    window.lastClickTime = Date.now(); // 클릭 시간 기록
+                    window.selectedCommonValuesBlob = null;
+                    updateNodeHighlight();
+                    network.redraw();
                 }
             }
         }
@@ -10382,6 +10399,9 @@ function renderCommonValuesNetworkGraph() {
     // 노드 하이라이트 업데이트 함수를 전역으로 이동
     window.updateNodeHighlight = function() {
         if (!window.network) return;
+        
+        // 스플라인 선택 상태와 테이블 헤더 동기화
+        syncSplineWithTableHeaders();
         
         // 먼저 모든 선택 해제
         window.network.unselectAll();
@@ -13955,7 +13975,7 @@ function setupValueColumnEvents() {
                 // 호버 이벤트
                 header.addEventListener('mouseenter', function() {
                     console.log(`🖱️ ${keyword} 헤더 호버 시작`);
-                    highlightValueGroupInGraph(config.valueKey, true);
+                    highlightValueGroupInGraph(config.valueKey, true); // 호버 효과
                     
                     // 스플라인 호버 상태 설정
                     window.hoveredBlob = config.valueKey;
@@ -13983,14 +14003,30 @@ function setupValueColumnEvents() {
                     if (selectedValueGroup === config.valueKey) {
                         // 선택 해제
                         selectedValueGroup = null;
+                        window.selectedCommonValuesBlob = null; // 스플라인 선택도 해제
                         unhighlightValueGroupInGraph();
                         updateHeaderSelectionState();
+                        // 그래프 하이라이트도 업데이트
+                        if (typeof window.updateNodeHighlight === 'function') {
+                            window.updateNodeHighlight();
+                        }
+                        if (window.network) {
+                            window.network.redraw();
+                        }
                         showToast(`${keyword} 그룹 선택이 해제되었습니다.`);
                     } else {
                         // 새로운 그룹 선택
                         selectedValueGroup = config.valueKey;
+                        window.selectedCommonValuesBlob = config.valueKey; // 스플라인 선택도 동기화
                         highlightValueGroupInGraph(config.valueKey, false);
                         updateHeaderSelectionState();
+                        // 그래프 하이라이트도 업데이트
+                        if (typeof window.updateNodeHighlight === 'function') {
+                            window.updateNodeHighlight();
+                        }
+                        if (window.network) {
+                            window.network.redraw();
+                        }
                         showToast(`${keyword} 그룹이 선택되었습니다.`);
                     }
                 });
@@ -14018,7 +14054,7 @@ function setupValueColumnEvents() {
         cell.addEventListener('mouseenter', function() {
             console.log(`🖱️ ${valueKey} 셀 호버 시작`);
             if (selectedValueGroup !== valueKey) {
-                highlightValueGroupInGraph(valueKey, true);
+                highlightValueGroupInGraph(valueKey, true); // 호버 효과
             }
             
             // 셀 시각적 효과
@@ -14044,7 +14080,7 @@ function setupValueColumnEvents() {
     console.log('✅ Value 컬럼 이벤트 시스템 초기화 완료');
 }
 
-// 그래프에서 value 그룹 하이라이트
+// 그래프에서 value 그룹 하이라이트 (호버용)
 function highlightValueGroupInGraph(valueKey, isTemporary = false) {
     console.log(`🎨 그래프 하이라이트 시작: ${valueKey}`);
     
@@ -14054,9 +14090,11 @@ function highlightValueGroupInGraph(valueKey, isTemporary = false) {
     }
     
     try {
-        // value 스플라인 선택과 동일한 효과 적용
-        // 전역 변수 selectedCommonValuesBlob에 접근
-        const originalSelectedBlob = window.selectedCommonValuesBlob || null;
+        // 호버 상태를 별도로 저장
+        window.hoveredCommonValuesBlob = valueKey;
+        
+        // 기존 선택된 스플라인이 있으면 우선 유지하되, 호버 효과를 위해 임시로 변경
+        const originalSelectedBlob = window.selectedCommonValuesBlob;
         window.selectedCommonValuesBlob = valueKey;
         
         // updateNodeHighlight 함수 호출하여 동일한 효과 적용
@@ -14066,25 +14104,19 @@ function highlightValueGroupInGraph(valueKey, isTemporary = false) {
             console.error('updateNodeHighlight 함수가 정의되지 않음');
         }
         
-        // 임시 호버인 경우 타이머 설정
-        if (isTemporary) {
-            setTimeout(() => {
-                // 원래 상태로 복원
-                window.selectedCommonValuesBlob = originalSelectedBlob;
-                if (typeof window.updateNodeHighlight === 'function') {
-                    window.updateNodeHighlight();
-                }
-            }, 100); // 짧은 지연으로 부드러운 전환
+        // 그래프 즉시 다시 그리기
+        if (window.network) {
+            window.network.redraw();
         }
         
-        console.log(`✨ ${valueKey} 그룹 하이라이트 완료 (value 스플라인 선택과 동일한 효과)`);
+        console.log(`✨ ${valueKey} 그룹 하이라이트 완료 (호버 효과)`);
         
     } catch (error) {
         console.error('그래프 하이라이트 오류:', error);
     }
 }
 
-// 그래프 하이라이트 해제
+// 그래프 하이라이트 해제 (호버 상태 복원)
 function unhighlightValueGroupInGraph() {
     console.log('🔄 그래프 하이라이트 해제');
     
@@ -14094,23 +14126,71 @@ function unhighlightValueGroupInGraph() {
     }
     
     try {
-        // value 스플라인 선택 해제와 동일한 효과 적용
-        // 전역 변수 selectedCommonValuesBlob을 null로 설정하여 선택 해제
-        const originalSelectedBlob = window.selectedCommonValuesBlob || null;
-        window.selectedCommonValuesBlob = null;
+        // 호버 상태 해제
+        window.hoveredCommonValuesBlob = null;
         
-        // updateNodeHighlight 함수 호출하여 동일한 효과 적용
+        // 원래 선택된 상태로 복원 (selectedValueGroup 기준)
+        if (selectedValueGroup) {
+            window.selectedCommonValuesBlob = selectedValueGroup;
+        } else {
+            window.selectedCommonValuesBlob = null;
+        }
+        
+        // updateNodeHighlight 함수 호출하여 상태 복원
         if (typeof window.updateNodeHighlight === 'function') {
             window.updateNodeHighlight();
         } else {
             console.error('updateNodeHighlight 함수가 정의되지 않음');
         }
         
-        console.log('🔄 그래프 하이라이트 해제 완료 (value 스플라인 선택 해제와 동일한 효과)');
+        // 그래프 즉시 다시 그리기
+        if (window.network) {
+            window.network.redraw();
+        }
+        
+        console.log('🔄 그래프 하이라이트 해제 완료 (호버 상태 복원)');
         
     } catch (error) {
         console.error('❌ 그래프 하이라이트 해제 중 오류:', error);
     }
+}
+
+// 스플라인 선택 상태와 테이블 헤더 동기화
+function syncSplineWithTableHeaders() {
+    const selectedBlob = window.selectedCommonValuesBlob;
+    
+    // 공통가치대응 테이블이 있는지 확인
+    const table = document.getElementById('commonValuesTable');
+    if (!table) return;
+    
+    // 모든 value 헤더의 상태 업데이트
+    const allHeaders = table.querySelectorAll('thead th[data-value-key]');
+    allHeaders.forEach(header => {
+        const valueKey = header.getAttribute('data-value-key');
+        
+        if (selectedBlob === valueKey) {
+            // 선택된 스플라인에 해당하는 헤더 하이라이트
+            header.classList.add('selected');
+        } else {
+            // 선택되지 않은 헤더 하이라이트 제거
+            header.classList.remove('selected');
+        }
+    });
+    
+    // 셀들도 동기화 (기존 로직 유지)
+    const valueCells = table.querySelectorAll('.col-value1, .col-value2, .col-value3');
+    valueCells.forEach(cell => {
+        const valueKey = cell.classList.contains('col-value1') ? 'value1' : 
+                        cell.classList.contains('col-value2') ? 'value2' : 'value3';
+        
+        if (selectedBlob === valueKey) {
+            cell.classList.add('selected-group');
+        } else {
+            cell.classList.remove('selected-group');
+        }
+    });
+    
+    console.log(`🔗 스플라인-헤더 동기화 완료: ${selectedBlob || '선택 없음'}`);
 }
 
 // 헤더 선택 상태 UI 업데이트
