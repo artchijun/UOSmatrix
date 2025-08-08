@@ -7629,6 +7629,10 @@ function renderCommonValuesNetworkGraph() {
                             width: 1.5,
                             color: { color: '#9e9e9e', opacity: 0.5 },
                             title: `${subjectType}`,
+                            arrows: { 
+                                to: { enabled: true, scaleFactor: 0.35 },
+                                from: { enabled: true, scaleFactor: 0.35 }
+                            },
                             smooth: { type: 'curvedCW', roundness: 0.2 }
                         });
                     }
@@ -7644,16 +7648,16 @@ function renderCommonValuesNetworkGraph() {
                 node: function(values, id, selected, hovering) {
                     // 기본 스타일 유지 (배경색은 변경하지 않음)
                     if (selected) {
-                        values.borderColor = '#454545ff';  // 검은색으로 선택 상태 표시
+                        // values.borderColor = '#454545ff';  // 검은색으로 선택 상태 표시
                         values.borderWidth = 3;
                         if (values.font) {
                             values.font.color = '#020202ff';
                         }
                     } else if (hovering) {
-                        values.borderColor = '#000000ff';  // 빨간색으로 호버 상태 표시
+                        values.borderColor = values.color ? values.color.border : '#01579b';  // 원래 노드의 테두리 색상 유지
                         values.borderWidth = 2;
                         if (values.font) {
-                            values.font.color = '#000000ff';
+                            values.font.color = values.color ? values.color.border : '#01579b';
                         }
                     } else {
                         // 기본 상태에서는 그룹별 색상 유지 (배경색은 그대로)
@@ -7686,11 +7690,49 @@ function renderCommonValuesNetworkGraph() {
             },
             chosen: {
                 edge: function(values, id, selected, hovering) {
+                    // 🔧 엣지 정보 가져오기
+                    const edge = network.body.data.edges.get(id);
+                    const isDashedEdge = edge && edge.dashes === true;
+                    
                     if (selected) {
-                        values.color = '#545454ff';  // 선택 시 청록색
+                        if (isDashedEdge && edge.title) {
+                            // 🔧 점선 엣지: 과목분류색 사용
+                            const subjectType = edge.title.trim();
+                            const subjectTypeBorderColors = {
+                                '설계': '#9e9e9e',
+                                '디지털': '#a1887f',
+                                '역사': '#d84315',
+                                '이론': '#00897b',
+                                '도시': '#c2185b',
+                                '사회': '#5e35b1',
+                                '기술': '#ef6c00',
+                                '실무': '#43a047',
+                                '비교과': '#757575'
+                            };
+                            values.color = subjectTypeBorderColors[subjectType] || '#4caf50';
+                        } else {
+                            values.color = '#515151ff';  // 일반 엣지 선택 시
+                        }
                         values.width = 3;
                     } else if (hovering) {
-                        values.color = '#414141ff';  // 호버 시 파란색
+                        if (isDashedEdge && edge.title) {
+                            // 🔧 점선 엣지 호버: 과목분류색 사용 (약간 밝게)
+                            const subjectType = edge.title.trim();
+                            const subjectTypeLightColors = {
+                                '설계': '#9e9e9e',
+                                '디지털': '#a1887f',
+                                '역사': '#d84315',
+                                '이론': '#00897b',
+                                '도시': '#c2185b',
+                                '사회': '#5e35b1',
+                                '기술': '#ef6c00',
+                                '실무': '#43a047',
+                                '비교과': '#757575'
+                            };
+                            values.color = subjectTypeLightColors[subjectType] || '#282828ff';
+                        } else {
+                            values.color = '#292929ff';  // 일반 엣지 호버 시
+                        }
                         values.width = 2;
                     } else {
                         values.color = '#bdbdbd';  // 기본 회색
@@ -7698,7 +7740,10 @@ function renderCommonValuesNetworkGraph() {
                     }
                 }
             },
-            arrows: { to: { enabled: true, scaleFactor: 0.35 } },
+            arrows: { 
+                to: { enabled: true, scaleFactor: 0.35 },
+                from: { enabled: true, scaleFactor: 0.35 }
+            },
             smooth: { type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.4 },
             length: 20 // 엣지 길이 더 길게
         },
@@ -7710,14 +7755,14 @@ function renderCommonValuesNetworkGraph() {
             enabled: true,
             barnesHut: {
                 gravitationalConstant: -2000, // 더 강한 반발력
-                centralGravity: 0.2, // 중앙 중력 거의 제거
+                centralGravity: 0, // 🔧 중앙 중력 완전 제거 (응축 현상 방지)
                 springLength: 12000, // 적당한 스프링 길이
-                springConstant: 0.0015, // 더 강한 스프링 (강화)
-                damping: 0.95, // 더 강한 감쇠로 부드러운 움직임
+                springConstant: 0.0008, // 🔧 더 약한 스프링 (기존 0.0015 → 0.0008)
+                damping: 0.98, // 🔧 더 강한 감쇠로 안정적인 움직임 (기존 0.95 → 0.98)
                 avoidOverlap: 2 // 겹침 방지
             },
             stabilization: { 
-                iterations: 1000,  // 더 많은 반복으로 충분한 안정화
+                iterations: 200,  // 🔧 안정화 반복 감소 (기존 1000 → 200)
                 enabled: true,
                 updateInterval: 50
             },
@@ -7935,6 +7980,9 @@ function renderCommonValuesNetworkGraph() {
             
             // 물리 시뮬레이션 강제 시작
             network.startSimulation();
+            
+            // 🔧 전체 네트워크 중심점 유지
+            maintainGlobalNetworkCenter();
         }, 50);
         
         // 3. 자기장 효과: 그룹 노드들을 원형으로 정렬하려는 힘
@@ -7970,6 +8018,9 @@ function renderCommonValuesNetworkGraph() {
             });
             
             network.startSimulation();
+            
+            // 🔧 전체 네트워크 중심점 유지
+            maintainGlobalNetworkCenter();
         }, 30);
         
         // 효과 정리
@@ -7997,6 +8048,179 @@ function renderCommonValuesNetworkGraph() {
         return validNodes > 0 ? 
             { x: sumX / validNodes, y: sumY / validNodes } : 
             { x: 0, y: 0 };
+    }
+    
+    // 🔧 전체 네트워크 중심점 계산 및 고정 시스템
+    let globalNetworkCenter = null; // 전체 네트워크의 고정 중심점
+    let networkCenterStabilized = false; // 중심점 안정화 여부
+    
+    // 전체 네트워크의 중심점 계산
+    function calculateGlobalNetworkCenter() {
+        const allPositions = network.getPositions();
+        let sumX = 0, sumY = 0, validNodes = 0;
+        
+        Object.values(allPositions).forEach(pos => {
+            if (pos && typeof pos.x === 'number' && typeof pos.y === 'number') {
+                sumX += pos.x;
+                sumY += pos.y;
+                validNodes++;
+            }
+        });
+        
+        return validNodes > 0 ? 
+            { x: sumX / validNodes, y: sumY / validNodes } : 
+            { x: 0, y: 0 };
+    }
+    
+    // 전체 네트워크 중심점 유지 시스템
+    function maintainGlobalNetworkCenter() {
+        if (!globalNetworkCenter || !networkCenterStabilized) return;
+        
+        const currentCenter = calculateGlobalNetworkCenter();
+        const offsetX = globalNetworkCenter.x - currentCenter.x;
+        const offsetY = globalNetworkCenter.y - currentCenter.y;
+        
+        // 중심점이 5px 이상 이동했을 때만 보정
+        const displacement = Math.sqrt(offsetX * offsetX + offsetY * offsetY);
+        if (displacement > 5) {
+            const allPositions = network.getPositions();
+            const updatePositions = {};
+            
+            // 모든 노드를 원래 중심점으로 되돌리기 위해 오프셋 적용
+            Object.keys(allPositions).forEach(nodeId => {
+                const pos = allPositions[nodeId];
+                if (pos) {
+                    updatePositions[nodeId] = {
+                        x: pos.x + offsetX * 0.3, // 부드럽게 보정 (30%씩)
+                        y: pos.y + offsetY * 0.3
+                    };
+                }
+            });
+            
+            // 배치 업데이트로 성능 최적화
+            if (Object.keys(updatePositions).length > 0) {
+                network.setPositions(updatePositions);
+            }
+        }
+    }
+    
+    // 🌟 페이지 로딩시 자동으로 물리효과 시작하는 함수
+    function triggerInitialPhysicsEffects() {
+        console.log('🎆 페이지 로딩시 자동 물리효과 시작');
+        
+        // 모든 그룹에 대해 순차적으로 물리효과 적용
+        valueKeys.forEach((groupKey, index) => {
+            const groupNodeIds = valueCourseIds[groupKey];
+            if (!groupNodeIds || groupNodeIds.length === 0) return;
+            
+            // 각 그룹마다 시간차를 두고 효과 적용 (0.5초씩 간격)
+            setTimeout(() => {
+                // 그룹 중심점을 클릭 위치로 사용
+                const centerPos = calculateGroupCenter(groupNodeIds);
+                
+                // 약간의 랜덤 오프셋 추가하여 자연스러움 연출
+                const clickPosition = {
+                    x: centerPos.x + (Math.random() - 0.5) * 100,
+                    y: centerPos.y + (Math.random() - 0.5) * 100
+                };
+                
+                // 기존 물리효과 함수 호출 (강도는 조금 약하게)
+                triggerSplinePhysicsEffectGentle(groupKey, clickPosition);
+                
+                console.log(`🎆 그룹 ${groupKey} 자동 물리효과 적용`);
+            }, index * 500); // 각 그룹마다 0.5초씩 지연
+        });
+    }
+    
+    // 🌟 부드러운 버전의 물리효과 (페이지 로딩시용)
+    function triggerSplinePhysicsEffectGentle(groupKey, clickPosition) {
+        const groupNodeIds = valueCourseIds[groupKey];
+        if (!groupNodeIds || groupNodeIds.length === 0) return;
+        
+        // 1. 부드러운 폭발 효과 (강도 낮음)
+        const explosionForce = 8; // 기존 15에서 8로 감소
+        const explosionDuration = 800; // 0.8초로 증가
+        
+        groupNodeIds.forEach(nodeId => {
+            const body = network.body.nodes[nodeId];
+            if (!body || !body.options.physics) return;
+            
+            const nodePos = network.getPosition(nodeId);
+            const dx = nodePos.x - clickPosition.x;
+            const dy = nodePos.y - clickPosition.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance > 0) {
+                const normalizedX = dx / distance;
+                const normalizedY = dy / distance;
+                
+                const forceStrength = explosionForce / (distance * 0.01 + 1);
+                
+                body.vx += normalizedX * forceStrength;
+                body.vy += normalizedY * forceStrength;
+            }
+        });
+        
+        // 2. 부드러운 진동 효과
+        let wavePhase = 0;
+        const waveInterval = setInterval(() => {
+            groupNodeIds.forEach((nodeId, index) => {
+                const body = network.body.nodes[nodeId];
+                if (!body || !body.options.physics) return;
+                
+                const waveForce = 2 * Math.sin(wavePhase + index * 0.3); // 기존 3에서 2로 감소
+                body.vx += waveForce * Math.cos(wavePhase) * 0.5;
+                body.vy += waveForce * Math.sin(wavePhase) * 0.5;
+            });
+            
+            wavePhase += 0.2; // 기존 0.3에서 0.2로 감소 (더 부드럽게)
+            network.startSimulation();
+            
+            // 🔧 전체 네트워크 중심점 유지
+            maintainGlobalNetworkCenter();
+        }, 60); // 기존 50에서 60으로 증가 (더 부드럽게)
+        
+        // 3. 부드러운 자기장 효과
+        const magneticInterval = setInterval(() => {
+            const centerPos = calculateGroupCenter(groupNodeIds);
+            const targetRadius = 100; // 기존 120에서 100으로 감소
+            
+            groupNodeIds.forEach((nodeId, index) => {
+                const body = network.body.nodes[nodeId];
+                if (!body || !body.options.physics) return;
+                
+                const nodePos = network.getPosition(nodeId);
+                const dx = nodePos.x - centerPos.x;
+                const dy = nodePos.y - centerPos.y;
+                const currentRadius = Math.sqrt(dx * dx + dy * dy);
+                
+                if (currentRadius > 0) {
+                    const targetX = centerPos.x + (dx / currentRadius) * targetRadius;
+                    const targetY = centerPos.y + (dy / currentRadius) * targetRadius;
+                    
+                    const attractX = (targetX - nodePos.x) * 0.015; // 기존 0.02에서 0.015로 감소
+                    const attractY = (targetY - nodePos.y) * 0.015;
+                    
+                    body.vx += attractX;
+                    body.vy += attractY;
+                }
+                
+                const orbitalForce = 0.8; // 기존 1에서 0.8로 감소
+                body.vx += -dy * orbitalForce * 0.0008; // 기존 0.001에서 0.0008로 감소
+                body.vy += dx * orbitalForce * 0.0008;
+            });
+            
+            network.startSimulation();
+            
+            // 🔧 전체 네트워크 중심점 유지
+            maintainGlobalNetworkCenter();
+        }, 40); // 기존 30에서 40으로 증가 (더 부드럽게)
+        
+        // 효과 정리
+        setTimeout(() => {
+            clearInterval(waveInterval);
+            clearInterval(magneticInterval);
+        }, explosionDuration);
     }
     
     // Start the directional force system immediately after network creation
@@ -8033,11 +8257,31 @@ function renderCommonValuesNetworkGraph() {
     // 네트워크 안정화 완료 후에도 다시 한번 확인 - 활성화됨
     network.on('stabilizationIterationsDone', function() {
         startRepulsionSystem(); // 항상 반발력 시스템 시작
+        
+        // 🔧 네트워크 안정화 완료 후 전체 중심점 고정
+        globalNetworkCenter = calculateGlobalNetworkCenter();
+        networkCenterStabilized = true;
+        console.log('🎯 전체 네트워크 중심점 고정:', globalNetworkCenter);
+        
+        // 🌟 페이지 로딩시 자동으로 물리효과 시작 (안정화 완료 후)
+        setTimeout(() => {
+            triggerInitialPhysicsEffects();
+        }, 200);
     });
     
     // 최종 백업 - 1초 후 무조건 시작 - 활성화됨
     setTimeout(() => {
         startRepulsionSystem(); // 확실히 반발력 시스템 시작
+        
+        // 🔧 백업용 중심점 고정 (안정화가 완료되지 않은 경우 대비)
+        if (!networkCenterStabilized) {
+            globalNetworkCenter = calculateGlobalNetworkCenter();
+            networkCenterStabilized = true;
+            console.log('🎯 백업: 전체 네트워크 중심점 고정:', globalNetworkCenter);
+        }
+        
+        // 🌟 백업용 물리효과 시작 (안정화가 완료되지 않은 경우 대비)
+        triggerInitialPhysicsEffects();
     }, 1000);
     
     // 동적 제어점 초기화 및 업데이트 함수
@@ -9637,10 +9881,26 @@ function renderCommonValuesNetworkGraph() {
             return false;
         }
         
+        // 🔧 좌표값 유효성 검사 추가
+        if (typeof point.x !== 'number' || typeof point.y !== 'number' || 
+            isNaN(point.x) || isNaN(point.y)) {
+            return false;
+        }
+        
         let inside = false;
         for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-            if (((polygon[i].y > point.y) !== (polygon[j].y > point.y)) &&
-                (point.x < (polygon[j].x - polygon[i].x) * (point.y - polygon[i].y) / (polygon[j].y - polygon[i].y) + polygon[i].x)) {
+            const pi = polygon[i];
+            const pj = polygon[j];
+            
+            // 🔧 폴리곤 좌표값 유효성 검사
+            if (!pi || !pj || typeof pi.x !== 'number' || typeof pi.y !== 'number' ||
+                typeof pj.x !== 'number' || typeof pj.y !== 'number' ||
+                isNaN(pi.x) || isNaN(pi.y) || isNaN(pj.x) || isNaN(pj.y)) {
+                continue;
+            }
+            
+            if (((pi.y > point.y) !== (pj.y > point.y)) &&
+                (point.x < (pj.x - pi.x) * (point.y - pi.y) / (pj.y - pi.y) + pi.x)) {
                 inside = !inside;
             }
         }
@@ -9653,11 +9913,15 @@ function renderCommonValuesNetworkGraph() {
     let dragStartPosition = null;
     let groupOriginalPositions = {};
 
+    // 스플라인 선택 지속성 설정 (전역 변수)
+    window.splineSelectionPersistent = true; // 기본값: 지속성 모드
+    
     // blob 커브 클릭 및 드래그 이벤트 처리
     network.on('click', function(params) {
-        // 노드 클릭 시 스플라인 선택 해제
+        // 노드 클릭 시 스플라인 선택 해제 (지속성 모드일 때는 유지)
         if (params.nodes.length > 0) {
-            if (window.selectedCommonValuesBlob) {
+            // 지속성 모드가 아닐 때만 자동 해제
+            if (window.selectedCommonValuesBlob && !window.splineSelectionPersistent) {
                 window.selectedCommonValuesBlob = null;
                 updateNodeHighlight();
                 network.redraw();
@@ -9715,11 +9979,16 @@ function renderCommonValuesNetworkGraph() {
                 updateNodeHighlight();
                 network.redraw();
             } else {
-                // 빈 영역 클릭 시 선택 해제
+                // 빈 영역 클릭 시 선택 해제 (지속성 모드에서는 더블클릭 시만 해제)
                 if (window.selectedCommonValuesBlob) {
-                    window.selectedCommonValuesBlob = null;
-                    updateNodeHighlight();
-                    network.redraw();
+                    // 지속성 모드일 때는 더블클릭 시만 해제
+                    if (!window.splineSelectionPersistent || 
+                        (window.splineSelectionPersistent && window.lastClickTime && Date.now() - window.lastClickTime < 300)) {
+                        window.selectedCommonValuesBlob = null;
+                        updateNodeHighlight();
+                        network.redraw();
+                    }
+                    window.lastClickTime = Date.now(); // 클릭 시간 기록
                 }
             }
         }
@@ -9844,6 +10113,10 @@ function renderCommonValuesNetworkGraph() {
                 if (!window.dragUpdateTimer) {
                     window.dragUpdateTimer = setTimeout(() => {
                         updateGroupBoundary(draggedGroupKey);
+                        
+                        // 🔧 드래그 중 전체 네트워크 중심점 유지
+                        maintainGlobalNetworkCenter();
+                        
                         window.dragUpdateTimer = null;
                     }, 16); // ~60fps
                 }
@@ -9934,14 +10207,31 @@ function renderCommonValuesNetworkGraph() {
             isMouseDown = false;
             mouseDownPosition = null;
             
-            // 물리 시뮬레이션과 상호작용 재활성화, 반발력 시스템 재시작
+            // 🔧 물리 시뮬레이션과 상호작용 점진적 재활성화 (응축 현상 방지)
+            // 먼저 안정화 없이 물리만 활성화
             network.setOptions({
-                physics: { enabled: true },
+                physics: { 
+                    enabled: true,
+                    stabilization: { enabled: false } // 안정화 비활성화
+                },
                 interaction: {
                     dragNodes: true,
                     dragView: true
                 }
             });
+            
+            // 잠시 후 안정화 다시 활성화 (부드럽게)
+            setTimeout(() => {
+                network.setOptions({
+                    physics: { 
+                        enabled: true,
+                        stabilization: { 
+                            enabled: true,
+                            iterations: 50 // 적은 반복으로 부드럽게
+                        }
+                    }
+                });
+            }, 500); // 0.5초 후 안정화 재활성화
             
             // 반발력 시스템 상태 확인 (이미 활성화되어 있어야 함) - 비활성화됨
             repulsionSystemActive = false; // 반발력 시스템 비활성화
@@ -10017,6 +10307,10 @@ function renderCommonValuesNetworkGraph() {
                 if (!window.dragUpdateTimer) {
                     window.dragUpdateTimer = setTimeout(() => {
                         updateGroupBoundary(draggedGroupKey);
+                        
+                        // 🔧 드래그 중 전체 네트워크 중심점 유지
+                        maintainGlobalNetworkCenter();
+                        
                         window.dragUpdateTimer = null;
                     }, 16); // ~60fps
                 }
@@ -10040,16 +10334,30 @@ function renderCommonValuesNetworkGraph() {
             dragStartPosition = null;
             groupOriginalPositions = {};
             
-            // 그룹 스플라인 드래그 완료 시 모든 인터랙션 재활성화
+            // 🔧 그룹 스플라인 드래그 완료 시 점진적 재활성화 (응축 현상 방지)
             network.setOptions({
                 interaction: {
                     dragView: true, // 캔버스 드래그 재활성화
                     dragNodes: true // 개별 노드 드래그 재활성화
                 },
                 physics: {
-                    enabled: true // 물리 시뮬레이션 재활성화
+                    enabled: true, // 물리 시뮬레이션 재활성화
+                    stabilization: { enabled: false } // 안정화 비활성화
                 }
             });
+            
+            // 잠시 후 안정화 다시 활성화 (부드럽게)
+            setTimeout(() => {
+                network.setOptions({
+                    physics: { 
+                        enabled: true,
+                        stabilization: { 
+                            enabled: true,
+                            iterations: 50 // 적은 반복으로 부드럽게
+                        }
+                    }
+                });
+            }, 500); // 0.5초 후 안정화 재활성화
             
             // 드래그 완료 시 커서 원래대로 복원
             container.style.cursor = hoveredBlob ? 'pointer' : 'default';
@@ -10120,7 +10428,10 @@ function renderCommonValuesNetworkGraph() {
                             color: { color: groupColor, highlight: groupColor },
                             width: 2,
                             dashes: false,
-                            arrows: { to: { enabled: true, scaleFactor: 0.35 } },
+                            arrows: { 
+                                to: { enabled: true, scaleFactor: 0.35 },
+                                from: { enabled: true, scaleFactor: 0.35 }
+                            },
                             smooth: { type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.4 },
                             title: '같은 과목분류 연결',
                             zIndex: 10
@@ -10311,6 +10622,22 @@ function renderCommonValuesNetworkGraph() {
         const allNodes = network.body.data.nodes.get();
         const allEdges = network.body.data.edges.get();
         
+        // 🔧 과목분류별 색상 정의 가져오기
+        const { subjectTypeColors, categoryColors } = generateColorLegend();
+        
+        // 과목분류별 테두리 색상 (더 진한 색)
+        const subjectTypeBorderColors = {
+            '설계': '#9e9e9e',
+            '디지털': '#a1887f', 
+            '역사': '#ff8a65',
+            '이론': '#4db6ac',
+            '도시': '#f06292',
+            '사회': '#7986cb',
+            '기술': '#ffb74d',
+            '실무': '#66bb6a',
+            '비교과': '#8bc34a'
+        };
+        
         // 노드 업데이트 배열
         const nodeUpdateArray = [];
         
@@ -10329,22 +10656,33 @@ function renderCommonValuesNetworkGraph() {
                 // 호버된 노드 - 강한 하이라이트 (자동으로 chosen 스타일 적용됨)
                 network.selectNodes([hoveredNodeId]);
             } else if (connectedNodeIds.includes(node.id)) {
-                // 연결된 노드 - 중간 하이라이트 (배경색과 테두리 색상 모두 유지)
+                // 🔧 연결된 노드의 과목 정보 가져오기
+                const course = courses.find(c => c.courseName === node.label);
+                let fontColor = '#000000'; // 기본값
+                let borderColor = node.color ? node.color.border : '#bdbdbd';
+                
+                if (course && course.subjectType) {
+                    // 과목분류에 따른 폰트색과 테두리색 적용
+                    fontColor = subjectTypeBorderColors[course.subjectType] || '#000000';
+                    borderColor = subjectTypeBorderColors[course.subjectType] || borderColor;
+                }
+                
+                // 연결된 노드 - 중간 하이라이트 (과목분류색 적용)
                 nodeUpdateArray.push({
                     id: node.id,
                     opacity: 1.0,  // 더 선명하게 (0.8에서 0.9로 변경)
                     borderWidth: 3,  // 테두리 더 두껍게
                     color: {
                         background: node.color ? node.color.background : '#f8f9fa',
-                        border: node.color ? node.color.border : '#bdbdbd',
+                        border: borderColor,
                         highlight: {
                             background: node.color ? node.color.background : '#f8f9fa',
-                            border: node.color ? node.color.border : '#bdbdbd'
+                            border: borderColor
                         }
                     },
                     font: {
                         ...node.font,
-                        color: '#000000'
+                        color: fontColor // 🔧 과목분류색으로 변경
                     }
                 });
             } else {
@@ -10381,15 +10719,24 @@ function renderCommonValuesNetworkGraph() {
             }
             
             if (connectedEdgeIds.includes(edge.id)) {
-                // 연결된 엣지 - 중간 하이라이트
+                // 🔧 연결된 엣지의 색상을 호버된 노드의 과목분류색으로 설정
+                const hoveredNode = allNodes.find(n => n.id === hoveredNodeId);
+                const hoveredCourse = hoveredNode ? courses.find(c => c.courseName === hoveredNode.label) : null;
+                let edgeColor = '#666666'; // 기본값
+                
+                if (hoveredCourse && hoveredCourse.subjectType) {
+                    edgeColor = subjectTypeBorderColors[hoveredCourse.subjectType] || '#666666';
+                }
+                
+                // 연결된 엣지 - 과목분류색으로 하이라이트
                 edgeUpdateArray.push({
                     id: edge.id,
                     color: {
-                        color: '#666666',
-                        highlight: '#666666',
-                        hover: '#666666'
+                        color: edgeColor,
+                        highlight: edgeColor,
+                        hover: edgeColor
                     },
-                    width: 2
+                    width: 3 // 두께도 증가
                 });
             } else {
                 // 나머지 엣지 - 흐리게
@@ -10417,7 +10764,10 @@ function renderCommonValuesNetworkGraph() {
     });
 
     network.on('blurNode', function(params) {
-        network.unselectAll();
+        // 지속성 모드가 아닐 때만 선택 해제
+        if (!window.splineSelectionPersistent) {
+            network.unselectAll();
+        }
         
         // 노드 원래 상태로 복원
         const nodeRestoreArray = [];
@@ -10775,7 +11125,10 @@ function renderCommonValuesNetworkGraph() {
 
           network.on('blurEdge', function(params) {
           console.log('🔚 [blurEdge 시작] Map 크기:', edgeHoverOriginalNodeStyles.size, edgeHoverOriginalEdgeStyles.size);
-          network.unselectAll();
+          // 지속성 모드가 아닐 때만 선택 해제
+          if (!window.splineSelectionPersistent) {
+              network.unselectAll();
+          }
         
         // 모든 노드 원래 상태로 복원
         const nodeRestoreArray = [];

@@ -2878,6 +2878,37 @@ th, td, .matrix-table th, .matrix-table td {
     box-shadow: 0 2px 8px rgba(56, 142, 60, 0.3) !important;
 }
 
+/* 🔗 스플라인 호버 시 헤더 효과 */
+.common-values-table th[data-value-key="value1"].spline-hovered {
+    background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%) !important;
+    color: white !important;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
+    transform: scale(1.005) !important;
+    transition: all 0.2s ease !important;
+    z-index: 5 !important;
+    box-shadow: 0 2px 8px rgba(25, 118, 210, 0.3) !important;
+}
+
+.common-values-table th[data-value-key="value2"].spline-hovered {
+    background: linear-gradient(135deg, #d81b60 0%, #c2185b 100%) !important;
+    color: white !important;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
+    transform: scale(1.005) !important;
+    transition: all 0.2s ease !important;
+    z-index: 5 !important;
+    box-shadow: 0 2px 8px rgba(216, 27, 96, 0.3) !important;
+}
+
+.common-values-table th[data-value-key="value3"].spline-hovered {
+    background: linear-gradient(135deg, #388e3c 0%, #2e7d32 100%) !important;
+    color: white !important;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3) !important;
+    transform: scale(1.005) !important;
+    transition: all 0.2s ease !important;
+    z-index: 5 !important;
+    box-shadow: 0 2px 8px rgba(56, 142, 60, 0.3) !important;
+}
+
 /* 공통가치대응 Value 셀 호버 효과 */
 .common-values-table .col-value1:hover,
 .common-values-table .col-value2:hover,
