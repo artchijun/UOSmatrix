@@ -9370,7 +9370,11 @@ function handleCommonValuesDrop(e) {
         
         // 드래그가 완전히 종료된 후 렌더링
         setTimeout(() => {
+            // 드래그 앤 드롭은 셀 편집과 무관하므로 강제 렌더링
+            const tempFlag = isCommonValuesCellEditing;
+            isCommonValuesCellEditing = false;
             renderCommonValuesTable();
+            isCommonValuesCellEditing = tempFlag;
         }, 50);
         return;
     }
@@ -9401,7 +9405,11 @@ function handleCommonValuesDrop(e) {
         
         // 드래그가 완전히 종료된 후 렌더링
         setTimeout(() => {
+            // 드래그 앤 드롭은 셀 편집과 무관하므로 강제 렌더링
+            const tempFlag = isCommonValuesCellEditing;
+            isCommonValuesCellEditing = false;
             renderCommonValuesTable();
+            isCommonValuesCellEditing = tempFlag;
         }, 50);
     }
 }
