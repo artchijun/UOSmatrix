@@ -7794,7 +7794,11 @@ function renderCommonValuesNetworkGraph() {
                 damping: 0.95, // 더 강한 감쇠로 부드러운 움직임
                 avoidOverlap: 2 // 겹침 방지
             },
-            stabilization: { iterations: 30 },
+            stabilization: { 
+                iterations: 1000,  // 더 많은 반복으로 충분한 안정화
+                enabled: true,
+                updateInterval: 50
+            },
             adaptiveTimestep: true, // 적응형 시간 간격
         },
         interaction: {
@@ -9801,20 +9805,156 @@ function renderCommonValuesNetworkGraph() {
         }
     }
     
-    // 마우스 노드 호버 효과 (간단한 방식)
+    // 마우스 노드 호버 효과 (연결된 요소 포함)
+    let nodeHoverOriginalStyles = new Map();
+    let edgeHoverOriginalStyles = new Map();
+    
     network.on('hoverNode', function(params) {
-        // 호버된 노드만 하이라이트
-        const nodeId = params.node;
-        network.selectNodes([nodeId]);
+        const hoveredNodeId = params.node;
+        
+        // 연결된 노드와 엣지 찾기
+        const connectedNodeIds = network.getConnectedNodes(hoveredNodeId);
+        const connectedEdgeIds = network.getConnectedEdges(hoveredNodeId);
+        
+        // 모든 노드와 엣지 가져오기
+        const allNodes = network.body.data.nodes.get();
+        const allEdges = network.body.data.edges.get();
+        
+        // 노드 업데이트 배열
+        const nodeUpdateArray = [];
+        
+        allNodes.forEach(node => {
+            // 원래 스타일 저장
+            if (!nodeHoverOriginalStyles.has(node.id)) {
+                nodeHoverOriginalStyles.set(node.id, {
+                    opacity: node.opacity || 1,
+                    font: { ...node.font },
+                    color: node.color ? { ...node.color } : undefined
+                });
+            }
+            
+            if (node.id === hoveredNodeId) {
+                // 호버된 노드 - 강한 하이라이트 (자동으로 chosen 스타일 적용됨)
+                network.selectNodes([hoveredNodeId]);
+            } else if (connectedNodeIds.includes(node.id)) {
+                // 연결된 노드 - 중간 하이라이트
+                nodeUpdateArray.push({
+                    id: node.id,
+                    opacity: 0.8,
+                    font: {
+                        ...node.font,
+                        color: '#542b2bff'
+                    }
+                });
+            } else {
+                // 나머지 노드 - 흐리게
+                nodeUpdateArray.push({
+                    id: node.id,
+                    opacity: 0.2,
+                    font: {
+                        ...node.font,
+                        color: 'rgba(73, 80, 87, 0.2)'
+                    }
+                });
+            }
+        });
+        
+        // 엣지 업데이트 배열
+        const edgeUpdateArray = [];
+        
+        allEdges.forEach(edge => {
+            // 원래 스타일 저장
+            if (!edgeHoverOriginalStyles.has(edge.id)) {
+                edgeHoverOriginalStyles.set(edge.id, {
+                    color: edge.color || { color: '#bdbdbd', highlight: '#bdbdbd' },
+                    width: edge.width || 1
+                });
+            }
+            
+            if (connectedEdgeIds.includes(edge.id)) {
+                // 연결된 엣지 - 중간 하이라이트
+                edgeUpdateArray.push({
+                    id: edge.id,
+                    color: {
+                        color: '#666666',
+                        highlight: '#666666',
+                        hover: '#666666'
+                    },
+                    width: 2
+                });
+            } else {
+                // 나머지 엣지 - 흐리게
+                edgeUpdateArray.push({
+                    id: edge.id,
+                    color: {
+                        color: 'rgba(189, 189, 189, 0.2)',
+                        highlight: 'rgba(189, 189, 189, 0.2)',
+                        hover: 'rgba(189, 189, 189, 0.2)'
+                    },
+                    width: 1
+                });
+            }
+        });
+        
+        // 업데이트 적용
+        if (nodeUpdateArray.length > 0) {
+            network.body.data.nodes.update(nodeUpdateArray);
+        }
+        if (edgeUpdateArray.length > 0) {
+            network.body.data.edges.update(edgeUpdateArray);
+        }
+        
         document.body.style.cursor = 'pointer';
     });
 
     network.on('blurNode', function(params) {
         network.unselectAll();
+        
+        // 노드 원래 상태로 복원
+        const nodeRestoreArray = [];
+        nodeHoverOriginalStyles.forEach((originalStyle, nodeId) => {
+            const restoreData = {
+                id: nodeId,
+                opacity: originalStyle.opacity,
+                font: originalStyle.font
+            };
+            
+            if (originalStyle.color) {
+                restoreData.color = originalStyle.color;
+            }
+            
+            nodeRestoreArray.push(restoreData);
+        });
+        
+        if (nodeRestoreArray.length > 0) {
+            network.body.data.nodes.update(nodeRestoreArray);
+        }
+        
+        // 엣지 원래 상태로 복원
+        const edgeRestoreArray = [];
+        edgeHoverOriginalStyles.forEach((originalStyle, edgeId) => {
+            edgeRestoreArray.push({
+                id: edgeId,
+                color: originalStyle.color,
+                width: originalStyle.width
+            });
+        });
+        
+        if (edgeRestoreArray.length > 0) {
+            network.body.data.edges.update(edgeRestoreArray);
+        }
+        
+        // 저장된 스타일 초기화
+        nodeHoverOriginalStyles.clear();
+        edgeHoverOriginalStyles.clear();
+        
         document.body.style.cursor = 'default';
     });
 
     // 엣지(화살표) 위에 마우스 올릴 때 해당 yearSemester의 모든 노드 하이라이트
+    let edgeHoverOriginalEdgeStyles = new Map();
+    let edgeHoverOriginalNodeStyles = new Map();
+    
     network.on('hoverEdge', function(params) {
         const edgeId = params.edge;
         const edge = network.body.data.edges.get(edgeId);
@@ -9823,19 +9963,133 @@ function renderCommonValuesNetworkGraph() {
             const yearSemester = edge.title;
             // 해당 yearSemester의 모든 노드 id 찾기
             const highlightNodeIds = [];
+            const dimNodeIds = [];
+            const nodeUpdateArray = [];
+            
+            // 모든 노드의 원래 상태 저장 및 업데이트 준비
             nodes.forEach(n => {
+                const currentNode = network.body.data.nodes.get(n.id);
+                
+                // 원래 스타일 저장 (처음 호버 시에만)
+                if (!edgeHoverOriginalNodeStyles.has(n.id)) {
+                    edgeHoverOriginalNodeStyles.set(n.id, {
+                        opacity: currentNode.opacity || 1,
+                        font: { ...currentNode.font },
+                        color: currentNode.color ? { ...currentNode.color } : undefined
+                    });
+                }
+                
                 const course = courses.find(c => c.id === n.id);
                 if (course && course.yearSemester === yearSemester) {
                     highlightNodeIds.push(n.id);
+                } else {
+                    dimNodeIds.push(n.id);
+                    // 디밍할 노드 업데이트 배열에 추가
+                    nodeUpdateArray.push({
+                        id: n.id,
+                        opacity: 0.2,
+                        font: { 
+                            ...currentNode.font,
+                            color: 'rgba(73, 80, 87, 0.2)' 
+                        }
+                    });
                 }
             });
+            
+            // 하이라이트할 노드 선택
             network.selectNodes(highlightNodeIds);
+            
+            // 나머지 노드들 투명도 적용 (배치 업데이트)
+            if (nodeUpdateArray.length > 0) {
+                network.body.data.nodes.update(nodeUpdateArray);
+            }
+            
+            // 모든 엣지들 처리
+            const allEdges = network.body.data.edges.get();
+            const edgeUpdateArray = [];
+            
+            allEdges.forEach(e => {
+                // 원래 스타일 저장 (처음 호버 시에만)
+                if (!edgeHoverOriginalEdgeStyles.has(e.id)) {
+                    edgeHoverOriginalEdgeStyles.set(e.id, {
+                        color: e.color || { color: '#bdbdbd', highlight: '#bdbdbd' },
+                        width: e.width || 1
+                    });
+                }
+                
+                // 엣지의 title이 같은 yearSemester인지 확인
+                if (e.title === yearSemester) {
+                    // 같은 학년학기의 모든 엣지는 검은색으로
+                    edgeUpdateArray.push({
+                        id: e.id,
+                        color: { 
+                            color: '#654242ff', 
+                            highlight: '#313131ff',
+                            hover: '#281198ff'
+                        },
+                        width: 2
+                    });
+                } else {
+                    // 다른 엣지들은 투명도 적용
+                    edgeUpdateArray.push({
+                        id: e.id,
+                        color: { 
+                            color: 'rgba(189, 189, 189, 0.2)', 
+                            highlight: 'rgba(189, 189, 189, 0.2)',
+                            hover: 'rgba(189, 189, 189, 0.2)'
+                        },
+                        width: 1
+                    });
+                }
+            });
+            
+            // 배치로 업데이트
+            network.body.data.edges.update(edgeUpdateArray);
         }
         document.body.style.cursor = 'pointer';
     });
 
     network.on('blurEdge', function(params) {
         network.unselectAll();
+        
+        // 모든 노드 원래 상태로 복원
+        const nodeRestoreArray = [];
+        edgeHoverOriginalNodeStyles.forEach((originalStyle, nodeId) => {
+            const restoreData = {
+                id: nodeId,
+                opacity: originalStyle.opacity,
+                font: originalStyle.font
+            };
+            
+            // color 속성이 있으면 추가
+            if (originalStyle.color) {
+                restoreData.color = originalStyle.color;
+            }
+            
+            nodeRestoreArray.push(restoreData);
+        });
+        
+        if (nodeRestoreArray.length > 0) {
+            network.body.data.nodes.update(nodeRestoreArray);
+        }
+        
+        // 모든 엣지 원래 상태로 복원
+        const edgeRestoreArray = [];
+        edgeHoverOriginalEdgeStyles.forEach((originalStyle, edgeId) => {
+            edgeRestoreArray.push({
+                id: edgeId,
+                color: originalStyle.color,
+                width: originalStyle.width
+            });
+        });
+        
+        if (edgeRestoreArray.length > 0) {
+            network.body.data.edges.update(edgeRestoreArray);
+        }
+        
+        // 저장된 원래 스타일 초기화
+        edgeHoverOriginalNodeStyles.clear();
+        edgeHoverOriginalEdgeStyles.clear();
         document.body.style.cursor = 'default';
     });
 }
