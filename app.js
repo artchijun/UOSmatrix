@@ -7369,15 +7369,15 @@ function renderCommonValuesNetworkGraph() {
                     // 그룹 라벨 위치 기준으로 노드 초기 위치 배치 (라벨 아래쪽, x축으로 분산)
                     let initX = undefined, initY = undefined;
                     if (typeof groupLabelPositions !== 'undefined' && groupLabelPositions[key]) {
-                        // 더 나은 초기 배치: 원형 패턴으로 배치
+                        // 더 나은 초기 배치: 원형 패턴으로 배치 (간격 확대)
                         const totalNodes = valueCourseIds[key].length;
-                        const radius = Math.max(80, totalNodes * 15); // 노드 수에 따라 반지름 조정
+                        const radius = Math.max(120, totalNodes * 25); // 노드 수에 따라 반지름 조정 (간격 확대)
                         const angleStep = (2 * Math.PI) / totalNodes;
                         const angle = idx * angleStep;
                         
-                        // 원형 배치로 초기 위치 계산
+                        // 원형 배치로 초기 위치 계산 (더 넓은 간격)
                         initX = groupLabelPositions[key].x + Math.cos(angle) * radius;
-                        initY = groupLabelPositions[key].y + 100 + Math.sin(angle) * radius;
+                        initY = groupLabelPositions[key].y + 120 + Math.sin(angle) * radius;
                         
                         // 속하지 않은 그룹 폴리곤(hull)과 일정 거리 이상 떨어지도록 위치 조정
                         valueKeys.forEach(otherKey => {
@@ -7391,18 +7391,18 @@ function renderCommonValuesNetworkGraph() {
                                     const dist = Math.sqrt(dx*dx + dy*dy);
                                     if (dist < minDist) minDist = dist;
                                 });
-                                // 만약 너무 가까우면(80px 미만) hull 바깥 방향으로 밀어냄
-                                if (minDist < 80) {
+                                // 만약 너무 가까우면(120px 미만) hull 바깥 방향으로 밀어냄
+                                if (minDist < 120) {
                                     // hull 중심 계산
                                     let hullCenterX = 0, hullCenterY = 0;
                                     hull.forEach(pt => { hullCenterX += pt.x; hullCenterY += pt.y; });
                                     hullCenterX /= hull.length; hullCenterY /= hull.length;
-                                    // 바깥 방향으로 80-minDist 만큼 이동
+                                    // 바깥 방향으로 120-minDist 만큼 이동
                                     const dx = initX - hullCenterX;
                                     const dy = initY - hullCenterY;
                                     const len = Math.sqrt(dx*dx + dy*dy) || 1;
-                                    initX += (dx/len) * (80-minDist);
-                                    initY += (dy/len) * (80-minDist);
+                                    initX += (dx/len) * (120-minDist);
+                                    initY += (dy/len) * (120-minDist);
                                 }
                             }
                         });
@@ -7454,8 +7454,8 @@ function renderCommonValuesNetworkGraph() {
                         const totalNodes = courseNodeCount + totalExtracurricular;
                         
                         // 원형 배치로 초기 위치 계산 (교과목 노드들 바깥쪽에 배치)
-                        const baseRadius = Math.max(80, courseNodeCount * 15);
-                        const radius = baseRadius + 40; // 교과목 노드들보다 바깥쪽에 배치
+                        const baseRadius = Math.max(120, courseNodeCount * 25);
+                        const radius = baseRadius + 60; // 교과목 노드들보다 바깥쪽에 배치 (간격 확대)
                         const angleStep = (2 * Math.PI) / totalExtracurricular;
                         const angle = idx * angleStep;
                         
@@ -7712,7 +7712,7 @@ function renderCommonValuesNetworkGraph() {
                 gravitationalConstant: -2000, // 더 강한 반발력
                 centralGravity: 0.2, // 중앙 중력 거의 제거
                 springLength: 12000, // 적당한 스프링 길이
-                springConstant: 0.0008, // 더 강한 스프링
+                springConstant: 0.0015, // 더 강한 스프링 (강화)
                 damping: 0.95, // 더 강한 감쇠로 부드러운 움직임
                 avoidOverlap: 2 // 겹침 방지
             },
@@ -7885,7 +7885,7 @@ function renderCommonValuesNetworkGraph() {
     }
     
     // Start the directional force system immediately after network creation
-    startDirectionalForceSystem();
+            startDirectionalForceSystem();
     
     // 동적 제어점 시스템
     let dynamicControlPoints = new Map(); // groupKey -> [{x, y, vx, vy, originalX, originalY}]
@@ -7999,7 +7999,7 @@ function renderCommonValuesNetworkGraph() {
                 if (distance > 0 && distance < maxRepulsionDistance) {
                     // 스프링 반발력 공식: F = k * (equilibrium_distance - current_distance)
                     const equilibriumDistance = 160; // 평형 거리 (증가)
-                    const springConstant = 1.2; // 스프링 상수 (증가)
+                    const springConstant = 2.0; // 스프링 상수 (강화)
                     
                     // 라벨 크기를 고려한 추가 반발력
                     const labelWidth = labelPos.width || 100;
@@ -8279,7 +8279,7 @@ function renderCommonValuesNetworkGraph() {
                                 const distance = Math.sqrt(dx * dx + dy * dy);
                                 
                                 if (distance > 30 && distance < 120) { // 더 제한적인 거리에서만 인력 작용 (20→30, 200→120)
-                                    const springForce = Math.min(8, distance * 0.05); // 스프링 인력 대폭 약화 (30→8, 0.15→0.05)
+                                    const springForce = Math.min(15, distance * 0.08); // 스프링 인력 강화
                                     const normalizedX = dx / distance;
                                     const normalizedY = dy / distance;
                                     
@@ -8287,8 +8287,8 @@ function renderCommonValuesNetworkGraph() {
                                         boundaryForces.set(nodeId, { x: 0, y: 0 });
                                     }
                                     const currentForce = boundaryForces.get(nodeId);
-                                    currentForce.x += normalizedX * springForce * 0.2; // 더 약하게 적용 (0.5 → 0.2)
-                                    currentForce.y += normalizedY * springForce * 0.2;
+                                                            currentForce.x += normalizedX * springForce * 0.4; // 강화된 스프링 인력
+                        currentForce.y += normalizedY * springForce * 0.4;
                                 }
                             }
                         }
@@ -8608,7 +8608,7 @@ function renderCommonValuesNetworkGraph() {
         if (repulsionInterval) {
             clearInterval(repulsionInterval);
         }
-        repulsionInterval = setInterval(applyContinuousRepulsion, 16); // 60fps - 지속적 반발력
+                            repulsionInterval = setInterval(applyContinuousRepulsion, 8); // 120fps - 더 빠른 지속적 반발력
         
         // 물리 시뮬레이션을 완전히 비활성화하고 직접 제어
         network.setOptions({
@@ -8719,9 +8719,10 @@ function renderCommonValuesNetworkGraph() {
     }
     // 지속적으로 부드럽게 노드들을 그룹 경계 밖으로 밀어내는 함수 (스플라인 버텍스 반발력 포함)
     function applyContinuousRepulsion() {
-        if (!commonValuesBlobData || Object.keys(commonValuesBlobData).length === 0) {
-            return false; // 처리할 데이터가 없음
-        }
+        // 스플라인 데이터가 없어도 기본 반발력은 작용하도록 수정
+        // if (!commonValuesBlobData || Object.keys(commonValuesBlobData).length === 0) {
+        //     return false; // 처리할 데이터가 없음
+        // }
 
         // 그룹 드래그 중에는 침입 노드 검사 중단 (false positive 방지)
         if (isDraggingGroup) {
@@ -8729,13 +8730,13 @@ function renderCommonValuesNetworkGraph() {
         }
 
         const baseRepulsionForce = 80; // 기존 30 → 80으로 증가 (더 빠르게)
-        const springK = 0.08; // 스프링 상수(조절 가능)
+        const springK = 0.15; // 스프링 상수(강화)
         const minDistanceFromBoundary = 600; // 경계에서 더 가까운 거리
         const boundaryOffset = 150; // 경계 확장 오프셋 (줄임)
-        const labelRepulsionForce = 200; // 그룹 제목 반발력 (줄임)
-        const labelRepulsionRadius = 150; // 그룹 제목 반발력 반경 (150px로 줄임)
-        const nodeRepulsionForce = 150; // 노드 간 반발력 (강화)
-        const nodeRepulsionRadius = 100; // 노드 간 반발력 반경 (강화)
+        const labelRepulsionForce = 300; // 그룹 제목 반발력 (강화)
+        const labelRepulsionRadius = 200; // 그룹 제목 반발력 반경 (확대)
+        const nodeRepulsionForce = 250; // 노드 간 반발력 (강화)
+        const nodeRepulsionRadius = 150; // 노드 간 반발력 반경 (확대)
         let totalForceApplied = 0;
         let detectedIntruders = [];
         
@@ -8745,6 +8746,35 @@ function renderCommonValuesNetworkGraph() {
             if (!node) return;
             
             const nodePosition = { x: node.x, y: node.y };
+            
+            // value 그룹별 방향성 힘 적용
+            let directionalForce = 0.3; // 방향성 힘의 강도 (조정)
+            let targetX = nodePosition.x;
+            let targetY = nodePosition.y;
+            
+            // 노드가 속한 value 그룹 찾기
+            let nodeValueGroup = null;
+            for (const [valueKey, nodeIds] of Object.entries(valueCourseIds)) {
+                if (nodeIds.includes(nodeId)) {
+                    nodeValueGroup = valueKey;
+                    break;
+                }
+            }
+            
+            // value 그룹에 따른 방향성 힘 적용 (더 부드럽게)
+            if (nodeValueGroup === 'value1') {
+                // value1: 왼쪽으로 이동
+                const dx = -150; // 왼쪽 방향 힘
+                node.vx = (node.vx || 0) + dx * directionalForce * 0.005;
+            } else if (nodeValueGroup === 'value2') {
+                // value2: 위쪽으로 이동
+                const dy = -150; // 위쪽 방향 힘
+                node.vy = (node.vy || 0) + dy * directionalForce * 0.005;
+            } else if (nodeValueGroup === 'value3') {
+                // value3: 오른쪽으로 이동
+                const dx = 150; // 오른쪽 방향 힘
+                node.vx = (node.vx || 0) + dx * directionalForce * 0.005;
+            }
             
             // 노드 간 반발력 적용 (모든 다른 노드와의 거리 확인)
             Object.keys(network.body.nodes).forEach(otherNodeId => {
@@ -8764,7 +8794,7 @@ function renderCommonValuesNetworkGraph() {
                     
                     // 거리에 반비례하는 반발력 (가까울수록 강함)
                     const forceMultiplier = Math.max(0.1, (nodeRepulsionRadius - distance) / nodeRepulsionRadius);
-                    const repulsionForce = nodeRepulsionForce * forceMultiplier * 0.02; // 강화된 반발력
+                    const repulsionForce = nodeRepulsionForce * forceMultiplier * 0.05; // 더 강화된 반발력
                     
                     // 노드에 반발력 적용
                     node.vx = (node.vx || 0) + dirX * repulsionForce;
@@ -8786,7 +8816,7 @@ function renderCommonValuesNetworkGraph() {
                     
                     // 거리에 반비례하는 반발력 (가까울수록 강함)
                     const forceMultiplier = Math.max(0.1, (labelRepulsionRadius - distance) / labelRepulsionRadius);
-                    const repulsionForce = labelRepulsionForce * forceMultiplier * 0.01;
+                    const repulsionForce = labelRepulsionForce * forceMultiplier * 0.03; // 더 강화된 반발력
                     
                     // 노드에 반발력 적용
                     node.vx = (node.vx || 0) + dirX * repulsionForce;
@@ -8795,7 +8825,8 @@ function renderCommonValuesNetworkGraph() {
                 }
             });
             
-            // 각 그룹에 대해 확인
+            // 각 그룹에 대해 확인 (스플라인 데이터가 있을 때만)
+            if (commonValuesBlobData && Object.keys(commonValuesBlobData).length > 0) {
             valueKeys.forEach(groupKey => {
                 const groupNodeIds = valueCourseIds[groupKey];
                 const groupBoundary = commonValuesBlobData[groupKey];
@@ -8828,7 +8859,7 @@ function renderCommonValuesNetworkGraph() {
                             const dirX = dx / distance;
                             const dirY = dy / distance;
                             // spring force: F = -k * x (x: 경계 중심~노드 거리)
-                            const springForce = springK * distance + baseRepulsionForce * 0.2;
+                            const springForce = springK * distance + baseRepulsionForce * 0.4;
                             node.vx = (node.vx || 0) + dirX * springForce;
                             node.vy = (node.vy || 0) + dirY * springForce;
                             totalForceApplied += springForce;
@@ -8867,7 +8898,7 @@ function renderCommonValuesNetworkGraph() {
                             const dirX = dx / distance;
                             const dirY = dy / distance;
                             // spring force: F = -k * x (x: 경계 중심~노드 거리)
-                            const springForce = springK * distance + baseRepulsionForce * 0.8;
+                            const springForce = springK * distance + baseRepulsionForce * 1.0;
                             node.vx = (node.vx || 0) + dirX * springForce;
                             node.vy = (node.vy || 0) + dirY * springForce;
                             totalForceApplied += springForce;
@@ -8895,6 +8926,7 @@ function renderCommonValuesNetworkGraph() {
                     }
                 }
             });
+            } // 스플라인 데이터가 있을 때만 실행하는 if문 닫기
         });
         
         // // 시각적 표시 업데이트
@@ -8984,7 +9016,7 @@ function renderCommonValuesNetworkGraph() {
                     const dy = node1.y - node2.y;
                     const distance = Math.sqrt(dx * dx + dy * dy);
                     
-                                            if (distance < 300) { // 300px 미만이면 아직 안정화되지 않음
+                    if (distance < 300) { // 300px 미만이면 아직 안정화되지 않음
                             allNodesFarEnough = false;
                             break;
                         }
@@ -9376,112 +9408,112 @@ function renderCommonValuesNetworkGraph() {
     
     // 스플라인 그리기 함수
     function drawSplineForGroup(ctx, key) {
-        const ids = valueCourseIds[key];
-        if (!ids.length) {
-            return;
-        }
-        let outlinePoints = [];
-        ids.forEach(id => {
-            const points = getNodeOutlinePoints(network, id, 100); // offset을 크게 적용
-            outlinePoints = outlinePoints.concat(points);
-        });
-        
-        outlinePoints.forEach((pt, idx) => {
+            const ids = valueCourseIds[key];
+            if (!ids.length) {
+                return;
+            }
+            let outlinePoints = [];
+            ids.forEach(id => {
+                const points = getNodeOutlinePoints(network, id, 100); // offset을 크게 적용
+                outlinePoints = outlinePoints.concat(points);
+            });
             
-        });
-        
-        if (outlinePoints.length < 3) {
-            return;
-        }
-        let hull = convexHull(outlinePoints);
-        // 스플라인 버텍스 포인트 개수 증가
-        hull = increaseSplineVertices(hull);
-        // 더 부드러운 스플라인을 위해 스무싱 활성화
-        for (let i = 0; i < 3; i++) hull = smoothHull(hull); // smoothing 3회
-        commonValuesBlobData[key] = hull;
-        
-        // blob 색상 및 강조 효과 개선
-        ctx.save();
-        
-        // 선택/호버 상태에 따른 투명도 설정
-        let alpha = 0.56; // 기본
+            outlinePoints.forEach((pt, idx) => {
+                
+            });
+            
+            if (outlinePoints.length < 3) {
+                return;
+            }
+            let hull = convexHull(outlinePoints);
+            // 스플라인 버텍스 포인트 개수 증가
+            hull = increaseSplineVertices(hull);
+            // 더 부드러운 스플라인을 위해 스무싱 활성화
+            for (let i = 0; i < 3; i++) hull = smoothHull(hull); // smoothing 3회
+            commonValuesBlobData[key] = hull;
+            
+            // blob 색상 및 강조 효과 개선
+            ctx.save();
+            
+            // 선택/호버 상태에 따른 투명도 설정
+            let alpha = 0.56; // 기본
         if (window.selectedCommonValuesBlob === key) {
             alpha = 1.95; // 선택됨 (더 진하게)
         } else if (window.hoveredBlob === key) {
             alpha = 0.65; // 호버됨 (선택과 동일하게 진하게)
-        }
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = groupBgColors[key] || 'rgba(33,150,243,0.16)';
+            }
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = groupBgColors[key] || 'rgba(33,150,243,0.16)';
 
-        // 선택/호버 상태에 따른 테두리 설정
-        const strokeColor = groupColors[key] || '#666';
-        ctx.strokeStyle = strokeColor;
-        let lineWidth = 2; // 기본
+            // 선택/호버 상태에 따른 테두리 설정
+            const strokeColor = groupColors[key] || '#666';
+            ctx.strokeStyle = strokeColor;
+            let lineWidth = 2; // 기본
         if (window.selectedCommonValuesBlob === key) {
-            lineWidth = 4; // 선택됨
-        } else if (hoveredBlob === key) {
-            lineWidth = 3; // 호버됨
-        }
-        ctx.lineWidth = lineWidth;
-        // 점선 제거
-        // ctx.setLineDash([6, 2]); // 점선 패턴 제거
-        drawSmoothCurve(ctx, hull);
-        ctx.fill();
-        ctx.stroke();
-        // ctx.setLineDash([]); // 점선 패턴 초기화 제거
-        ctx.restore();
-
-        
-        // 그룹명 라벨 표시 (중앙)
-        if (ids.length > 0) {
-            // 중앙점 계산
-            let centerX = 0, centerY = 0;
-            ids.forEach(id => {
-                const pos = network.getPosition(id);
-                centerX += pos.x; centerY += pos.y;
-            });
-            centerX /= ids.length; centerY /= ids.length;
-            ctx.save();
-            ctx.globalAlpha = 1;
-            // 선택/호버 상태에 따른 폰트 스타일 설정
-            let fontSize = 26;
-            if (hoveredLabel === key) {
-                fontSize = 32; // 호버 시 폰트 크기 증가
+                lineWidth = 4; // 선택됨
+            } else if (hoveredBlob === key) {
+                lineWidth = 3; // 호버됨
             }
-            ctx.font = `bold ${fontSize}px Noto Sans KR, sans-serif`;
-            
-            let textColor;
-            if (window.selectedCommonValuesBlob === key) {
-                textColor = groupColors[key] || '#333'; // 선택됨
-            } else if (hoveredBlob === key || hoveredLabel === key) {
-                textColor = 'rgba(85, 85, 85, 0.8)'; // 호버됨
-            } else {
-                textColor = 'rgba(127, 127, 127, 0.29)'; // 기본 (회색)
-            }
-            ctx.fillStyle = textColor;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.strokeStyle = 'white';
-            ctx.lineWidth = 5;
-            const groupLabel = commonValuesGroupNames[key] || key;
-            
-            // 라벨 텍스트 크기 측정 및 위치 저장
-            const textMetrics = ctx.measureText(groupLabel);
-            const labelWidth = textMetrics.width;
-            const labelHeight = 30; // 폰트 크기 26px 기준으로 약간 여유 있게
-            
-            // 캔버스 좌표계로 저장 (DOM 좌표로 변환하지 않음)
-            groupLabelPositions.set(key, {
-                x: centerX,
-                y: centerY,
-                width: labelWidth,
-                height: labelHeight
-            });
-            
-            ctx.strokeText(groupLabel, centerX, centerY);
-            ctx.fillText(groupLabel, centerX, centerY);
+            ctx.lineWidth = lineWidth;
+            // 점선 제거
+            // ctx.setLineDash([6, 2]); // 점선 패턴 제거
+            drawSmoothCurve(ctx, hull);
+            ctx.fill();
+            ctx.stroke();
+            // ctx.setLineDash([]); // 점선 패턴 초기화 제거
             ctx.restore();
-        }
+
+            
+            // 그룹명 라벨 표시 (중앙)
+            if (ids.length > 0) {
+                // 중앙점 계산
+                let centerX = 0, centerY = 0;
+                ids.forEach(id => {
+                    const pos = network.getPosition(id);
+                    centerX += pos.x; centerY += pos.y;
+                });
+                centerX /= ids.length; centerY /= ids.length;
+                ctx.save();
+                ctx.globalAlpha = 1;
+                // 선택/호버 상태에 따른 폰트 스타일 설정
+                let fontSize = 26;
+                if (hoveredLabel === key) {
+                    fontSize = 32; // 호버 시 폰트 크기 증가
+                }
+                ctx.font = `bold ${fontSize}px Noto Sans KR, sans-serif`;
+                
+                let textColor;
+            if (window.selectedCommonValuesBlob === key) {
+                    textColor = groupColors[key] || '#333'; // 선택됨
+                } else if (hoveredBlob === key || hoveredLabel === key) {
+                    textColor = 'rgba(85, 85, 85, 0.8)'; // 호버됨
+                } else {
+                    textColor = 'rgba(127, 127, 127, 0.29)'; // 기본 (회색)
+                }
+                ctx.fillStyle = textColor;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 5;
+                const groupLabel = commonValuesGroupNames[key] || key;
+                
+                // 라벨 텍스트 크기 측정 및 위치 저장
+                const textMetrics = ctx.measureText(groupLabel);
+                const labelWidth = textMetrics.width;
+                const labelHeight = 30; // 폰트 크기 26px 기준으로 약간 여유 있게
+                
+                // 캔버스 좌표계로 저장 (DOM 좌표로 변환하지 않음)
+                groupLabelPositions.set(key, {
+                    x: centerX,
+                    y: centerY,
+                    width: labelWidth,
+                    height: labelHeight
+                });
+                
+                ctx.strokeText(groupLabel, centerX, centerY);
+                ctx.fillText(groupLabel, centerX, centerY);
+                ctx.restore();
+            }
     }
 
     // 점이 폴리곤 내부에 있는지 확인하는 함수
@@ -10312,13 +10344,14 @@ function renderCommonValuesNetworkGraph() {
 
     // 엣지(화살표) 위에 마우스 올릴 때 해당 yearSemester의 모든 노드 하이라이트
     let edgeHoverOriginalEdgeStyles = new Map();
-    let edgeHoverOriginalNodeStyles = new Map();
-    
-    network.on('hoverEdge', function(params) {
+          let edgeHoverOriginalNodeStyles = new Map();
+      
+      network.on('hoverEdge', function(params) {
         const edgeId = params.edge;
         const edge = network.body.data.edges.get(edgeId);
-        if (edge && edge.title) {
-            const highlightNodeIds = [];
+        console.log('🎯 [hoverEdge 시작] edgeId:', edgeId, 'Map 크기:', edgeHoverOriginalNodeStyles.size, edgeHoverOriginalEdgeStyles.size);
+          if (edge && edge.title) {
+              const highlightNodeIds = [];
             const dimNodeIds = [];
             const nodeUpdateArray = [];
             
@@ -10327,26 +10360,44 @@ function renderCommonValuesNetworkGraph() {
             
             // 점선 엣지인지 확인 (같은 과목분류 연결)
             if (edge.dashes === true) {
+                console.log('점선 엣지 호버 감지:', edge.title);
                 // 점선 엣지: 과목분류 기반 하이라이트
-                // title에서 과목분류 추출 (예: "설계 - VALUE1 to VALUE2")
+                // title에서 과목분류 추출 (예: "설계 - VALUE1 to VALUE2" 또는 단순히 "설계")
+                let subjectType;
                 const subjectTypeMatch = edge.title.match(/^([^\-]+)\s*-/);
                 if (subjectTypeMatch) {
-                    const subjectType = subjectTypeMatch[1].trim();
+                    subjectType = subjectTypeMatch[1].trim();
+                    console.log('과목분류 추출 (하이픈 형태):', subjectType);
+                } else {
+                    // 하이픈이 없으면 전체 title을 과목분류로 사용
+                    subjectType = edge.title.trim();
+                    console.log('과목분류 추출 (단순 형태):', subjectType);
+                }
+                
+                if (subjectType) {
                     
                     // 같은 과목분류를 가진 모든 노드 찾기
-                    allCurrentNodes.forEach(currentNode => {
+                    console.log('전체 courses 배열:', courses.length, '개');
+                    console.log('전체 노드:', allCurrentNodes.length, '개');
+                    console.log('찾는 과목분류:', subjectType);
+            allCurrentNodes.forEach(currentNode => {
                         // 원래 스타일 저장 (처음 호버 시에만)
                         if (!edgeHoverOriginalNodeStyles.has(currentNode.id)) {
+                            console.log('💾 노드 원본 스타일 저장:', currentNode.id);
                             edgeHoverOriginalNodeStyles.set(currentNode.id, {
                                 opacity: currentNode.opacity || 1,
                                 font: { ...currentNode.font },
                                 color: currentNode.color ? { ...currentNode.color } : undefined,
                                 borderWidth: currentNode.borderWidth || 2
                             });
+                        } else {
+                            console.log('⏭️ 노드 원본 스타일 이미 저장됨:', currentNode.id);
                         }
                         
                         const course = courses.find(c => c.id === currentNode.id);
+                        console.log('노드ID:', currentNode.id, '→ course:', course ? course.subjectType : '없음');
                         if (course && course.subjectType === subjectType) {
+                            console.log('✅ 매칭된 노드:', currentNode.id, course.subjectType);
                             highlightNodeIds.push(currentNode.id);
                         } else {
                             dimNodeIds.push(currentNode.id);
@@ -10370,24 +10421,43 @@ function renderCommonValuesNetworkGraph() {
                         }
                     });
                     
-                    // 하이라이트할 노드들도 업데이트 배열에 추가 (색상 체계 유지)
+                    // 하이라이트할 노드들도 업데이트 배열에 추가 (교과목 테마 컬러로 하이라이트)
+                    console.log('하이라이트할 노드들:', highlightNodeIds.length, '개');
                     highlightNodeIds.forEach(nodeId => {
                         const currentNode = network.body.data.nodes.get(nodeId);
+                        console.log('하이라이트 노드 처리:', nodeId, currentNode ? '존재' : '없음');
+                        
+                        // 과목분류별 테마 색상 가져오기
+                                const subjectTypeColors = {
+                                    '설계': '#9e9e9e',
+                                    '디지털': '#a1887f',
+                                    '역사': '#d84315',
+                                    '이론': '#00897b',
+                                    '도시': '#c2185b',
+                                    '사회': '#5e35b1',
+                                    '기술': '#ef6c00',
+                                    '실무': '#43a047',
+                                    '비교과': '#757575'
+                                };
+                        
+                        const course = courses.find(c => c.id === nodeId);
+                        const themeColor = course && subjectTypeColors[course.subjectType] ? subjectTypeColors[course.subjectType] : '#2e7d32';
+                        
                         nodeUpdateArray.push({
                             id: nodeId,
                             opacity: 1,
-                            borderWidth: 3,
+                            borderWidth: 4, // 더 두꺼운 테두리
                             color: {
-                                background: currentNode.color ? currentNode.color.background : '#f8f9fa',
-                                border: currentNode.color ? currentNode.color.border : '#bdbdbd',
+                                background: themeColor, // 교과목 테마 컬러로 배경 변경
+                                border: themeColor, // 교과목 테마 컬러로 테두리 변경
                                 highlight: {
-                                    background: currentNode.color ? currentNode.color.background : '#f8f9fa',
-                                    border: currentNode.color ? currentNode.color.border : '#bdbdbd'
+                                    background: themeColor,
+                                    border: themeColor
                                 }
                             },
                             font: {
                                 ...currentNode.font,
-                                color: '#000000ff'
+                                color: '#ffffff' // 흰색 텍스트로 대비
                             }
                         });
                     });
@@ -10395,31 +10465,37 @@ function renderCommonValuesNetworkGraph() {
                     // 모든 엣지들 처리
                     const allEdges = network.body.data.edges.get();
                     const edgeUpdateArray = [];
+                    console.log('전체 엣지들:', allEdges.length, '개');
                     
                     allEdges.forEach(e => {
                         // 원래 스타일 저장 (처음 호버 시에만)
                         if (!edgeHoverOriginalEdgeStyles.has(e.id)) {
+                            console.log('💾 엣지 원본 스타일 저장:', e.id);
                             edgeHoverOriginalEdgeStyles.set(e.id, {
                                 color: e.color || { color: '#bdbdbd', highlight: '#bdbdbd' },
                                 width: e.width || 1,
                                 dashes: e.dashes || false
                             });
+                        } else {
+                            console.log('⏭️ 엣지 원본 스타일 이미 저장됨:', e.id);
                         }
                         
                         // 같은 과목분류의 점선 엣지인지 확인
+                        console.log('엣지 확인:', e.id, '점선:', e.dashes, 'title:', e.title);
                         if (e.dashes === true && e.title && e.title.includes(subjectType)) {
+                            console.log('✅ 매칭된 엣지:', e.id, e.title);
                             // 과목분류별 테마 색상 가져오기
-                            const subjectTypeColors = {
-                                '설계': '#9e9e9e',
-                                '디지털': '#a1887f',
-                                '역사': '#d84315',
-                                '이론': '#00897b',
-                                '도시': '#c2185b',
-                                '사회': '#5e35b1',
-                                '기술': '#ef6c00',
-                                '실무': '#43a047',
-                                '비교과': '#757575'
-                            };
+                                const subjectTypeColors = {
+                                    '설계': '#9e9e9e',
+                                    '디지털': '#a1887f',
+                                    '역사': '#d84315',
+                                    '이론': '#00897b',
+                                    '도시': '#c2185b',
+                                    '사회': '#5e35b1',
+                                    '기술': '#ef6c00',
+                                    '실무': '#43a047',
+                                    '비교과': '#757575'
+                                };
                             
                             const themeColor = subjectTypeColors[subjectType] || '#2e7d32';
                             
@@ -10436,6 +10512,7 @@ function renderCommonValuesNetworkGraph() {
                             });
                         } else {
                             // 다른 엣지들은 투명도 적용
+                            console.log('❌ 디밍 엣지:', e.id);
                             edgeUpdateArray.push({
                                 id: e.id,
                                 color: { 
@@ -10449,8 +10526,19 @@ function renderCommonValuesNetworkGraph() {
                     });
                     
                     // 배치로 업데이트
+                    console.log('엣지 업데이트 배열:', edgeUpdateArray.length, '개');
                     if (edgeUpdateArray.length > 0) {
+                        console.log('엣지 업데이트 적용 중...');
                         network.body.data.edges.update(edgeUpdateArray);
+                        console.log('엣지 업데이트 완료');
+                    }
+                    
+                    // 노드 업데이트 적용
+                    console.log('노드 업데이트 배열:', nodeUpdateArray.length, '개');
+                    if (nodeUpdateArray.length > 0) {
+                        console.log('노드 업데이트 적용:', nodeUpdateArray.length, '개 노드');
+                        network.body.data.nodes.update(nodeUpdateArray);
+                        console.log('노드 업데이트 완료');
                     }
                 }
             } else {
@@ -10459,47 +10547,28 @@ function renderCommonValuesNetworkGraph() {
                 
                 // 모든 노드의 원래 상태 저장 및 업데이트 준비
                 allCurrentNodes.forEach(currentNode => {
-                    // 원래 스타일 저장 (처음 호버 시에만)
-                    if (!edgeHoverOriginalNodeStyles.has(currentNode.id)) {
-                        edgeHoverOriginalNodeStyles.set(currentNode.id, {
-                            opacity: currentNode.opacity || 1,
-                            font: { ...currentNode.font },
-                            color: currentNode.color ? { ...currentNode.color } : undefined
-                        });
-                    }
-                    
-                    const course = courses.find(c => c.id === currentNode.id);
-                    if (course && course.yearSemester === yearSemester) {
-                        highlightNodeIds.push(currentNode.id);
-                    } else {
-                        dimNodeIds.push(currentNode.id);
-                        // 디밍할 노드 업데이트 배열에 추가
-                        nodeUpdateArray.push({
-                            id: currentNode.id,
-                            opacity: 0.3,  // 더 강한 투명도 적용
-                            font: { 
-                                ...currentNode.font,
-                                color: 'rgba(73, 80, 87, 0.3)'  // 폰트도 같은 투명도로
-                            },
-                            color: {
-                                background: currentNode.color ? currentNode.color.background : '#f8f9fa',
-                                border: currentNode.color ? currentNode.color.border : '#bdbdbd',
-                                highlight: {
-                                    background: currentNode.color ? currentNode.color.background : '#f8f9fa',
-                                    border: currentNode.color ? currentNode.color.border : '#bdbdbd'
-                                }
-                            }
-                        });
-                    }
-                });
+                // 원래 스타일 저장 (처음 호버 시에만)
+                if (!edgeHoverOriginalNodeStyles.has(currentNode.id)) {
+                    edgeHoverOriginalNodeStyles.set(currentNode.id, {
+                        opacity: currentNode.opacity || 1,
+                        font: { ...currentNode.font },
+                        color: currentNode.color ? { ...currentNode.color } : undefined
+                    });
+                }
                 
-                // 하이라이트할 노드들도 업데이트 배열에 추가 (색상 체계 유지)
-                highlightNodeIds.forEach(nodeId => {
-                    const currentNode = network.body.data.nodes.get(nodeId);
+                const course = courses.find(c => c.id === currentNode.id);
+                if (course && course.yearSemester === yearSemester) {
+                    highlightNodeIds.push(currentNode.id);
+                } else {
+                    dimNodeIds.push(currentNode.id);
+                    // 디밍할 노드 업데이트 배열에 추가
                     nodeUpdateArray.push({
-                        id: nodeId,
-                        opacity: 1,
-                        borderWidth: 3,
+                        id: currentNode.id,
+                        opacity: 0.3,  // 더 강한 투명도 적용
+                        font: { 
+                            ...currentNode.font,
+                            color: 'rgba(73, 80, 87, 0.3)'  // 폰트도 같은 투명도로
+                        },
                         color: {
                             background: currentNode.color ? currentNode.color.background : '#f8f9fa',
                             border: currentNode.color ? currentNode.color.border : '#bdbdbd',
@@ -10507,55 +10576,74 @@ function renderCommonValuesNetworkGraph() {
                                 background: currentNode.color ? currentNode.color.background : '#f8f9fa',
                                 border: currentNode.color ? currentNode.color.border : '#bdbdbd'
                             }
-                        },
-                        font: {
-                            ...currentNode.font,
-                            color: '#000000ff'
                         }
                     });
-                });
-                
-                // 모든 엣지들 처리
-                const allEdges = network.body.data.edges.get();
-                const edgeUpdateArray = [];
-                
-                allEdges.forEach(e => {
-                    // 원래 스타일 저장 (처음 호버 시에만)
-                    if (!edgeHoverOriginalEdgeStyles.has(e.id)) {
-                        edgeHoverOriginalEdgeStyles.set(e.id, {
-                            color: e.color || { color: '#bdbdbd', highlight: '#bdbdbd' },
-                            width: e.width || 1
-                        });
-                    }
-                    
-                    // 엣지의 title이 같은 yearSemester인지 확인
-                    if (e.title === yearSemester) {
-                        // 같은 학년학기의 모든 엣지는 검은색으로
-                        edgeUpdateArray.push({
-                            id: e.id,
-                            color: { 
-                                color: '#525252ff', 
-                                highlight: '#313131ff',
-                                hover: '#333333ff'
-                            },
-                            width: 3
-                        });
-                    } else {
-                        // 다른 엣지들은 투명도 적용
-                        edgeUpdateArray.push({
-                            id: e.id,
-                            color: { 
-                                color: 'rgba(189, 189, 189, 0.2)', 
-                                highlight: 'rgba(189, 189, 189, 0.2)',
-                                hover: 'rgba(189, 189, 189, 0.2)'
-                            },
-                            width: 1
-                        });
+                }
+            });
+            
+            // 하이라이트할 노드들도 업데이트 배열에 추가 (색상 체계 유지)
+            highlightNodeIds.forEach(nodeId => {
+                const currentNode = network.body.data.nodes.get(nodeId);
+                nodeUpdateArray.push({
+                    id: nodeId,
+                    opacity: 1,
+                    borderWidth: 3,
+                    color: {
+                        background: currentNode.color ? currentNode.color.background : '#f8f9fa',
+                            border: currentNode.color ? currentNode.color.border : '#bdbdbd',
+                        highlight: {
+                            background: currentNode.color ? currentNode.color.background : '#f8f9fa',
+                                border: currentNode.color ? currentNode.color.border : '#bdbdbd'
+                        }
+                    },
+                    font: {
+                        ...currentNode.font,
+                        color: '#000000ff'
                     }
                 });
+            });
+            
+            // 모든 엣지들 처리
+            const allEdges = network.body.data.edges.get();
+            const edgeUpdateArray = [];
+            
+            allEdges.forEach(e => {
+                // 원래 스타일 저장 (처음 호버 시에만)
+                if (!edgeHoverOriginalEdgeStyles.has(e.id)) {
+                    edgeHoverOriginalEdgeStyles.set(e.id, {
+                        color: e.color || { color: '#bdbdbd', highlight: '#bdbdbd' },
+                        width: e.width || 1
+                    });
+                }
                 
-                // 배치로 업데이트
-                network.body.data.edges.update(edgeUpdateArray);
+                // 엣지의 title이 같은 yearSemester인지 확인
+                if (e.title === yearSemester) {
+                    // 같은 학년학기의 모든 엣지는 검은색으로
+                    edgeUpdateArray.push({
+                        id: e.id,
+                        color: { 
+                            color: '#525252ff', 
+                            highlight: '#313131ff',
+                            hover: '#333333ff'
+                        },
+                        width: 3
+                    });
+                } else {
+                    // 다른 엣지들은 투명도 적용
+                    edgeUpdateArray.push({
+                        id: e.id,
+                        color: { 
+                            color: 'rgba(189, 189, 189, 0.2)', 
+                            highlight: 'rgba(189, 189, 189, 0.2)',
+                            hover: 'rgba(189, 189, 189, 0.2)'
+                        },
+                        width: 1
+                    });
+                }
+            });
+            
+            // 배치로 업데이트
+            network.body.data.edges.update(edgeUpdateArray);
             }
             
             // 모든 노드들 업데이트 (배치 처리)
@@ -10566,8 +10654,9 @@ function renderCommonValuesNetworkGraph() {
         document.body.style.cursor = 'pointer';
     });
 
-    network.on('blurEdge', function(params) {
-        network.unselectAll();
+          network.on('blurEdge', function(params) {
+          console.log('🔚 [blurEdge 시작] Map 크기:', edgeHoverOriginalNodeStyles.size, edgeHoverOriginalEdgeStyles.size);
+          network.unselectAll();
         
         // 모든 노드 원래 상태로 복원
         const nodeRestoreArray = [];
@@ -10619,6 +10708,7 @@ function renderCommonValuesNetworkGraph() {
         // 저장된 원래 스타일 초기화
         edgeHoverOriginalNodeStyles.clear();
         edgeHoverOriginalEdgeStyles.clear();
+        console.log('✅ [blurEdge 완료] Map 초기화 완료, 크기:', edgeHoverOriginalNodeStyles.size, edgeHoverOriginalEdgeStyles.size);
         document.body.style.cursor = 'default';
     });
     
@@ -11674,10 +11764,10 @@ function toggleColorModeCurriculum() {
         }
     } else {
         // 네트워크가 없으면 전체 그래프 재렌더링
-        if (typeof renderCommonValuesNetworkGraph === 'function') {
-            const commonValuesTab = document.getElementById('commonValues');
-            if (commonValuesTab && commonValuesTab.classList.contains('active')) {
-                renderCommonValuesNetworkGraph();
+    if (typeof renderCommonValuesNetworkGraph === 'function') {
+        const commonValuesTab = document.getElementById('commonValues');
+        if (commonValuesTab && commonValuesTab.classList.contains('active')) {
+            renderCommonValuesNetworkGraph();
             }
         }
     }
