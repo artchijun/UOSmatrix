@@ -7884,6 +7884,121 @@ function renderCommonValuesNetworkGraph() {
         directionalForceActive = false;
     }
     
+    // 🌟 스플라인 클릭 시 물리 효과 트리거 함수
+    function triggerSplinePhysicsEffect(groupKey, clickPosition) {
+        console.log(`🎆 스플라인 물리 효과 시작: ${groupKey}`, clickPosition);
+        
+        // 클릭된 그룹의 노드들 찾기
+        const groupNodeIds = valueCourseIds[groupKey];
+        if (!groupNodeIds || groupNodeIds.length === 0) return;
+        
+        // 1. 폭발 효과: 클릭 지점에서 노드들을 밀어냄
+        const explosionForce = 15; // 폭발력
+        const explosionDuration = 500; // 0.5초
+        
+        groupNodeIds.forEach(nodeId => {
+            const body = network.body.nodes[nodeId];
+            if (!body || !body.options.physics) return;
+            
+            const nodePos = network.getPosition(nodeId);
+            const dx = nodePos.x - clickPosition.x;
+            const dy = nodePos.y - clickPosition.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance > 0) {
+                const normalizedX = dx / distance;
+                const normalizedY = dy / distance;
+                
+                // 거리에 반비례하는 힘 (가까운 노드일수록 더 강한 힘)
+                const forceStrength = explosionForce / (distance * 0.01 + 1);
+                
+                // 즉시 속도 변경으로 폭발 효과
+                body.vx += normalizedX * forceStrength;
+                body.vy += normalizedY * forceStrength;
+            }
+        });
+        
+        // 2. 진동 효과: 그룹 전체에 파동 효과
+        let wavePhase = 0;
+        const waveInterval = setInterval(() => {
+            groupNodeIds.forEach((nodeId, index) => {
+                const body = network.body.nodes[nodeId];
+                if (!body || !body.options.physics) return;
+                
+                // 사인파를 이용한 진동 효과
+                const waveForce = 3 * Math.sin(wavePhase + index * 0.5);
+                body.vx += waveForce * Math.cos(wavePhase);
+                body.vy += waveForce * Math.sin(wavePhase);
+            });
+            
+            wavePhase += 0.3;
+            
+            // 물리 시뮬레이션 강제 시작
+            network.startSimulation();
+        }, 50);
+        
+        // 3. 자기장 효과: 그룹 노드들을 원형으로 정렬하려는 힘
+        const magneticInterval = setInterval(() => {
+            const centerPos = calculateGroupCenter(groupNodeIds);
+            const targetRadius = 120; // 목표 반지름
+            
+            groupNodeIds.forEach((nodeId, index) => {
+                const body = network.body.nodes[nodeId];
+                if (!body || !body.options.physics) return;
+                
+                const nodePos = network.getPosition(nodeId);
+                const dx = nodePos.x - centerPos.x;
+                const dy = nodePos.y - centerPos.y;
+                const currentRadius = Math.sqrt(dx * dx + dy * dy);
+                
+                // 목표 반지름으로 이동시키는 힘
+                if (currentRadius > 0) {
+                    const targetX = centerPos.x + (dx / currentRadius) * targetRadius;
+                    const targetY = centerPos.y + (dy / currentRadius) * targetRadius;
+                    
+                    const attractX = (targetX - nodePos.x) * 0.02;
+                    const attractY = (targetY - nodePos.y) * 0.02;
+                    
+                    body.vx += attractX;
+                    body.vy += attractY;
+                }
+                
+                // 원형 궤도 움직임 추가
+                const orbitalForce = 1;
+                body.vx += -dy * orbitalForce * 0.001;
+                body.vy += dx * orbitalForce * 0.001;
+            });
+            
+            network.startSimulation();
+        }, 30);
+        
+        // 효과 정리
+        setTimeout(() => {
+            clearInterval(waveInterval);
+            clearInterval(magneticInterval);
+            console.log('🎆 스플라인 물리 효과 종료');
+        }, explosionDuration);
+    }
+    
+    // 그룹 중심점 계산 헬퍼 함수
+    function calculateGroupCenter(nodeIds) {
+        let sumX = 0, sumY = 0;
+        let validNodes = 0;
+        
+        nodeIds.forEach(nodeId => {
+            const pos = network.getPosition(nodeId);
+            if (pos) {
+                sumX += pos.x;
+                sumY += pos.y;
+                validNodes++;
+            }
+        });
+        
+        return validNodes > 0 ? 
+            { x: sumX / validNodes, y: sumY / validNodes } : 
+            { x: 0, y: 0 };
+    }
+    
     // Start the directional force system immediately after network creation
             startDirectionalForceSystem();
     
@@ -9593,6 +9708,10 @@ function renderCommonValuesNetworkGraph() {
             if (clickedBlob) {
                 // 같은 그룹 클릭 시 선택해제, 다른 그룹 클릭 시 선택 변경
                 window.selectedCommonValuesBlob = window.selectedCommonValuesBlob === clickedBlob ? null : clickedBlob;
+                
+                // 🌟 그룹스플라인 클릭 시 새로운 물리효과 작동
+                triggerSplinePhysicsEffect(clickedBlob, canvasPosition);
+                
                 updateNodeHighlight();
                 network.redraw();
             } else {
