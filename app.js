@@ -11,6 +11,33 @@ const firebaseConfig = {
     appId: "1:208876542369:web:a50a4d20468bfb4c8b13e0"
 };
 
+// 🔧 vis-network 폰트 호환성을 위한 전역 안전 함수
+window.sanitizeVisNetworkFont = function(fontObj) {
+    // 기본 vis-network 호환 폰트 속성
+    const defaultFont = {
+        color: '#343a40',
+        size: 14,
+        face: 'arial',
+        background: 'none',
+        strokeWidth: 0,
+        strokeColor: '#ffffff'
+    };
+    
+    if (!fontObj || typeof fontObj !== 'object') {
+        return { ...defaultFont };
+    }
+    
+    // vis-network이 요구하는 모든 속성을 명시적으로 설정
+    return {
+        color: (fontObj.color && typeof fontObj.color === 'string') ? fontObj.color : defaultFont.color,
+        size: (fontObj.size && typeof fontObj.size === 'number' && fontObj.size > 0) ? fontObj.size : defaultFont.size,
+        face: (fontObj.face && typeof fontObj.face === 'string') ? fontObj.face : defaultFont.face,
+        background: (fontObj.background && typeof fontObj.background === 'string') ? fontObj.background : defaultFont.background,
+        strokeWidth: (fontObj.strokeWidth && typeof fontObj.strokeWidth === 'number') ? fontObj.strokeWidth : defaultFont.strokeWidth,
+        strokeColor: (fontObj.strokeColor && typeof fontObj.strokeColor === 'string') ? fontObj.strokeColor : defaultFont.strokeColor
+    };
+};
+
 // Firebase 초기화
 let db;
 let firebaseInitialized = false;
@@ -7685,6 +7712,47 @@ function renderCommonValuesNetworkGraph() {
             }
         }
     });
+    
+    // 추가: 비교과 노드들 사이의 분야연결엣지 (점선) 생성
+    const extracurricularGroups = {};
+    nodes.forEach(n => {
+        if (n.isExtracurricular && n.group) {
+            if (!extracurricularGroups[n.group]) extracurricularGroups[n.group] = [];
+            extracurricularGroups[n.group].push(n.id);
+        }
+    });
+    
+    // 비교과 노드들을 서로 다른 그룹끼리 점선으로 연결
+    const extracurricularGroupKeys = Object.keys(extracurricularGroups);
+    if (extracurricularGroupKeys.length > 1) {
+        for (let i = 0; i < extracurricularGroupKeys.length; i++) {
+            for (let j = i + 1; j < extracurricularGroupKeys.length; j++) {
+                const group1 = extracurricularGroupKeys[i];
+                const group2 = extracurricularGroupKeys[j];
+                const group1Nodes = extracurricularGroups[group1];
+                const group2Nodes = extracurricularGroups[group2];
+                
+                // 각 그룹의 노드들을 서로 연결
+                group1Nodes.forEach(nodeId1 => {
+                    group2Nodes.forEach(nodeId2 => {
+                        edges.push({
+                            from: nodeId1,
+                            to: nodeId2,
+                            dashes: true,  // 점선
+                            width: 1.5,
+                            color: { color: '#9e9e9e', opacity: 0.5 },
+                            title: `비교과 연결 (${group1} ↔ ${group2})`,
+                            arrows: { 
+                                to: { enabled: true, scaleFactor: 0.35 },
+                                from: { enabled: true, scaleFactor: 0.35 }
+                            },
+                            smooth: { type: 'curvedCW', roundness: 0.3 }
+                        });
+                    });
+                });
+            }
+        }
+    }
 
     // 네트워크 옵션 (vis-network 기본 스타일 완전 제어)
     const options = {
@@ -7872,15 +7940,14 @@ function renderCommonValuesNetworkGraph() {
         const baseBorderWidth = 1;
         const adjustedBorderWidth = baseBorderWidth + valueGroupCount;
 
-        n.font = {
+        // 🔧 vis-network 호환성을 위한 안전한 font 속성 설정
+        n.font = window.sanitizeVisNetworkFont({
             size: adjustedFontSize,
             color: '#495057',
             face: 'Noto Sans KR, Arial, sans-serif',
-            weight: '700',
-            bold: true,
             strokeWidth: 1,
             strokeColor: '#495057'
-        };
+        });
         n.borderWidth = adjustedBorderWidth;
         n.shapeProperties = {
             borderRadius: 12
@@ -10749,8 +10816,16 @@ function renderCommonValuesNetworkGraph() {
         // 스플라인 선택 상태와 테이블 헤더 동기화
         syncSplineWithTableHeaders();
         
-        // 먼저 모든 선택 해제
-        window.network.unselectAll();
+        // 🔧 vis-network 호환성을 위한 안전한 선택 해제
+        try {
+            window.network.unselectAll();
+        } catch (error) {
+            console.warn('unselectAll 호출 중 오류 발생:', error);
+            // 대안: 직접 선택된 노드 목록 초기화
+            if (window.network && window.network.body && window.network.body.selectionHandler) {
+                window.network.body.selectionHandler.unselectAll();
+            }
+        }
         
         const nodeUpdate = [];
         // 현재 네트워크의 실제 노드 데이터를 가져옵니다
@@ -10891,9 +10966,14 @@ function renderCommonValuesNetworkGraph() {
                 };
                 updatedNode.borderWidth = 3; // 선택된 노드는 테두리 두껍게
                 updatedNode.opacity = 1;
+                // 🚨 vis-network 호환성을 위한 안전한 font 속성 설정
                 updatedNode.font = {
-                    ...currentNode.font,
-                    color: '#020202ff'
+                    color: '#020202ff',
+                    size: (currentNode.font && currentNode.font.size) || 14,
+                    face: (currentNode.font && currentNode.font.face) || 'arial',
+                    background: (currentNode.font && currentNode.font.background) || 'none',
+                    strokeWidth: (currentNode.font && currentNode.font.strokeWidth) || 0,
+                    strokeColor: (currentNode.font && currentNode.font.strokeColor) || '#ffffff'
                 };
             } else {
                 // 선택되지 않은 노드는 원래 스타일로 복원
@@ -10949,16 +11029,26 @@ function renderCommonValuesNetworkGraph() {
                 // 선택 해제 시 투명도도 복원
                 if (!window.selectedCommonValuesBlob) {
                     updatedNode.opacity = 1;
+                    // 🚨 vis-network 호환성을 위한 안전한 font 속성 설정
                     updatedNode.font = {
-                        ...currentNode.font,
-                        color: '#495057'
+                        color: '#495057',
+                        size: (currentNode.font && currentNode.font.size) || 14,
+                        face: (currentNode.font && currentNode.font.face) || 'arial',
+                        background: (currentNode.font && currentNode.font.background) || 'none',
+                        strokeWidth: (currentNode.font && currentNode.font.strokeWidth) || 0,
+                        strokeColor: (currentNode.font && currentNode.font.strokeColor) || '#ffffff'
                     };
                 } else {
                     // 선택 중일 때는 투명하게
                     updatedNode.opacity = 0.3;
+                    // 🚨 vis-network 호환성을 위한 안전한 font 속성 설정
                     updatedNode.font = {
-                        ...currentNode.font,
-                        color: 'rgba(73, 80, 87, 0.3)'
+                        color: 'rgba(73, 80, 87, 0.3)',
+                        size: (currentNode.font && currentNode.font.size) || 14,
+                        face: (currentNode.font && currentNode.font.face) || 'arial',
+                        background: (currentNode.font && currentNode.font.background) || 'none',
+                        strokeWidth: (currentNode.font && currentNode.font.strokeWidth) || 0,
+                        strokeColor: (currentNode.font && currentNode.font.strokeColor) || '#ffffff'
                     };
                 }
             }
@@ -11003,6 +11093,8 @@ function renderCommonValuesNetworkGraph() {
             '비교과': '#8bc34a'
         };
         
+        // 🔧 전역 sanitizeVisNetworkFont 함수 사용
+        
         // 노드 업데이트 배열
         const nodeUpdateArray = [];
         
@@ -11011,7 +11103,7 @@ function renderCommonValuesNetworkGraph() {
             if (!nodeHoverOriginalStyles.has(node.id)) {
                 nodeHoverOriginalStyles.set(node.id, {
                     opacity: node.opacity || 1,
-                    font: { ...node.font },
+                    font: window.sanitizeVisNetworkFont(node.font),
                     color: node.color ? { ...node.color } : undefined,
                     borderWidth: node.borderWidth || 2
                 });
@@ -11045,10 +11137,10 @@ function renderCommonValuesNetworkGraph() {
                             border: borderColor
                         }
                     },
-                    font: {
-                        ...node.font,
+                    font: window.sanitizeVisNetworkFont({
+                        ...window.sanitizeVisNetworkFont(node.font),
                         color: fontColor // 🔧 과목분류색으로 변경
-                    }
+                    })
                 });
             } else {
                 // 나머지 노드 - 흐리게 (배경색은 유지, 투명도만 조정)
@@ -11063,10 +11155,10 @@ function renderCommonValuesNetworkGraph() {
                             border: node.color ? node.color.border : '#bdbdbd'
                         }
                     },
-                    font: {
-                        ...node.font,
+                    font: window.sanitizeVisNetworkFont({
+                        ...window.sanitizeVisNetworkFont(node.font),
                         color: 'rgba(73, 80, 87, 0.2)'  // 폰트도 더 흐리게
-                    }
+                    })
                 });
             }
         });
@@ -11117,12 +11209,31 @@ function renderCommonValuesNetworkGraph() {
             }
         });
         
-        // 업데이트 적용
+        // 🔧 vis-network 호환성을 위한 안전한 업데이트 적용
         if (nodeUpdateArray.length > 0) {
-            network.body.data.nodes.update(nodeUpdateArray);
+            try {
+                network.body.data.nodes.update(nodeUpdateArray);
+            } catch (error) {
+                console.warn('노드 업데이트 중 오류 발생:', error);
+                // 개별적으로 업데이트 시도
+                nodeUpdateArray.forEach(nodeUpdate => {
+                    try {
+                        if (nodeUpdate.font) {
+                            nodeUpdate.font = window.sanitizeVisNetworkFont(nodeUpdate.font);
+                        }
+                        network.body.data.nodes.update([nodeUpdate]);
+                    } catch (e) {
+                        console.warn(`노드 ${nodeUpdate.id} 업데이트 실패:`, e);
+                    }
+                });
+            }
         }
         if (edgeUpdateArray.length > 0) {
-            network.body.data.edges.update(edgeUpdateArray);
+            try {
+                network.body.data.edges.update(edgeUpdateArray);
+            } catch (error) {
+                console.warn('엣지 업데이트 중 오류 발생:', error);
+            }
         }
         
         document.body.style.cursor = 'pointer';
@@ -11212,7 +11323,22 @@ function renderCommonValuesNetworkGraph() {
                         if (!edgeHoverOriginalNodeStyles.has(currentNode.id)) {
                             edgeHoverOriginalNodeStyles.set(currentNode.id, {
                                 opacity: currentNode.opacity || 1,
-                                font: { ...currentNode.font },
+                                // 🚨 vis-network 호환성을 위한 안전한 font 속성 복사
+                        font: currentNode.font ? {
+                            color: currentNode.font.color || '#495057',
+                            size: currentNode.font.size || 14,
+                            face: currentNode.font.face || 'arial',
+                            background: currentNode.font.background || 'none',
+                            strokeWidth: currentNode.font.strokeWidth || 0,
+                            strokeColor: currentNode.font.strokeColor || '#ffffff'
+                        } : {
+                            color: '#495057',
+                            size: 14,
+                            face: 'arial',
+                            background: 'none',
+                            strokeWidth: 0,
+                            strokeColor: '#ffffff'
+                        },
                                 color: currentNode.color ? { ...currentNode.color } : undefined,
                                 borderWidth: currentNode.borderWidth || 2
                             });
@@ -11228,9 +11354,14 @@ function renderCommonValuesNetworkGraph() {
                             nodeUpdateArray.push({
                                 id: currentNode.id,
                                 opacity: 0.3,  // 더 강한 투명도 적용
-                                font: { 
-                                    ...currentNode.font,
-                                    color: 'rgba(73, 80, 87, 0.3)'  // 폰트도 같은 투명도로
+                                // 🚨 vis-network 호환성을 위한 안전한 font 속성 설정
+                                font: {
+                                    color: 'rgba(73, 80, 87, 0.3)',
+                                    size: (currentNode.font && currentNode.font.size) || 14,
+                                    face: (currentNode.font && currentNode.font.face) || 'arial',
+                                    background: (currentNode.font && currentNode.font.background) || 'none',
+                                    strokeWidth: (currentNode.font && currentNode.font.strokeWidth) || 0,
+                                    strokeColor: (currentNode.font && currentNode.font.strokeColor) || '#ffffff'
                                 },
                                 color: {
                                     background: currentNode.color ? currentNode.color.background : '#f8f9fa',
@@ -11276,9 +11407,14 @@ function renderCommonValuesNetworkGraph() {
                                     border: themeColor
                                 }
                             },
+                            // 🚨 vis-network 호환성을 위한 안전한 font 속성 설정
                             font: {
-                                ...currentNode.font,
-                                color: '#ffffff' // 흰색 텍스트로 대비
+                                color: '#ffffff',
+                                size: (currentNode.font && currentNode.font.size) || 14,
+                                face: (currentNode.font && currentNode.font.face) || 'arial',
+                                background: (currentNode.font && currentNode.font.background) || 'none',
+                                strokeWidth: (currentNode.font && currentNode.font.strokeWidth) || 0,
+                                strokeColor: (currentNode.font && currentNode.font.strokeColor) || '#ffffff'
                             }
                         });
                     });
@@ -11340,14 +11476,33 @@ function renderCommonValuesNetworkGraph() {
                         }
                     });
                     
-                    // 배치로 업데이트
+                    // 🔧 안전한 배치 업데이트
                     if (edgeUpdateArray.length > 0) {
-                        network.body.data.edges.update(edgeUpdateArray);
+                        try {
+                            network.body.data.edges.update(edgeUpdateArray);
+                        } catch (error) {
+                            console.warn('엣지 배치 업데이트 중 오류:', error);
+                        }
                     }
                     
                     // 노드 업데이트 적용
                     if (nodeUpdateArray.length > 0) {
-                        network.body.data.nodes.update(nodeUpdateArray);
+                        try {
+                            network.body.data.nodes.update(nodeUpdateArray);
+                        } catch (error) {
+                            console.warn('노드 배치 업데이트 중 오류:', error);
+                            // 개별 업데이트 시도
+                            nodeUpdateArray.forEach(nodeUpdate => {
+                                try {
+                                    if (nodeUpdate.font) {
+                                        nodeUpdate.font = window.sanitizeVisNetworkFont(nodeUpdate.font);
+                                    }
+                                    network.body.data.nodes.update([nodeUpdate]);
+                                } catch (e) {
+                                    console.warn(`노드 ${nodeUpdate.id} 배치 업데이트 실패:`, e);
+                                }
+                            });
+                        }
                     }
                 }
             } else {
@@ -11360,7 +11515,22 @@ function renderCommonValuesNetworkGraph() {
                 if (!edgeHoverOriginalNodeStyles.has(currentNode.id)) {
                     edgeHoverOriginalNodeStyles.set(currentNode.id, {
                         opacity: currentNode.opacity || 1,
-                        font: { ...currentNode.font },
+                        // 🚨 vis-network 호환성을 위한 안전한 font 속성 복사
+                        font: currentNode.font ? {
+                            color: currentNode.font.color || '#495057',
+                            size: currentNode.font.size || 14,
+                            face: currentNode.font.face || 'arial',
+                            background: currentNode.font.background || 'none',
+                            strokeWidth: currentNode.font.strokeWidth || 0,
+                            strokeColor: currentNode.font.strokeColor || '#ffffff'
+                        } : {
+                            color: '#495057',
+                            size: 14,
+                            face: 'arial',
+                            background: 'none',
+                            strokeWidth: 0,
+                            strokeColor: '#ffffff'
+                        },
                         color: currentNode.color ? { ...currentNode.color } : undefined
                     });
                 }
@@ -11374,9 +11544,14 @@ function renderCommonValuesNetworkGraph() {
                     nodeUpdateArray.push({
                         id: currentNode.id,
                         opacity: 0.3,  // 더 강한 투명도 적용
-                        font: { 
-                            ...currentNode.font,
-                            color: 'rgba(73, 80, 87, 0.3)'  // 폰트도 같은 투명도로
+                        // 🚨 vis-network 호환성을 위한 안전한 font 속성 설정
+                        font: {
+                            color: 'rgba(73, 80, 87, 0.3)',
+                            size: (currentNode.font && currentNode.font.size) || 14,
+                            face: (currentNode.font && currentNode.font.face) || 'arial',
+                            background: (currentNode.font && currentNode.font.background) || 'none',
+                            strokeWidth: (currentNode.font && currentNode.font.strokeWidth) || 0,
+                            strokeColor: (currentNode.font && currentNode.font.strokeColor) || '#ffffff'
                         },
                         color: {
                             background: currentNode.color ? currentNode.color.background : '#f8f9fa',
@@ -11405,9 +11580,14 @@ function renderCommonValuesNetworkGraph() {
                                 border: currentNode.color ? currentNode.color.border : '#bdbdbd'
                         }
                     },
+                    // 🚨 vis-network 호환성을 위한 안전한 font 속성 설정
                     font: {
-                        ...currentNode.font,
-                        color: '#000000ff'
+                        color: '#000000ff',
+                        size: (currentNode.font && currentNode.font.size) || 14,
+                        face: (currentNode.font && currentNode.font.face) || 'arial',
+                        background: (currentNode.font && currentNode.font.background) || 'none',
+                        strokeWidth: (currentNode.font && currentNode.font.strokeWidth) || 0,
+                        strokeColor: (currentNode.font && currentNode.font.strokeColor) || '#ffffff'
                     }
                 });
             });
