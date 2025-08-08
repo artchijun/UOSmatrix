@@ -6984,9 +6984,8 @@ function drawArrowBetweenCells(svgContainer, fromCell, toCell, index, moveInfo) 
     animate.setAttribute('repeatCount', 'indefinite');
     path.appendChild(animate);
     
-
-    
-    svgContainer.appendChild(arrowHead);
+    // SVG 컨테이너에 패스 추가
+    svgContainer.appendChild(path);
 }
 
 // 윈도우 리사이즈 시 화살표 다시 그리기
@@ -7309,14 +7308,25 @@ function renderCommonValuesNetworkGraph() {
                 // 비교과 블럭 처리
                 if (id.startsWith('extracurricular-')) {
                     const name = window.extracurricularNameMap ? window.extracurricularNameMap[id] : id.replace('extracurricular-', '');
+                    const { subjectTypeColors, categoryColors } = generateColorLegend();
+                    
+                    let nodeColor = {};
+                    if (colorModeBySubjectType) {
+                        nodeColor.background = subjectTypeColors['비교과'] || '#f1f8e9';
+                        nodeColor.border = '#757575';
+                    } else {
+                        nodeColor.background = categoryColors['기타'] || '#f3e5f5';
+                        nodeColor.border = '#7b1fa2';
+                    }
+                    
                     nodes.push({
                         id: id,
                         label: name,
                         group: key,
                         shape: 'box',
                         color: {
-                            background: '#f1f8e9', // 비교과 블럭과 동일한 색상
-                            border: '#bdbdbd' // 다른 노드들과 동일한 회색 테두리
+                            background: nodeColor.background,
+                            border: nodeColor.border
                         },
                         fixed: false,
                         isExtracurricular: true // 비교과 노드 표시
@@ -7330,33 +7340,37 @@ function renderCommonValuesNetworkGraph() {
                     }
                     if (course) {
                     let nodeColor = {};
+                    const { subjectTypeColors, categoryColors } = generateColorLegend();
+                    
                     if (colorModeBySubjectType) {
-                        const typeClass = getSubjectTypeClass(course.subjectType);
-                        nodeColor.background = {
-                            'type-design': '#e8e8e8',
-                            'type-digital': '#f5f2e5',
-                            'type-history': '#ffece1',
-                            'type-theory': '#e0f2f1',
-                            'type-urban': '#fce4ec',
-                            'type-social': '#e8eaf6',
-                            'type-tech': '#fff3e0',
-                            'type-practice': '#e8f5e8',
-                            'type-extracurricular': '#f1f8e9',
-                            'type-unclassified': '#f6f6f6',
-                            'type-default': '#f5f5f5'
-                        }[typeClass] || '#f5f5f5';
-                        nodeColor.border = '#bdbdbd';
+                        // 과목분류별 색상
+                        nodeColor.background = subjectTypeColors[course.subjectType] || '#f5f5f5';
+                        // 테두리는 배경색보다 진한 색으로
+                        const borderColors = {
+                            '설계': '#9e9e9e',
+                            '디지털': '#a1887f',
+                            '역사': '#d84315',
+                            '이론': '#00897b',
+                            '도시': '#c2185b',
+                            '사회': '#5e35b1',
+                            '기술': '#ef6c00',
+                            '실무': '#43a047',
+                            '비교과': '#757575'
+                        };
+                        nodeColor.border = borderColors[course.subjectType] || '#757575';
                     } else {
-                        const catClass = getCategoryClass(course.category);
-                        nodeColor.background = {
-                            'category-liberal': '#e9ecef',
-                            'category-thinking': '#e3f2fd',
-                            'category-design': '#ffebee',
-                            'category-tech': '#fff3e0',
-                            'category-practice': '#e8f5e8',
-                            'category-etc': '#f3e5f5'
-                        }[catClass] || '#f8f9fa';
-                        nodeColor.border = '#adb5bd';
+                        // 구분별 색상
+                        nodeColor.background = categoryColors[course.category] || '#f8f9fa';
+                        // 테두리는 배경색보다 진한 색으로
+                        const borderColors = {
+                            '교양': '#6c757d',
+                            '건축적사고': '#1976d2',
+                            '설계': '#c62828',
+                            '기술': '#f57c00',
+                            '실무': '#388e3c',
+                            '기타': '#7b1fa2'
+                        };
+                        nodeColor.border = borderColors[course.category] || '#6c757d';
                     }
                     // 그룹 라벨 위치 기준으로 노드 초기 위치 배치 (라벨 아래쪽, x축으로 분산)
                     let initX = undefined, initY = undefined;
@@ -7418,13 +7432,14 @@ function renderCommonValuesNetworkGraph() {
             extracurricularTexts[key].forEach((text, idx) => {
                 const nodeId = `extracurricular-${key}-${idx}`;
                 if (!nodeIdSet.has(nodeId)) {
+                    const { subjectTypeColors, categoryColors } = generateColorLegend();
                     let nodeColor = {};
                     if (colorModeBySubjectType) {
-                        nodeColor.background = '#f1f8e9'; // type-extracurricular color
-                        nodeColor.border = '#bdbdbd';
+                        nodeColor.background = subjectTypeColors['비교과'] || '#f1f8e9';
+                        nodeColor.border = '#757575';
                     } else {
-                        nodeColor.background = '#f3e5f5'; // category-etc color
-                        nodeColor.border = '#adb5bd';
+                        nodeColor.background = categoryColors['기타'] || '#f3e5f5';
+                        nodeColor.border = '#7b1fa2';
                     }
                     
                     // 그룹 라벨 위치 기준으로 노드 초기 위치 배치
@@ -7442,8 +7457,8 @@ function renderCommonValuesNetworkGraph() {
                         group: key,
                         shape: 'box',
                         color: {
-                            background: '#f1f8e9', // 비교과 블럭과 동일한 색상
-                            border: '#bdbdbd' // 다른 노드들과 동일한 회색 테두리
+                            background: nodeColor.background,
+                            border: nodeColor.border
                         },
                         x: initX,
                         y: initY,
@@ -7460,13 +7475,14 @@ function renderCommonValuesNetworkGraph() {
             extracurricularBlocks[key].forEach((name, idx) => {
                 const nodeId = `extracurricular-block-${key}-${idx}`;
                 if (!nodeIdSet.has(nodeId)) {
+                    const { subjectTypeColors, categoryColors } = generateColorLegend();
                     let nodeColor = {};
                     if (colorModeBySubjectType) {
-                        nodeColor.background = '#f1f8e9'; // type-extracurricular color
-                        nodeColor.border = '#bdbdbd';
+                        nodeColor.background = subjectTypeColors['비교과'] || '#f1f8e9';
+                        nodeColor.border = '#757575';
                     } else {
-                        nodeColor.background = '#f3e5f5'; // category-etc color
-                        nodeColor.border = '#adb5bd';
+                        nodeColor.background = categoryColors['기타'] || '#f3e5f5';
+                        nodeColor.border = '#7b1fa2';
                     }
                     
                     // 그룹 라벨 위치 기준으로 노드 초기 위치 배치
@@ -7485,8 +7501,8 @@ function renderCommonValuesNetworkGraph() {
                         group: key,
                         shape: 'box',
                         color: {
-                            background: '#f1f8e9', // 비교과 블럭과 동일한 색상
-                            border: '#bdbdbd' // 다른 노드들과 동일한 회색 테두리
+                            background: nodeColor.background,
+                            border: nodeColor.border
                         },
                         x: initX,
                         y: initY,
@@ -7505,13 +7521,14 @@ function renderCommonValuesNetworkGraph() {
         extracurricularMergedTexts.forEach((text, idx) => {
             const nodeId = `extracurricular-merged-${idx}`;
             if (!nodeIdSet.has(nodeId)) {
+                const { subjectTypeColors, categoryColors } = generateColorLegend();
                 let nodeColor = {};
                 if (colorModeBySubjectType) {
-                    nodeColor.background = '#f1f8e9'; // type-extracurricular color
-                    nodeColor.border = '#bdbdbd';
+                    nodeColor.background = subjectTypeColors['비교과'] || '#f1f8e9';
+                    nodeColor.border = '#757575';
                 } else {
-                    nodeColor.background = '#f3e5f5'; // category-etc color
-                    nodeColor.border = '#adb5bd';
+                    nodeColor.background = categoryColors['기타'] || '#f3e5f5';
+                    nodeColor.border = '#7b1fa2';
                 }
                 
                 nodes.push({
@@ -7564,23 +7581,49 @@ function renderCommonValuesNetworkGraph() {
         }
     });
 
-    // // 추가: 같은 분야(subjectType)에 있는 노드들도 모두 연결
-    // const subjectTypeGroups = {};
-    // nodes.forEach(n => {
-    //     const course = nodeCourseMap[n.id];
-    //     if (course && course.subjectType) {
-    //         if (!subjectTypeGroups[course.subjectType]) subjectTypeGroups[course.subjectType] = [];
-    //         subjectTypeGroups[course.subjectType].push(n.id);
-    //     }
-    // });
-    // Object.values(subjectTypeGroups).forEach(groupIds => {
-    //     for (let i = 0; i < groupIds.length; i++) {
-    //         for (let j = i + 1; j < groupIds.length; j++) {
-    //             edges.push({ from: groupIds[i], to: groupIds[j] });
-    //             edges.push({ from: groupIds[j], to: groupIds[i] });
-    //         }
-    //     }
-    // });
+    // 추가: 같은 과목분류를 가지지만 다른 value 그룹에 속한 노드들을 점선으로 연결
+    const subjectTypeGroups = {};
+    nodes.forEach(n => {
+        const course = nodeCourseMap[n.id];
+        if (course && course.subjectType) {
+            if (!subjectTypeGroups[course.subjectType]) subjectTypeGroups[course.subjectType] = [];
+            subjectTypeGroups[course.subjectType].push(n.id);
+        }
+    });
+    
+    // 각 과목분류 그룹 내에서 다른 value 그룹에 속한 노드들만 연결
+    Object.entries(subjectTypeGroups).forEach(([subjectType, nodeIds]) => {
+        if (nodeIds.length > 1) {
+            for (let i = 0; i < nodeIds.length; i++) {
+                for (let j = i + 1; j < nodeIds.length; j++) {
+                    const nodeId1 = nodeIds[i];
+                    const nodeId2 = nodeIds[j];
+                    
+                    // 각 노드가 속한 value 그룹 찾기
+                    let node1ValueGroup = null;
+                    let node2ValueGroup = null;
+                    
+                    for (const [valueKey, valueNodeIds] of Object.entries(valueCourseIds)) {
+                        if (valueNodeIds.includes(nodeId1)) node1ValueGroup = valueKey;
+                        if (valueNodeIds.includes(nodeId2)) node2ValueGroup = valueKey;
+                    }
+                    
+                    // 다른 value 그룹에 속한 경우에만 점선으로 연결
+                    if (node1ValueGroup && node2ValueGroup && node1ValueGroup !== node2ValueGroup) {
+                        edges.push({
+                            from: nodeId1,
+                            to: nodeId2,
+                            dashes: true,  // 점선
+                            width: 1.5,
+                            color: { color: '#9e9e9e', opacity: 0.5 },
+                            title: `${subjectType} - ${node1ValueGroup} to ${node2ValueGroup}`,
+                            smooth: { type: 'curvedCW', roundness: 0.2 }
+                        });
+                    }
+                }
+            }
+        }
+    });
 
     // 네트워크 옵션 (vis-network 기본 스타일 완전 제어)
     const options = {
@@ -7621,24 +7664,7 @@ function renderCommonValuesNetworkGraph() {
             borderWidth: 2,
             borderWidthSelected: 4
         },
-        groups: {
-            value1: {
-                color: {background: '#e1f5fe', border: '#01579b'},
-                shape: 'box'
-            },
-            value2: {
-                color: {background: '#f3e5f5', border: '#6a1b9a'},
-                shape: 'box'
-            },
-            value3: {
-                color: {background: '#e8f5e9', border: '#1b5e20'},
-                shape: 'box'
-            },
-            merged: {
-                color: {background: '#f3e5f5', border: '#adb5bd'},
-                shape: 'box'
-            }
-        },
+        // groups 설정 제거 - 노드별로 개별 색상 적용
         // 엣지 설정 (vis-network 기본 스타일 완전 제어)
         edges: {
             color: { 
@@ -9713,6 +9739,9 @@ function renderCommonValuesNetworkGraph() {
     
     // 노드 하이라이트 업데이트 함수
     function updateNodeHighlight() {
+        // 먼저 모든 선택 해제
+        network.unselectAll();
+        
         const nodeUpdate = [];
         // 현재 네트워크의 실제 노드 데이터를 가져옵니다
         const currentNodes = network.body.data.nodes.get();
@@ -9745,17 +9774,77 @@ function renderCommonValuesNetworkGraph() {
                     }
                 };
                 updatedNode.borderWidth = 3; // 선택된 노드는 테두리 두껍게
+                updatedNode.opacity = 1;
+                updatedNode.font = {
+                    ...currentNode.font,
+                    color: '#020202ff'
+                };
             } else {
-                // 선택되지 않은 노드는 원래 스타일로 복원 - 현재 노드의 색상 유지
+                // 선택되지 않은 노드는 원래 스타일로 복원
+                let originalBorderColor = '#bdbdbd'; // 기본값
+                
+                // 선택 해제 시에만 원래 색상 찾기
+                if (!selectedCommonValuesBlob) {
+                    const { subjectTypeColors, categoryColors } = generateColorLegend();
+                    // 노드의 과목 찾기
+                    const course = courses.find(c => c.id === nodeId);
+                    if (course) {
+                        if (colorModeBySubjectType) {
+                            originalBorderColor = {
+                                '설계': '#9e9e9e',
+                                '디지털': '#a1887f',
+                                '역사': '#d84315',
+                                '이론': '#00897b',
+                                '도시': '#c2185b',
+                                '사회': '#5e35b1',
+                                '기술': '#ef6c00',
+                                '실무': '#43a047',
+                                '비교과': '#757575'
+                            }[course.subjectType] || '#757575';
+                        } else {
+                            originalBorderColor = {
+                                '교양': '#6c757d',
+                                '건축적사고': '#1976d2',
+                                '설계': '#c62828',
+                                '기술': '#f57c00',
+                                '실무': '#388e3c',
+                                '기타': '#7b1fa2'
+                            }[course.category] || '#6c757d';
+                        }
+                    } else if (nodeId.startsWith('extracurricular')) {
+                        // 비교과 노드의 경우
+                        originalBorderColor = colorModeBySubjectType ? '#757575' : '#7b1fa2';
+                    }
+                } else {
+                    // 선택 중일 때는 현재 색상 유지
+                    originalBorderColor = currentNode.color ? currentNode.color.border : '#bdbdbd';
+                }
+                
                 updatedNode.color = {
                     background: currentNode.color ? currentNode.color.background : '#f8f9fa',
-                    border: currentNode.color ? currentNode.color.border : '#bdbdbd',
+                    border: originalBorderColor,
                     highlight: {
                         background: currentNode.color ? currentNode.color.background : '#f8f9fa',
-                        border: currentNode.color ? currentNode.color.border : '#bdbdbd'
+                        border: originalBorderColor
                     }
                 };
                 updatedNode.borderWidth = 2; // 기본 테두리 두께
+                
+                // 선택 해제 시 투명도도 복원
+                if (!selectedCommonValuesBlob) {
+                    updatedNode.opacity = 1;
+                    updatedNode.font = {
+                        ...currentNode.font,
+                        color: '#495057'
+                    };
+                } else {
+                    // 선택 중일 때는 투명하게
+                    updatedNode.opacity = 0.3;
+                    updatedNode.font = {
+                        ...currentNode.font,
+                        color: 'rgba(73, 80, 87, 0.3)'
+                    };
+                }
             }
             
             nodeUpdate.push(updatedNode);
@@ -9806,7 +9895,7 @@ function renderCommonValuesNetworkGraph() {
                 // 연결된 노드 - 중간 하이라이트 (배경색은 유지, 테두리만 강조)
                 nodeUpdateArray.push({
                     id: node.id,
-                    opacity: 0.6,
+                    opacity: 0.8,
                     borderWidth: 2,
                     color: {
                         background: node.color ? node.color.background : '#f8f9fa',
@@ -9825,7 +9914,7 @@ function renderCommonValuesNetworkGraph() {
                 // 나머지 노드 - 흐리게 (배경색은 유지, 투명도만 조정)
                 nodeUpdateArray.push({
                     id: node.id,
-                    opacity: 0.3,  // 엣지 호버와 동일한 투명도
+                    opacity: 0.5,  // 엣지 호버와 동일한 투명도
                     color: {
                         background: node.color ? node.color.background : '#f8f9fa',
                         border: node.color ? node.color.border : '#bdbdbd',
@@ -9874,7 +9963,7 @@ function renderCommonValuesNetworkGraph() {
                         highlight: 'rgba(189, 189, 189, 0.2)',
                         hover: 'rgba(189, 189, 189, 0.2)'
                     },
-                    width: 1
+                    width: 2
                 });
             }
         });
@@ -10903,9 +10992,61 @@ function toggleColorMode() {
         renderCommonValuesTable();
         }
         
-        // 네트워크 그래프도 함께 업데이트
-        if (typeof renderCommonValuesNetworkGraph === 'function') {
-            renderCommonValuesNetworkGraph();
+        // 네트워크 그래프의 노드 색상 업데이트
+        if (typeof network !== 'undefined' && network && network.body && network.body.data && network.body.data.nodes) {
+            const allNodes = network.body.data.nodes.get();
+            const nodeUpdateArray = [];
+            
+            allNodes.forEach(node => {
+                // 학년-학기 노드는 스킵
+                if (node.group === 'semester') return;
+                
+                // 노드의 과목 정보 찾기
+                const course = courses.find(c => c.id === node.id);
+                if (!course) return;
+                
+                // 색상 범례 가져오기
+                const colorLegend = generateColorLegend();
+                let newColor = '#f8f9fa'; // 기본색
+                let borderColor = '#bdbdbd'; // 기본 테두리색
+                
+                if (colorModeBySubjectType) {
+                    // 과목분류 모드
+                    if (course.subjectType && colorLegend.subjectTypes && colorLegend.subjectTypes[course.subjectType]) {
+                        newColor = colorLegend.subjectTypes[course.subjectType];
+                        borderColor = colorLegend.subjectTypes[course.subjectType];
+                    }
+                } else {
+                    // 구분 모드
+                    if (course.category && colorLegend.categories && colorLegend.categories[course.category]) {
+                        newColor = colorLegend.categories[course.category];
+                        borderColor = colorLegend.categories[course.category];
+                    }
+                }
+                
+                // 노드 색상 업데이트
+                nodeUpdateArray.push({
+                    id: node.id,
+                    color: {
+                        background: newColor,
+                        border: borderColor,
+                        highlight: {
+                            background: newColor,
+                            border: borderColor
+                        }
+                    }
+                });
+            });
+            
+            // 업데이트 적용
+            if (nodeUpdateArray.length > 0) {
+                network.body.data.nodes.update(nodeUpdateArray);
+            }
+        } else {
+            // 네트워크가 없으면 전체 그래프 재렌더링
+            if (typeof renderCommonValuesNetworkGraph === 'function') {
+                renderCommonValuesNetworkGraph();
+            }
         }
     }
     
