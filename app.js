@@ -7774,22 +7774,19 @@ function renderCommonValuesNetworkGraph() {
         physics: {
             enabled: true,
             barnesHut: {
-                gravitationalConstant: -1500, // 최적화: 반발력 조정
-                centralGravity: 0, // 중앙 중력 완전 제거
-                springLength: 200, // 최적화: 스프링 길이 단축
-                springConstant: 0.001, // 최적화: 적절한 스프링 상수
-                damping: 0.99, // 최적화: 강한 감쇠로 빠른 안정화
-                avoidOverlap: 1 // 최적화: 겹침 방지 최소화
+                gravitationalConstant: -2000, // 더 강한 반발력
+                centralGravity: 0.2, // 중앙 중력 거의 제거
+                springLength: 12000, // 적당한 스프링 길이
+                springConstant: 0.0008, // 더 강한 스프링
+                damping: 0.85, // 감쇠를 줄여서 더 오래 움직이도록
+                avoidOverlap: 2 // 겹침 방지
             },
             stabilization: { 
-                iterations: 100,  // 최적화: 안정화 반복 최소화
-                enabled: true,
-                updateInterval: 100, // 최적화: 업데이트 간격 증가
-                fit: true // 최적화: 자동 피팅 활성화
+                enabled: false // 안정화 비활성화 - 노드가 계속 움직임
             },
-            adaptiveTimestep: true,
-            timestep: 0.5, // 최적화: 시간 간격 조정
-            maxVelocity: 30 // 최적화: 최대 속도 제한
+            minVelocity: 0.01, // 최소 속도를 매우 낮게 설정
+            maxVelocity: 50, // 최대 속도 제한
+            adaptiveTimestep: true, // 적응형 시간 간격
         },
         interaction: {
             hover: true,
@@ -7798,6 +7795,33 @@ function renderCommonValuesNetworkGraph() {
         autoResize: true,
         height: '100%',
         width: '100%',
+        // physics: {
+        //     enabled: true,
+        //     barnesHut: {
+        //         gravitationalConstant: -2000, // 최적화: 반발력 조정
+        //         centralGravity: 0.3, // 중앙 중력 완전 제거
+        //         springLength: 12000, // 최적화: 스프링 길이 단축
+        //         springConstant: 0.0008, // 최적화: 적절한 스프링 상수
+        //         damping: 0.80, // 최적화: 강한 감쇠로 빠른 안정화
+        //         avoidOverlap: 5 // 최적화: 겹침 방지 최소화
+        //     },
+        //     stabilization: { 
+        //         iterations: 1000,  // 최적화: 안정화 반복 최소화
+        //         enabled: true,
+        //         updateInterval: 100, // 최적화: 업데이트 간격 증가
+        //         fit: true // 최적화: 자동 피팅 활성화
+        //     },
+        //     adaptiveTimestep: true,
+        //     timestep: 0.5, // 최적화: 시간 간격 조정
+        //     maxVelocity: 0.1 // 최적화: 최대 속도 제한
+        // },
+        // interaction: {
+        //     hover: true,
+        //     tooltipDelay: 120,
+        // },
+        // autoResize: true,
+        // height: '100%',
+        // width: '100%',
     };
 
     // 기존 네트워크 제거

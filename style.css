@@ -2245,42 +2245,59 @@ th, td, .matrix-table th, .matrix-table td {
     position: relative;
 }
 
-/* 커스텀 교과목 툴팁 스타일 (작고 아담하게) */
+/* 🌟 개선된 커스텀 교과목 툴팁 스타일 */
 .custom-course-tooltip {
     position: absolute;
-    background: rgba(80, 82, 87, 0.98);
-    color: #fff;
-    padding: 4px 8px;
-    border-radius: 7px;
-    font-size: 12px;
-    font-family: var(--font-family);
-    box-shadow: 0 4px 16px rgba(56, 56, 56, 0.18), 0 1px 3px rgba(0,0,0,0.08);
+    background: rgba(45, 55, 72, 0.95);
+    color: #ffffff;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 500;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25), 0 2px 6px rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     z-index: 9999;
-    min-width: 120px;
-    max-width: 220px;
+    min-width: 140px;
+    max-width: 280px;
     pointer-events: none;
-    transition: opacity 0.15s cubic-bezier(.4,0,.2,1);
-    opacity: 0.98;
-    line-height: 0.5em;
-    border: 1px solid rgba(255,255,255,0.08);
+    transition: opacity 0.2s ease-in-out;
+    opacity: 0.96;
+    line-height: 1.4;
+    border: 1px solid rgba(255,255,255,0.12);
     white-space: pre-line;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    letter-spacing: 0.3px;
 }
+
 .custom-course-tooltip .tooltip-title {
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 700;
-    margin-bottom: 1.2;
+    margin-bottom: 8px;
     color: #ffd86b;
-    letter-spacing: 1.2px;
+    letter-spacing: 0.5px;
+    display: block;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding-bottom: 6px;
 }
+
 .custom-course-tooltip .tooltip-row {
-    margin: 5;
+    margin: 6px 0;
     padding: 0;
     font-size: 12px;
     word-break: keep-all;
-    line-height: 1.2;
+    line-height: 1.4;
+    display: block;
 }
+
 .custom-course-tooltip .tooltip-row:last-child {
     margin-bottom: 0;
+}
+
+.custom-course-tooltip .tooltip-row b {
+    font-weight: 600;
+    color: #e2e8f0;
 }
 
 /* 이수모형 수정모드 버튼 스타일 */
@@ -2464,6 +2481,100 @@ th, td, .matrix-table th, .matrix-table td {
     border-radius: 3px;
     border-left: 3px solid #f44336;
     margin: 2px 0;
+}
+
+/* 🌟 vis-network 엣지 툴팁 개선 스타일 */
+.vis-tooltip {
+    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    line-height: 1.4 !important;
+    padding: 8px 12px !important;
+    background: rgba(45, 55, 72, 0.95) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25), 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    max-width: 200px !important;
+    white-space: nowrap !important;
+    z-index: 10000 !important;
+    pointer-events: none !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+    letter-spacing: 0.3px !important;
+    transition: opacity 0.2s ease-in-out !important;
+    animation: tooltipFadeIn 0.2s ease-out !important;
+}
+
+/* 툴팁 등장 애니메이션 */
+@keyframes tooltipFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* vis-network 툴팁 텍스트 스타일 */
+.vis-tooltip-text {
+    font-family: 'Noto Sans KR', sans-serif !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: #ffffff !important;
+    text-align: center !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* 🎨 다양한 테마별 엣지 툴팁 스타일 */
+.vis-tooltip[data-edge-type="yearSemester"] {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.95), rgba(37, 99, 235, 0.95)) !important;
+    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+}
+
+.vis-tooltip[data-edge-type="subjectType-설계"] {
+    background: linear-gradient(135deg, rgba(158, 158, 158, 0.95), rgba(117, 117, 117, 0.95)) !important;
+    border: 1px solid rgba(158, 158, 158, 0.3) !important;
+}
+
+.vis-tooltip[data-edge-type="subjectType-디지털"] {
+    background: linear-gradient(135deg, rgba(161, 136, 127, 0.95), rgba(141, 110, 99, 0.95)) !important;
+    border: 1px solid rgba(161, 136, 127, 0.3) !important;
+}
+
+.vis-tooltip[data-edge-type="subjectType-역사"] {
+    background: linear-gradient(135deg, rgba(216, 67, 21, 0.95), rgba(183, 28, 28, 0.95)) !important;
+    border: 1px solid rgba(216, 67, 21, 0.3) !important;
+}
+
+.vis-tooltip[data-edge-type="subjectType-이론"] {
+    background: linear-gradient(135deg, rgba(0, 137, 123, 0.95), rgba(0, 105, 92, 0.95)) !important;
+    border: 1px solid rgba(0, 137, 123, 0.3) !important;
+}
+
+/* 호버 상태에서 툴팁 강조 효과 */
+.vis-tooltip:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.3), 0 3px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* 반응형 디자인 - 모바일 최적화 */
+@media (max-width: 768px) {
+    .vis-tooltip {
+        font-size: 12px !important;
+        padding: 6px 10px !important;
+        max-width: 180px !important;
+        border-radius: 6px !important;
+    }
+    
+    .vis-tooltip-text {
+        font-size: 12px !important;
+    }
 }
 
 /* 호버 효과 */
@@ -3755,21 +3866,23 @@ th, td, .matrix-table th, .matrix-table td {
         z-index: 1000;
     }
 
-    /* 툴팁 모바일 최적화 */
+    /* 툴팁 모바일 최적화 - 개선됨 */
     .custom-course-tooltip {
-        max-width: 250px;
-        font-size: 11px;
-        padding: 8px;
+        max-width: 260px;
+        font-size: 12px;
+        padding: 8px 12px;
+        border-radius: 6px;
     }
 
     .custom-course-tooltip .tooltip-title {
-        font-size: 12px;
+        font-size: 13px;
         margin-bottom: 6px;
+        padding-bottom: 4px;
     }
 
     .custom-course-tooltip .tooltip-row {
-        font-size: 10px;
-        margin-bottom: 4px;
+        font-size: 11px;
+        margin: 4px 0;
     }
 
     /* 버전 관리 모바일 최적화 */
