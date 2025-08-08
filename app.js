@@ -7616,8 +7616,8 @@ function renderCommonValuesNetworkGraph() {
                     let node2ValueGroup = null;
                     
                     for (const [valueKey, valueNodeIds] of Object.entries(valueCourseIds)) {
-                        if (Array.isArray(valueNodeIds) && valueNodeIds.includes(nodeId1)) node1ValueGroup = valueKey;
-                        if (Array.isArray(valueNodeIds) && valueNodeIds.includes(nodeId2)) node2ValueGroup = valueKey;
+                        if (valueNodeIds.includes(nodeId1)) node1ValueGroup = valueKey;
+                        if (valueNodeIds.includes(nodeId2)) node2ValueGroup = valueKey;
                     }
                     
                     // 다른 value 그룹에 속한 경우에만 점선으로 연결
@@ -7754,24 +7754,22 @@ function renderCommonValuesNetworkGraph() {
         physics: {
             enabled: true,
             barnesHut: {
-                gravitationalConstant: -1500, // 반발력 조정
+                gravitationalConstant: -1500, // 최적화: 반발력 조정
                 centralGravity: 0, // 중앙 중력 완전 제거
-                springLength: 200, // 스프링 길이 설정
-                springConstant: 0.001, // 스프링 상수
-                damping: 0.85, // 시뮬레이션 지속시간 연장: 감쇠 감소 (더 오래 움직임)
-                avoidOverlap: 1 // 겹침 방지 최소화
+                springLength: 200, // 최적화: 스프링 길이 단축
+                springConstant: 0.001, // 최적화: 적절한 스프링 상수
+                damping: 0.99, // 최적화: 강한 감쇠로 빠른 안정화
+                avoidOverlap: 1 // 최적화: 겹침 방지 최소화
             },
             stabilization: { 
-                iterations: 500,  // 시뮬레이션 지속시간 연장: 안정화 반복 증가
+                iterations: 100,  // 최적화: 안정화 반복 최소화
                 enabled: true,
-                updateInterval: 25, // 시뮬레이션 지속시간 연장: 업데이트 간격 감소 (더 자주 업데이트)
-                fit: true,
-                onlyDynamicEdges: false // 모든 엣지에 대해 안정화 수행
+                updateInterval: 100, // 최적화: 업데이트 간격 증가
+                fit: true // 최적화: 자동 피팅 활성화
             },
             adaptiveTimestep: true,
-            timestep: 0.3, // 시뮬레이션 지속시간 연장: 더 세밀한 시간 간격
-            maxVelocity: 50, // 시뮬레이션 지속시간 연장: 최대 속도 증가
-            minVelocity: 0.1 // 최소 속도 임계값 설정
+            timestep: 0.5, // 최적화: 시간 간격 조정
+            maxVelocity: 30 // 최적화: 최대 속도 제한
         },
         interaction: {
             hover: true,
@@ -7791,7 +7789,7 @@ function renderCommonValuesNetworkGraph() {
         // 해당 노드가 몇 개의 VALUE 그룹에 속하는지 계산
         let valueGroupCount = 0;
         valueKeys.forEach(key => {
-            if (valueCourseIds[key] && Array.isArray(valueCourseIds[key]) && valueCourseIds[key].includes(n.id)) {
+            if (valueCourseIds[key].includes(n.id)) {
                 valueGroupCount++;
             }
         });
@@ -7968,9 +7966,71 @@ function renderCommonValuesNetworkGraph() {
             }
         });
         
-        // 진동 효과 완전 제거 (성능 최적화)
+        // 2. 진동 효과: 그룹 전체에 파동 효과
+        let wavePhase = 0;
+        const waveInterval = setInterval(() => {
+            groupNodeIds.forEach((nodeId, index) => {
+                const body = network.body.nodes[nodeId];
+                if (!body || !body.options.physics) return;
+                
+                // 사인파를 이용한 진동 효과
+                const waveForce = 3 * Math.sin(wavePhase + index * 0.5);
+                body.vx += waveForce * Math.cos(wavePhase);
+                body.vy += waveForce * Math.sin(wavePhase);
+            });
+            
+            wavePhase += 0.3;
+            
+            // 물리 시뮬레이션 강제 시작
+            network.startSimulation();
+            
+            // 🔧 전체 네트워크 중심점 유지
+            maintainGlobalNetworkCenter();
+        }, 50);
         
-        // 자기장 효과 및 타이머 완전 제거 (성능 최적화)
+        // 3. 자기장 효과: 그룹 노드들을 원형으로 정렬하려는 힘
+        const magneticInterval = setInterval(() => {
+            const centerPos = calculateGroupCenter(groupNodeIds);
+            const targetRadius = 320; // 목표 반지름
+            
+            groupNodeIds.forEach((nodeId, index) => {
+                const body = network.body.nodes[nodeId];
+                if (!body || !body.options.physics) return;
+                
+                const nodePos = network.getPosition(nodeId);
+                const dx = nodePos.x - centerPos.x;
+                const dy = nodePos.y - centerPos.y;
+                const currentRadius = Math.sqrt(dx * dx + dy * dy);
+                
+                // 목표 반지름으로 이동시키는 힘
+                if (currentRadius > 0) {
+                    const targetX = centerPos.x + (dx / currentRadius) * targetRadius;
+                    const targetY = centerPos.y + (dy / currentRadius) * targetRadius;
+                    
+                    const attractX = (targetX - nodePos.x) * 0.02;
+                    const attractY = (targetY - nodePos.y) * 0.02;
+                    
+                    body.vx += attractX;
+                    body.vy += attractY;
+                }
+                
+                // 원형 궤도 움직임 추가
+                const orbitalForce = 1;
+                body.vx += -dy * orbitalForce * 0.001;
+                body.vy += dx * orbitalForce * 0.001;
+            });
+            
+            network.startSimulation();
+            
+            // 🔧 전체 네트워크 중심점 유지
+            maintainGlobalNetworkCenter();
+        }, 30);
+        
+        // 효과 정리
+        setTimeout(() => {
+            clearInterval(waveInterval);
+            clearInterval(magneticInterval);
+        }, explosionDuration);
     }
     
     // 그룹 중심점 계산 헬퍼 함수
@@ -8121,44 +8181,10 @@ function renderCommonValuesNetworkGraph() {
         globalNetworkCenter = calculateGlobalNetworkCenter();
         networkCenterStabilized = true;
         
-        // 시뮬레이션 지속시간 연장: 안정화 완료 후에도 물리 엔진 계속 활성화
-        network.setOptions({
-            physics: {
-                enabled: true, // 물리 엔진 계속 활성화
-                stabilization: {
-                    enabled: false // 추가 안정화는 비활성화
-                }
-            }
-        });
-        
-        // 물리 엔진을 주기적으로 재활성화하여 지속적인 움직임 유지
-        const keepSimulationAlive = setInterval(() => {
-            if (network && network.body && network.body.data) {
-                // 시뮬레이션 지속시간 연장: 주기적 재시작
-                network.startSimulation();
-                
-                // 약간의 랜덤 힘을 가해 자연스러운 움직임 유지
-                const allNodes = network.body.data.nodes.get();
-                if (allNodes.length > 0) {
-                    // 랜덤하게 선택된 몇 개 노드에 미세한 힘 적용
-                    const randomNodes = allNodes.slice(0, Math.min(3, allNodes.length));
-                    randomNodes.forEach(node => {
-                        const body = network.body.nodes[node.id];
-                        if (body && body.options.physics) {
-                            // 매우 작은 랜덤 힘으로 자연스러운 움직임 유지
-                            const microForce = 0.1;
-                            body.vx += (Math.random() - 0.5) * microForce;
-                            body.vy += (Math.random() - 0.5) * microForce;
-                        }
-                    });
-                }
-            }
-        }, 3000); // 3초마다 시뮬레이션 재시작 및 미세 조정
-        
-        // 페이지 언로드 시 인터벌 정리
-        window.addEventListener('beforeunload', () => {
-            clearInterval(keepSimulationAlive);
-        });
+        // 🌟 페이지 로딩시 자동으로 물리효과 시작 (안정화 완료 후)
+        setTimeout(() => {
+            triggerInitialPhysicsEffects();
+        }, 200);
     });
     
     // 최종 백업 - 1초 후 무조건 시작 - 활성화됨
@@ -9033,7 +9059,7 @@ function renderCommonValuesNetworkGraph() {
             // 노드가 속한 value 그룹 찾기
             let nodeValueGroup = null;
             for (const [valueKey, nodeIds] of Object.entries(valueCourseIds)) {
-                if (Array.isArray(nodeIds) && nodeIds.includes(nodeId)) {
+                if (nodeIds.includes(nodeId)) {
                     nodeValueGroup = valueKey;
                     break;
                 }
@@ -9837,9 +9863,6 @@ function renderCommonValuesNetworkGraph() {
     
     // blob 커브 클릭 및 드래그 이벤트 처리
     network.on('click', function(params) {
-        // 시뮬레이션 지속시간 연장: 클릭 시 시뮬레이션 재시작
-        network.startSimulation();
-        
         // 노드 클릭 시에는 스플라인 선택을 유지
         if (params.nodes.length > 0) {
             return;
@@ -9910,11 +9933,6 @@ function renderCommonValuesNetworkGraph() {
     window.hoveredBlob = null; // 전역 변수로 설정
     let hoveredLabel = null; // 호버된 라벨 추적
     network.on('hoverNode', function(params) {
-        // 시뮬레이션 지속시간 연장: 노드 호버 시 약간의 물리적 반응
-        setTimeout(() => {
-            network.startSimulation();
-        }, 50);
-        
         // 노드 호버 시에도 스플라인 호버 상태 유지
         // 스플라인 호버 해제하지 않음
     });
@@ -10236,11 +10254,6 @@ function renderCommonValuesNetworkGraph() {
 
     // 그룹 드래그 종료
     network.on('dragEnd', function(params) {
-        // 시뮬레이션 지속시간 연장: 드래그 종료 시 시뮬레이션 재시작
-        setTimeout(() => {
-            network.startSimulation();
-        }, 100);
-        
         if (isDraggingGroup) {
             const currentGroupKey = draggedGroupKey; // 현재 그룹키 저장
             
@@ -10307,12 +10320,8 @@ function renderCommonValuesNetworkGraph() {
         // 스플라인 선택 상태와 테이블 헤더 동기화
         syncSplineWithTableHeaders();
         
-        // 먼저 모든 선택 해제 (에러 방지를 위한 try-catch 추가)
-        try {
-            window.network.unselectAll();
-        } catch (error) {
-            // vis.js 내부 오류 발생 시 무시하고 계속 진행
-        }
+        // 먼저 모든 선택 해제
+        window.network.unselectAll();
         
         const nodeUpdate = [];
         // 현재 네트워크의 실제 노드 데이터를 가져옵니다
@@ -10320,7 +10329,7 @@ function renderCommonValuesNetworkGraph() {
         
         // 선택된 그룹의 노드들 수집
         let selectedGroupNodeIds = [];
-        if (window.selectedCommonValuesBlob && valueCourseIds[window.selectedCommonValuesBlob] && Array.isArray(valueCourseIds[window.selectedCommonValuesBlob])) {
+        if (window.selectedCommonValuesBlob && valueCourseIds[window.selectedCommonValuesBlob]) {
             selectedGroupNodeIds = valueCourseIds[window.selectedCommonValuesBlob];
         }
         
@@ -10431,7 +10440,7 @@ function renderCommonValuesNetworkGraph() {
         currentNodes.forEach(currentNode => {
             const nodeId = currentNode.id;
             let isInSelectedGroup = false;
-            if (window.selectedCommonValuesBlob && valueCourseIds[window.selectedCommonValuesBlob] && Array.isArray(valueCourseIds[window.selectedCommonValuesBlob])) {
+            if (window.selectedCommonValuesBlob && valueCourseIds[window.selectedCommonValuesBlob]) {
                 isInSelectedGroup = valueCourseIds[window.selectedCommonValuesBlob].includes(nodeId);
             }
             
