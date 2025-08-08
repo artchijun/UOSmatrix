@@ -7774,12 +7774,12 @@ function renderCommonValuesNetworkGraph() {
         physics: {
             enabled: true,
             barnesHut: {
-                gravitationalConstant: -2000, // 더 강한 반발력
-                centralGravity: 0.2, // 중앙 중력 거의 제거
-                springLength: 12000, // 적당한 스프링 길이
-                springConstant: 0.0008, // 더 강한 스프링
-                damping: 0.85, // 감쇠를 줄여서 더 오래 움직이도록
-                avoidOverlap: 2 // 겹침 방지
+                gravitationalConstant: -5000, // 🌟 더 강한 반발력으로 노드 간격 증가
+                centralGravity: 0.1, // 🌟 중앙 중력을 더 줄여서 분산도 증가
+                springLength: 250, // 🌟 스프링 길이를 더 늘려서 노드간 거리 증가
+                springConstant: 0.001, // 🌟 스프링 상수 조정
+                damping: 0.7, // 🌟 감쇠 조정
+                avoidOverlap: 1.2 // 🌟 겹침 방지 강화
             },
             stabilization: { 
                 enabled: false // 안정화 비활성화 - 노드가 계속 움직임
@@ -9351,8 +9351,8 @@ function renderCommonValuesNetworkGraph() {
         let visualHull = [...hull];
         for (let i = 0; i < 3; i++) visualHull = smoothHull(visualHull);
         
-        // 클릭 감지 경계: 원본 컨벡스 헐을 기반으로 적절한 확장 적용
-        let clickBoundary = expandPolygon(hull, 15); // 15픽셀 확장
+        // 🔧 클릭 감지 경계: 시각적 스플라인과 유사하게 만들되 약간만 확장
+        let clickBoundary = expandPolygon(visualHull, 3); // 3픽셀만 확장
         
         // 시각적 렌더링을 위한 데이터는 별도 저장
         if (!window.commonValuesVisualData) {
@@ -9667,8 +9667,8 @@ function renderCommonValuesNetworkGraph() {
             let visualHull = [...hull];
             for (let i = 0; i < 3; i++) visualHull = smoothHull(visualHull); // smoothing 3회
             
-            // 클릭 감지 경계: 원본 컨벡스 헐을 기반으로 적절한 확장 적용
-            let clickBoundary = expandPolygon(hull, 15); // 15픽셀 확장
+            // 🔧 클릭 감지 경계: 시각적 스플라인과 유사하게 만들되 약간만 확장
+            let clickBoundary = expandPolygon(visualHull, 3); // 3픽셀만 확장
             
             // 시각적 렌더링을 위한 데이터는 별도 저장
             if (!window.commonValuesVisualData) {
@@ -9919,6 +9919,16 @@ function renderCommonValuesNetworkGraph() {
             }
             
             if (clickedBlob) {
+                // 🔧 디버깅: 클릭 위치와 폴리곤 정보 로그
+                if (window.DEBUG_SPLINE_CLICKS) {
+                    console.log('Spline clicked:', {
+                        blob: clickedBlob,
+                        clickPos: canvasPosition,
+                        polygon: commonValuesBlobData[clickedBlob],
+                        visualData: window.commonValuesVisualData[clickedBlob]
+                    });
+                }
+                
                 // 같은 그룹 클릭 시 선택해제, 다른 그룹 클릭 시 선택 변경
                 window.selectedCommonValuesBlob = window.selectedCommonValuesBlob === clickedBlob ? null : clickedBlob;
                 
@@ -9928,6 +9938,18 @@ function renderCommonValuesNetworkGraph() {
                 updateNodeHighlight();
                 network.redraw();
             } else {
+                // 🔧 디버깅: 빈 영역 클릭 정보 로그
+                if (window.DEBUG_SPLINE_CLICKS) {
+                    console.log('Empty area clicked:', {
+                        clickPos: canvasPosition,
+                        checkedPolygons: valueKeys.map(k => ({
+                            key: k,
+                            polygon: commonValuesBlobData[k],
+                            isInside: commonValuesBlobData[k] ? isPointInPolygon(canvasPosition, commonValuesBlobData[k]) : false
+                        }))
+                    });
+                }
+                
                 // 빈 영역 클릭 시 선택 해제
                 if (window.selectedCommonValuesBlob) {
                     window.selectedCommonValuesBlob = null;
@@ -13401,6 +13423,18 @@ function debugCommonValuesCells() {
 }
 // 글로벌 함수로 등록 (콘솔에서 사용 가능)
 window.debugCommonValuesCells = debugCommonValuesCells;
+
+// 🔧 스플라인 클릭 디버깅 활성화/비활성화
+window.enableSplineClickDebug = function() {
+    window.DEBUG_SPLINE_CLICKS = true;
+    console.log('스플라인 클릭 디버깅이 활성화되었습니다. 스플라인을 클릭해보세요.');
+};
+
+window.disableSplineClickDebug = function() {
+    window.DEBUG_SPLINE_CLICKS = false;
+    console.log('스플라인 클릭 디버깅이 비활성화되었습니다.');
+};
+
 // 공통가치대응 탭의 현재 셀 데이터를 수집하는 함수
 function collectCommonValuesTableData() {
     const table = document.querySelector('#commonValuesTable');
@@ -14596,35 +14630,79 @@ class PhysicsEffectsSystem {
     
     applyVibrationEffect(deltaTime) {
         const time = Date.now() * 0.001; // 초 단위
+        const globalTime = time * 0.5; // 전체적인 진동 리듬
         
         this.nodes.forEach(node => {
             const state = this.nodeStates.get(node.id);
             if (!state) return;
             
-            // 그룹별 진동 패턴
+            // 🌟 그룹별 고유 진동 패턴과 강화된 설정
             let frequency = 0.5;
             let amplitude = this.vibrationIntensity;
+            let vibrationPattern = 'sine'; // 기본 패턴
             
             switch(node.group) {
                 case 'value1':
-                    frequency = 0.8;
-                    amplitude *= 1.2;
+                    frequency = 0.9;
+                    amplitude *= 1.4; // 🌟 더 강한 진동
+                    vibrationPattern = 'pulse'; // 🌟 펄스 타입 진동
                     break;
                 case 'value2':
-                    frequency = 0.6;
-                    amplitude *= 0.8;
+                    frequency = 0.7;
+                    amplitude *= 1.0;
+                    vibrationPattern = 'wave'; // 🌟 파동 타입 진동
                     break;
                 case 'value3':
-                    frequency = 1.0;
-                    amplitude *= 1.5;
+                    frequency = 1.1;
+                    amplitude *= 1.6; // 🌟 가장 강한 진동
+                    vibrationPattern = 'circular'; // 🌟 원형 진동
                     break;
             }
             
-            const vibrationX = Math.sin(time * frequency + state.vibrationPhase) * amplitude;
-            const vibrationY = Math.cos(time * frequency * 0.7 + state.vibrationPhase) * amplitude * 0.6;
+            let vibrationX = 0, vibrationY = 0;
             
-            state.force.x += vibrationX;
-            state.force.y += vibrationY;
+            // 🌟 진동 패턴별 다양한 효과
+            switch(vibrationPattern) {
+                case 'pulse': // 💓 펄스 진동 - 간헐적이고 강한 진동
+                    const pulseIntensity = Math.max(0, Math.sin(time * frequency * 0.5)) * 2;
+                    const pulseBase = Math.sin(time * frequency * 4 + state.vibrationPhase);
+                    vibrationX = pulseBase * amplitude * pulseIntensity;
+                    vibrationY = Math.cos(time * frequency * 3 + state.vibrationPhase) * amplitude * pulseIntensity * 0.7;
+                    break;
+                    
+                case 'wave': // 🌊 파동 진동 - 부드럽고 연속적인 진동
+                    const waveModulation = 1 + 0.5 * Math.sin(globalTime + state.vibrationPhase * 0.1);
+                    vibrationX = Math.sin(time * frequency + state.vibrationPhase) * amplitude * waveModulation;
+                    vibrationY = Math.sin(time * frequency * 1.3 + state.vibrationPhase + Math.PI/3) * amplitude * waveModulation * 0.8;
+                    break;
+                    
+                case 'circular': // 🌀 원형 진동 - 회전하는 진동
+                    const radius = amplitude * (1 + 0.3 * Math.sin(globalTime));
+                    const angle = time * frequency * 2 + state.vibrationPhase;
+                    vibrationX = Math.cos(angle) * radius;
+                    vibrationY = Math.sin(angle) * radius;
+                    break;
+                    
+                default: // 🎵 기본 사인파 진동 - 향상된 버전
+                    const intensityModulation = 1 + 0.4 * Math.sin(globalTime * 0.3);
+                    vibrationX = Math.sin(time * frequency + state.vibrationPhase) * amplitude * intensityModulation;
+                    vibrationY = Math.cos(time * frequency * 0.7 + state.vibrationPhase) * amplitude * intensityModulation * 0.6;
+                    break;
+            }
+            
+            // 🌟 동적 강도 조절 - 시간에 따른 강도 변화
+            const dynamicIntensity = 0.7 + 0.3 * Math.sin(globalTime * 0.2 + node.id * 0.1);
+            
+            // 🌟 최종 진동 힘 적용
+            state.force.x += vibrationX * dynamicIntensity;
+            state.force.y += vibrationY * dynamicIntensity;
+            
+            // 🌟 진동 잔향 효과 - 이전 진동이 점차 감쇠
+            if (!state.vibrationDecay) state.vibrationDecay = {x: 0, y: 0};
+            state.vibrationDecay.x = state.vibrationDecay.x * 0.95 + vibrationX * 0.05;
+            state.vibrationDecay.y = state.vibrationDecay.y * 0.95 + vibrationY * 0.05;
+            state.force.x += state.vibrationDecay.x * 0.2;
+            state.force.y += state.vibrationDecay.y * 0.2;
         });
     }
     
@@ -15630,30 +15708,75 @@ function highlightEdgeType(edgeType) {
                 }
             }
             
-            // 원래 스타일 저장 (첫 번째 하이라이트 시에만)
-            if (!edge.originalColor) {
-                edge.originalColor = { ...edge.color };
-                edge.originalWidth = edge.width;
+            // 🌟 원래 스타일 저장 (첫 번째 하이라이트 시에만) - 정확한 원본 그래프 스타일 보존
+            if (!edge.originalColor && edge.originalWidth === undefined) {
+                // 🎯 원본 그래프의 정확한 색상 정보 저장
+                if (edge.color && typeof edge.color === 'object') {
+                    // 현재 color 객체가 있으면 완전히 복사
+                    edge.originalColor = {
+                        color: edge.color.color,
+                        opacity: edge.color.opacity !== undefined ? edge.color.opacity : 1
+                    };
+                } else if (edge.dashes) {
+                    // 점선 엣지의 기본 원본 그래프 색상
+                    edge.originalColor = {
+                        color: '#9e9e9e',
+                        opacity: 0.5
+                    };
+                } else {
+                    // 실선 엣지는 기본 vis-network 색상 (null로 저장하여 나중에 기본값 사용)
+                    edge.originalColor = null;
+                }
+                
+                // 🎯 원본 그래프의 정확한 width 저장
+                edge.originalWidth = edge.width || (edge.dashes ? 1.5 : 3);
             }
             
             edgeUpdateArray.push({
                 id: edge.id,
-                width: edge.dashes ? 2 : 2, // 점선은 2px, 실선은 3px
+                width: edge.dashes ? 3 : 3, // 점선은 2px, 실선은 3px
                 color: { 
                     color: edge.dashes ? highlightColor : '#595959ff', // 점선은 과목분류 색상, 실선은 검은색
                     opacity: 0.8
                 }
             });
         } else {
-            // 하이라이트되지 않는 엣지는 원래 스타일로 복원
+            // 🌟 하이라이트되지 않는 엣지는 정확한 원본 그래프 스타일로 복원
             const originalStyle = {
                 id: edge.id,
-                width: edge.originalWidth || (edge.dashes ? 1.5 : 3),
-                color: edge.originalColor || { 
-                    color: edge.dashes ? '#9e9e9e' : '#666',
-                    opacity: edge.dashes ? 0.5 : 1
-                }
+                width: edge.originalWidth || (edge.dashes ? 1.5 : 3)
             };
+            
+            // 🎯 원본 그래프의 정확한 색상 복원
+            if (edge.originalColor === null) {
+                // 실선 엣지는 기본 vis-network 스타일 사용
+                delete originalStyle.color;
+            } else if (edge.originalColor && typeof edge.originalColor === 'object') {
+                originalStyle.color = {
+                    color: edge.originalColor.color,
+                    opacity: edge.originalColor.opacity !== undefined ? edge.originalColor.opacity : 1
+                };
+            } else {
+                // 기본 색상
+                if (edge.dashes) {
+                    originalStyle.color = {
+                        color: '#9e9e9e',
+                        opacity: 0.5
+                    };
+                } else {
+                    delete originalStyle.color;
+                }
+            }
+            
+            // 🎯 점선 엣지의 기타 속성들 복원
+            if (edge.dashes) {
+                originalStyle.dashes = true;
+                originalStyle.arrows = { 
+                    to: { enabled: true, scaleFactor: 0.35 },
+                    from: { enabled: true, scaleFactor: 0.35 }
+                };
+                originalStyle.smooth = { type: 'curvedCW', roundness: 0.2 };
+            }
             
             edgeUpdateArray.push(originalStyle);
         }
@@ -15664,7 +15787,7 @@ function highlightEdgeType(edgeType) {
     }
 }
 
-// 🌟 엣지 하이라이트 해제 함수
+// 🌟 엣지 하이라이트 해제 함수 - 완전한 원본 그래프 스타일 복원
 function unhighlightEdgeType() {
     if (!window.network) return;
     
@@ -15672,22 +15795,51 @@ function unhighlightEdgeType() {
     const edgeUpdateArray = [];
     
     edges.forEach(edge => {
-        // 원래 엣지 스타일로 복원
+        // 🌟 원래 그래프의 정확한 엣지 스타일로 완전 복원
         const originalStyle = {
-            id: edge.id,
-            width: edge.originalWidth || (edge.dashes ? 1.5 : 3),
-            color: edge.originalColor || { 
-                color: edge.dashes ? '#9e9e9e' : '#666',
-                opacity: edge.dashes ? 0.5 : 1
-            }
+            id: edge.id
         };
         
-        // 원본 스타일이 저장되어 있으면 사용, 없으면 기본값 사용
-        if (edge.originalColor) {
-            originalStyle.color = { ...edge.originalColor };
-        }
-        if (edge.originalWidth !== undefined) {
+        // 🌟 저장된 원본 width 복원 또는 정확한 원본 그래프 기본값 사용
+        if (edge.originalWidth !== undefined && edge.originalWidth !== null) {
             originalStyle.width = edge.originalWidth;
+        } else {
+            // 🎯 원본 그래프의 정확한 width: 점선 1.5px, 실선 3px
+            originalStyle.width = edge.dashes ? 1.5 : 3;
+        }
+        
+        // 🌟 저장된 원본 color 복원 또는 정확한 원본 그래프 기본값 사용
+        if (edge.originalColor === null) {
+            // 실선 엣지는 기본 vis-network 스타일 (color 속성 제거하여 기본값 사용)
+            delete originalStyle.color;
+        } else if (edge.originalColor && typeof edge.originalColor === 'object') {
+            // 원본 색상이 저장되어 있으면 완전히 복원
+            originalStyle.color = {
+                color: edge.originalColor.color,
+                opacity: edge.originalColor.opacity !== undefined ? edge.originalColor.opacity : 1
+            };
+        } else {
+            // 🎯 원본 그래프의 정확한 색상: 점선은 회색 0.5 투명도, 실선은 기본
+            if (edge.dashes) {
+                originalStyle.color = {
+                    color: '#9e9e9e',
+                    opacity: 0.5
+                };
+            } else {
+                // 실선 엣지는 기본 vis-network 스타일 (color 속성 제거하여 기본값 사용)
+                delete originalStyle.color;
+            }
+        }
+        
+        // 🌟 기타 원본 속성들도 복원
+        if (edge.dashes) {
+            originalStyle.dashes = true;
+            // 점선 엣지의 경우 원본 그래프의 화살표와 smooth 설정 복원
+            originalStyle.arrows = { 
+                to: { enabled: true, scaleFactor: 0.35 },
+                from: { enabled: true, scaleFactor: 0.35 }
+            };
+            originalStyle.smooth = { type: 'curvedCW', roundness: 0.2 };
         }
         
         edgeUpdateArray.push(originalStyle);
@@ -15695,6 +15847,25 @@ function unhighlightEdgeType() {
     
     if (edgeUpdateArray.length > 0) {
         window.network.body.data.edges.update(edgeUpdateArray);
+        
+        // 🌟 복원 후 원본 스타일 정보 정리 (메모리 절약)
+        setTimeout(() => {
+            const updatedEdges = window.network.body.data.edges.get();
+            const cleanupArray = [];
+            
+            updatedEdges.forEach(edge => {
+                if (edge.originalColor || edge.originalWidth !== undefined) {
+                    const cleanEdge = { ...edge };
+                    delete cleanEdge.originalColor;
+                    delete cleanEdge.originalWidth;
+                    cleanupArray.push(cleanEdge);
+                }
+            });
+            
+            if (cleanupArray.length > 0) {
+                window.network.body.data.edges.update(cleanupArray);
+            }
+        }, 100);
     }
 }
 
