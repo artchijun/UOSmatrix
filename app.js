@@ -9366,7 +9366,7 @@ function handleCommonValuesDrop(e) {
         }
         
         // 변경 기록 추가
-        addChangeRecord('commonValues', `${subjectType}-${targetColumn}`, `${course.courseName} 블럭이 복사되었습니다.`);
+        addChangeHistory('이동', course.courseName, [{field: '공통가치대응', before: sourceCell || '미배치', after: `${subjectType}-${targetColumn}`}]);
         
         // 드래그가 완전히 종료된 후 렌더링
         setTimeout(() => {
@@ -9401,7 +9401,7 @@ function handleCommonValuesDrop(e) {
         course.isRequired = isRequired ? '필수' : '선택';
         
         // 변경 기록 추가
-        addChangeRecord('commonValues', `${subjectType}-${isRequired ? '필수' : '선택'}`, `${course.courseName}이(가) ${subjectType} ${isRequired ? '필수' : '선택'}(으)로 분류되었습니다.`);
+        addChangeHistory('이동', course.courseName, [{field: '분류', before: sourceCell || '미분류', after: `${subjectType} ${isRequired ? '필수' : '선택'}`}]);
         
         // 드래그가 완전히 종료된 후 렌더링
         setTimeout(() => {
@@ -9649,6 +9649,13 @@ function showDeleteZone() {
                 else if (isRequired !== undefined) {
                     course.subjectType = null;
                     course.isRequired = null;
+                }
+                
+                // 변경 기록 추가
+                if (valueKey) {
+                    addChangeHistory('삭제', courseName, [{field: '공통가치대응', before: `${subjectType}-${valueKey}`, after: '삭제됨'}]);
+                } else if (isRequired !== undefined) {
+                    addChangeHistory('삭제', courseName, [{field: '분류', before: `${subjectType} ${isRequired ? '필수' : '선택'}`, after: '미분류'}]);
                 }
                 
                 // 드래그가 완전히 종료된 후 렌더링
