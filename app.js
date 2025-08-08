@@ -6896,6 +6896,9 @@ function renderCommonValuesTable() {
         return;
     }
     
+    // commonValuesCopiedBlocks에서 존재하지 않는 course ID 제거
+    cleanupCommonValuesCopiedBlocks();
+    
     // 공통가치대응 탭이 활성화되어 있지 않으면 렌더링하지 않음 (복원 시에는 제외)
     const commonValuesTab = document.getElementById('commonValuesTab');
     if (commonValuesTab && !commonValuesTab.classList.contains('active') && !window.isRestoringVersion) {
@@ -7457,7 +7460,11 @@ function renderCommonValuesNetworkGraph() {
     subjectTypes.forEach(subjectType => {
         valueKeys.forEach(key => {
             if (commonValuesCopiedBlocks[subjectType] && Array.isArray(commonValuesCopiedBlocks[subjectType][key])) {
-                valueCourseIds[key].push(...commonValuesCopiedBlocks[subjectType][key]);
+                // 실제로 존재하는 course ID만 추가
+                const validCourseIds = commonValuesCopiedBlocks[subjectType][key].filter(courseId => {
+                    return courses.some(c => c.id === courseId);
+                });
+                valueCourseIds[key].push(...validCourseIds);
             }
         });
     });
@@ -7916,7 +7923,16 @@ function renderCommonValuesNetworkGraph() {
                 
                 if (isGroupMember && groupNodeIds.length > 1) {
                     // 1. 그룹 중심점으로의 인력
-                    const groupPositions = groupNodeIds.map(id => network.getPosition(id)).filter(pos => pos);
+                    const groupPositions = groupNodeIds.map(id => {
+                        try {
+                            const pos = network.getPosition(id);
+                            return pos;
+                        } catch (e) {
+                            // 노드가 존재하지 않는 경우 무시
+                            console.warn(`Node ${id} not found in network`);
+                            return null;
+                        }
+                    }).filter(pos => pos);
                     if (groupPositions.length > 0) {
                         const centerX = groupPositions.reduce((sum, pos) => sum + pos.x, 0) / groupPositions.length;
                         const centerY = groupPositions.reduce((sum, pos) => sum + pos.y, 0) / groupPositions.length;
@@ -8472,10 +8488,15 @@ function renderCommonValuesNetworkGraph() {
 
         let outlinePoints = [];
         ids.forEach(id => {
-            const position = network.getPosition(id);
-            if (position) {
-                const points = getNodeOutlinePoints(network, id, 15);
-                outlinePoints = outlinePoints.concat(points);
+            try {
+                const position = network.getPosition(id);
+                if (position) {
+                    const points = getNodeOutlinePoints(network, id, 15);
+                    outlinePoints = outlinePoints.concat(points);
+                }
+            } catch (e) {
+                // 노드가 존재하지 않는 경우 무시
+                console.warn(`Node ${id} not found in network`);
             }
         });
 
@@ -9586,6 +9607,28 @@ function toggleColorModeCurriculum() {
 
 // 공통가치대응 VALUE1,2,3 셀의 복사된 블럭 정보를 관리하는 전역 객체
 let commonValuesCopiedBlocks = {};
+
+// commonValuesCopiedBlocks에서 존재하지 않는 course ID 제거
+function cleanupCommonValuesCopiedBlocks() {
+    const subjectTypes = [
+        '설계', '디지털', '역사', '이론', '도시', '사회', '기술', '실무', '비교과'
+    ];
+    const valueKeys = ['value1', 'value2', 'value3'];
+    
+    subjectTypes.forEach(subjectType => {
+        if (commonValuesCopiedBlocks[subjectType]) {
+            valueKeys.forEach(key => {
+                if (Array.isArray(commonValuesCopiedBlocks[subjectType][key])) {
+                    // 실제로 존재하는 course ID만 남기기
+                    commonValuesCopiedBlocks[subjectType][key] = 
+                        commonValuesCopiedBlocks[subjectType][key].filter(courseId => {
+                            return courses.some(c => c.id === courseId);
+                        });
+                }
+            });
+        }
+    });
+}
 
 // [추가] 드래그 시작한 셀 정보를 저장하는 전역 변수
 let draggedFromCell = null;
