@@ -8941,9 +8941,9 @@ function renderCommonValuesNetworkGraph() {
         const minDistanceFromBoundary = 600; // 경계에서 더 가까운 거리
         const boundaryOffset = 150; // 경계 확장 오프셋 (줄임)
         const labelRepulsionForce = 300; // 그룹 제목 반발력 (강화)
-        const labelRepulsionRadius = 200; // 그룹 제목 반발력 반경 (확대)
-        const nodeRepulsionForce = 250; // 노드 간 반발력 (강화)
-        const nodeRepulsionRadius = 150; // 노드 간 반발력 반경 (확대)
+        const labelRepulsionRadius = 300; // 그룹 제목 반발력 반경 (확대)
+        const nodeRepulsionForce = 350; // 노드 간 반발력 (강화)
+        const nodeRepulsionRadius = 250; // 노드 간 반발력 반경 (확대)
         let totalForceApplied = 0;
         let detectedIntruders = [];
         
@@ -8968,20 +8968,7 @@ function renderCommonValuesNetworkGraph() {
                 }
             }
             
-            // value 그룹에 따른 방향성 힘 적용 (더 부드럽게)
-            if (nodeValueGroup === 'value1') {
-                // value1: 왼쪽으로 이동
-                const dx = -150; // 왼쪽 방향 힘
-                node.vx = (node.vx || 0) + dx * directionalForce * 0.005;
-            } else if (nodeValueGroup === 'value2') {
-                // value2: 위쪽으로 이동
-                const dy = -150; // 위쪽 방향 힘
-                node.vy = (node.vy || 0) + dy * directionalForce * 0.005;
-            } else if (nodeValueGroup === 'value3') {
-                // value3: 오른쪽으로 이동
-                const dx = 150; // 오른쪽 방향 힘
-                node.vx = (node.vx || 0) + dx * directionalForce * 0.005;
-            }
+
             
             // 노드 간 반발력 적용 (모든 다른 노드와의 거리 확인)
             Object.keys(network.body.nodes).forEach(otherNodeId => {
@@ -11100,7 +11087,7 @@ function renderCommonValuesNetworkGraph() {
         setupValueColumnEvents();
     }, 200);
     
-    // 🌟 인터랙티브 레전드 생성
+    // 🌟 인터랙티브 레전드 생성 (공통가치대응 탭에서만)
     createInteractiveLegend();
 }
 // ... existing code ...
@@ -14171,15 +14158,51 @@ class PhysicsEffectsSystem {
         this.magneticFieldStrength = 5.0;
         this.explosionForce = 20.0;
         
-        // 애니메이션 루프
+        // 애니메이션 루프 관리
         this.animationId = null;
         this.lastTime = 0;
+        this.loopStarted = false;
+        
+        // 이벤트 핸들러 참조
+        this.visibilityHandler = null;
+        this.focusHandler = null;
+        this.blurHandler = null;
+        
+        // 성능 관리 시스템
+        this.frameCount = 0;
+        this.performanceMode = 'adaptive'; // high, medium, low, adaptive
+        this.targetFPS = 60;
+        this.frameInterval = 1000 / this.targetFPS;
+        this.lastFrameTime = 0;
+        this.performanceStats = {
+            averageFrameTime: 16.67,
+            frameTimeHistory: [],
+            memoryUsage: 0,
+            lastOptimizationTime: Date.now()
+        };
+        
+        // 장기 실행 관리
+        this.startTime = Date.now();
+        this.runTime = 0;
+        this.lastCleanupTime = Date.now();
+        this.cleanupInterval = 5 * 60 * 1000; // 5분마다 정리
+        this.maxRunTime = 24 * 60 * 60 * 1000; // 24시간 최대 실행
+        this.userInactiveTime = 0;
+        this.lastUserActivity = Date.now();
+        
+        // 배터리 최적화
+        this.powerSaveMode = false;
+        this.backgroundMode = false;
         
         // 노드별 물리 상태
         this.nodeStates = new Map();
         this.initializeNodeStates();
         
+        // 지속적 물리 시뮬레이션 시작
         this.startAnimationLoop();
+        
+        // 자동 복구 시스템 설정
+        this.setupAutoRecovery();
     }
     
     initializeNodeStates() {
@@ -14195,43 +14218,310 @@ class PhysicsEffectsSystem {
     }
     
     startAnimationLoop() {
+        // 기존 애니메이션 루프가 있다면 중단
+        this.stopAnimationLoop();
+        
+        // 애니메이션 루프 시작 시간 초기화
+        this.lastTime = performance.now();
+        this.lastFrameTime = this.lastTime;
+        this.loopStarted = true;
+        this.frameCount = 0;
+        
         const animate = (currentTime) => {
-            const deltaTime = currentTime - this.lastTime;
-            this.lastTime = currentTime;
-            
-            if (this.isActive && deltaTime > 0) {
-                this.updatePhysics(deltaTime);
+            try {
+                // 루프가 중단되었다면 재시작하지 않음
+                if (!this.loopStarted) return;
+                
+                const deltaTime = currentTime - this.lastTime;
+                const frameElapsed = currentTime - this.lastFrameTime;
+                
+                // FPS 제한 및 적응형 성능 관리
+                const shouldSkipFrame = this.shouldSkipFrame(frameElapsed, deltaTime);
+                
+                if (!shouldSkipFrame && this.isActive && deltaTime > 0 && deltaTime < 1000) {
+                    this.lastFrameTime = currentTime;
+                    this.frameCount++;
+                    
+                    // 성능 통계 업데이트
+                    this.updatePerformanceStats(deltaTime);
+                    
+                    // 물리 업데이트 실행
+                    this.updatePhysics(deltaTime);
+                    
+                    // 장기 실행 관리
+                    this.manageLongTermExecution();
+                }
+                
+                this.lastTime = currentTime;
+                
+                // 다음 프레임 예약
+                this.animationId = requestAnimationFrame(animate);
+                
+            } catch (error) {
+                console.warn('Physics animation loop error:', error);
+                // 에러 발생 시 루프 재시작 시도
+                this.restartAnimationLoop();
             }
-            
-            this.animationId = requestAnimationFrame(animate);
         };
         
         this.animationId = requestAnimationFrame(animate);
+        
+        // 브라우저 탭 가시성 변경 시 처리
+        this.setupVisibilityHandling();
+        
+        // 사용자 활동 추적 시작
+        this.setupUserActivityTracking();
+    }
+    
+    stopAnimationLoop() {
+        this.loopStarted = false;
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+        }
+    }
+    
+    restartAnimationLoop() {
+        console.log('Restarting physics animation loop...');
+        setTimeout(() => {
+            if (this.isActive) {
+                this.startAnimationLoop();
+            }
+        }, 100);
+    }
+    
+    setupVisibilityHandling() {
+        // 페이지 가시성 변경 이벤트 처리
+        if (typeof document !== 'undefined') {
+            const handleVisibilityChange = () => {
+                if (document.hidden) {
+                    // 탭이 숨겨졌을 때 - 물리 효과 일시정지
+                    this.pauseEffects();
+                } else {
+                    // 탭이 다시 보일 때 - 물리 효과 재개
+                    this.resumeEffects();
+                }
+            };
+            
+            // 기존 이벤트 리스너 제거 후 새로 추가
+            document.removeEventListener('visibilitychange', this.visibilityHandler);
+            this.visibilityHandler = handleVisibilityChange;
+            document.addEventListener('visibilitychange', this.visibilityHandler);
+        }
+        
+        // 윈도우 포커스/블러 이벤트 처리
+        if (typeof window !== 'undefined') {
+            const handleFocus = () => this.resumeEffects();
+            const handleBlur = () => this.pauseEffects();
+            
+            window.removeEventListener('focus', this.focusHandler);
+            window.removeEventListener('blur', this.blurHandler);
+            
+            this.focusHandler = handleFocus;
+            this.blurHandler = handleBlur;
+            
+            window.addEventListener('focus', this.focusHandler);
+            window.addEventListener('blur', this.blurHandler);
+        }
+    }
+    
+    // 🔧 누락된 메소드: 사용자 활동 추적 설정
+    setupUserActivityTracking() {
+        const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+        
+        const updateActivity = () => {
+            this.lastUserActivity = Date.now();
+            this.userInactiveTime = 0;
+        };
+        
+        // 이벤트 리스너 등록
+        activityEvents.forEach(event => {
+            document.addEventListener(event, updateActivity, { passive: true });
+        });
+    }
+    
+    // 🔧 누락된 메소드: 프레임 스킵 판단 로직
+    shouldSkipFrame(frameElapsed, deltaTime) {
+        // 성능 기반 프레임 스킵 결정
+        const targetFrameTime = this.frameInterval;
+        
+        // 프레임율이 너무 높거나 시스템이 과부하인 경우 스킵
+        if (frameElapsed < targetFrameTime * 0.8) {
+            return true;
+        }
+        
+        // 파워 세이브 모드에서 프레임 스킵
+        if (this.powerSaveMode && frameElapsed < targetFrameTime * 1.5) {
+            return true;
+        }
+        
+        // 백그라운드 모드에서 더 많은 프레임 스킵
+        if (this.backgroundMode && frameElapsed < targetFrameTime * 2) {
+            return true;
+        }
+        
+        // 사용자 비활성 상태에서 프레임 제한
+        const inactiveTime = Date.now() - this.lastUserActivity;
+        if (inactiveTime > 30000 && frameElapsed < targetFrameTime * 3) { // 30초 비활성
+            return true;
+        }
+        
+        return false;
+    }
+    
+    // 🔧 누락된 메소드: 성능 통계 업데이트
+    updatePerformanceStats(deltaTime) {
+        // 프레임 시간 기록
+        this.performanceStats.frameTimeHistory.push(deltaTime);
+        
+        // 최대 100개 기록 유지
+        if (this.performanceStats.frameTimeHistory.length > 100) {
+            this.performanceStats.frameTimeHistory.shift();
+        }
+        
+        // 평균 프레임 시간 계산
+        const total = this.performanceStats.frameTimeHistory.reduce((a, b) => a + b, 0);
+        this.performanceStats.averageFrameTime = total / this.performanceStats.frameTimeHistory.length;
+        
+        // 메모리 사용량 추정 (간략한 계산)
+        this.performanceStats.memoryUsage = this.nodeStates.size * 64 + this.performanceStats.frameTimeHistory.length * 8;
+        
+        // 성능 모드 자동 조정
+        if (this.performanceStats.averageFrameTime > 33.33) { // 30fps 미만
+            this.performanceMode = 'low';
+        } else if (this.performanceStats.averageFrameTime > 20) { // 50fps 미만
+            this.performanceMode = 'medium';
+        } else {
+            this.performanceMode = 'high';
+        }
+    }
+    
+    // 🔧 누락된 메소드: 장기 실행 관리
+    manageLongTermExecution() {
+        const currentTime = Date.now();
+        this.runTime = currentTime - this.startTime;
+        
+        // 주기적 정리 (5분마다)
+        if (currentTime - this.lastCleanupTime > this.cleanupInterval) {
+            this.performCleanup();
+            this.lastCleanupTime = currentTime;
+        }
+        
+        // 최대 실행 시간 체크 (24시간)
+        if (this.runTime > this.maxRunTime) {
+            console.log('Max runtime reached, restarting physics system...');
+            this.restartSystem();
+        }
+        
+        // 사용자 비활성 상태 추적
+        this.userInactiveTime = currentTime - this.lastUserActivity;
+        
+        // 1시간 이상 비활성 상태에서는 파워 세이브 모드 활성화
+        if (this.userInactiveTime > 3600000) {
+            this.powerSaveMode = true;
+        } else {
+            this.powerSaveMode = false;
+        }
+    }
+    
+    // 🔧 누락된 메소드: 안전한 효과 적용
+    safeApplyEffect(effectFunction, effectName) {
+        try {
+            effectFunction();
+        } catch (error) {
+            console.warn(`Error applying ${effectName} effect:`, error);
+            // 효과 실패 시 해당 효과만 비활성화
+            this.disableEffect(effectName);
+        }
+    }
+    
+    // 🔧 헬퍼 메소드들
+    performCleanup() {
+        // 메모리 정리
+        this.performanceStats.frameTimeHistory = this.performanceStats.frameTimeHistory.slice(-50);
+        
+        // 노드 상태 검증 및 정리
+        const validNodeIds = new Set(this.nodes.map(n => n.id));
+        for (const nodeId of this.nodeStates.keys()) {
+            if (!validNodeIds.has(nodeId)) {
+                this.nodeStates.delete(nodeId);
+            }
+        }
+    }
+    
+    restartSystem() {
+        this.startTime = Date.now();
+        this.runTime = 0;
+        this.frameCount = 0;
+        this.performanceStats.frameTimeHistory = [];
+        console.log('Physics system restarted');
+    }
+    
+    disableEffect(effectName) {
+        switch (effectName) {
+            case 'vibration':
+                this.vibrationActive = false;
+                break;
+            case 'magnetic field':
+                this.magneticFieldActive = false;
+                break;
+            case 'pulse':
+                this.pulseActive = false;
+                break;
+            case 'attraction':
+                this.attractionActive = false;
+                break;
+            case 'forces':
+                // 힘 적용은 비활성화하지 않음
+                break;
+        }
     }
     
     updatePhysics(deltaTime) {
-        const dt = Math.min(deltaTime / 16.67, 2); // 60fps 기준 정규화
-        
-        // 성능 최적화: 너무 작은 델타타임은 무시
-        if (dt < 0.1) return;
-        
-        if (this.vibrationActive) {
-            this.applyVibrationEffect(dt);
+        try {
+            const dt = Math.min(deltaTime / 16.67, 2); // 60fps 기준 정규화
+            
+            // 성능 최적화: 너무 작은 델타타임은 무시
+            if (dt < 0.1 || !this.isActive) return;
+            
+            // 네트워크가 유효한지 확인
+            if (!this.network || !this.network.body) return;
+            
+            // 물리 효과 적용
+            if (this.vibrationActive) {
+                this.safeApplyEffect(() => this.applyVibrationEffect(dt), 'vibration');
+            }
+            
+            if (this.magneticFieldActive) {
+                this.safeApplyEffect(() => this.applyMagneticField(dt), 'magnetic field');
+            }
+            
+            if (this.pulseActive) {
+                this.safeApplyEffect(() => this.applyPulseEffect(dt), 'pulse');
+            }
+            
+            if (this.attractionActive) {
+                this.safeApplyEffect(() => this.applyAttractionEffect(dt), 'attraction');
+            }
+            
+            this.safeApplyEffect(() => this.applyForces(dt), 'forces');
+            
+            // 자동 복구 시스템을 위한 프레임 타임 업데이트
+            this.lastFrameTime = Date.now();
+            
+        } catch (error) {
+            console.warn('Physics update error:', error);
+            // 에러가 발생해도 시뮬레이션을 완전히 중단하지 않음
         }
-        
-        if (this.magneticFieldActive) {
-            this.applyMagneticField(dt);
+    }
+    
+    safeApplyEffect(effectFunction, effectName) {
+        try {
+            effectFunction();
+        } catch (error) {
+            console.warn(`Physics ${effectName} effect error:`, error);
+            // 개별 효과 에러는 다른 효과들의 동작을 방해하지 않음
         }
-        
-        if (this.pulseActive) {
-            this.applyPulseEffect(dt);
-        }
-        
-        if (this.attractionActive) {
-            this.applyAttractionEffect(dt);
-        }
-        
-        this.applyForces(dt);
     }
     
     // 🌪️ 진동 효과
@@ -14572,11 +14862,26 @@ class PhysicsEffectsSystem {
     }
     
     pauseEffects() {
+        console.log('Pausing physics effects...');
         this.isActive = false;
+        
+        // 애니메이션 루프도 일시정지 (성능 최적화)
+        this.stopAnimationLoop();
     }
     
     resumeEffects() {
+        console.log('Resuming physics effects...');
         this.isActive = true;
+        
+        // 애니메이션 루프 재시작
+        if (!this.loopStarted) {
+            this.startAnimationLoop();
+        }
+        
+        // 진동 효과가 활성화되어 있었다면 재시작
+        if (this.vibrationActive) {
+            this.startContinuousVibration();
+        }
     }
     
     resetEffects() {
@@ -14594,10 +14899,96 @@ class PhysicsEffectsSystem {
     }
     
     destroy() {
-        if (this.animationId) {
-            cancelAnimationFrame(this.animationId);
-        }
+        console.log('Destroying physics effects system...');
+        
+        // 애니메이션 루프 중단
+        this.stopAnimationLoop();
+        
+        // 모든 효과 리셋
         this.resetEffects();
+        
+        // 이벤트 리스너 정리
+        this.cleanupEventListeners();
+        
+        // 상태 정리
+        this.isActive = false;
+        this.nodeStates.clear();
+    }
+    
+    cleanupEventListeners() {
+        // 페이지 가시성 이벤트 리스너 제거
+        if (this.visibilityHandler && typeof document !== 'undefined') {
+            document.removeEventListener('visibilitychange', this.visibilityHandler);
+            this.visibilityHandler = null;
+        }
+        
+        // 윈도우 포커스/블러 이벤트 리스너 제거
+        if (this.focusHandler && typeof window !== 'undefined') {
+            window.removeEventListener('focus', this.focusHandler);
+            this.focusHandler = null;
+        }
+        
+        if (this.blurHandler && typeof window !== 'undefined') {
+            window.removeEventListener('blur', this.blurHandler);
+            this.blurHandler = null;
+        }
+        
+        // 자동 복구 타이머 정리
+        if (this.recoveryInterval) {
+            clearInterval(this.recoveryInterval);
+            this.recoveryInterval = null;
+        }
+    }
+    
+    setupAutoRecovery() {
+        // 주기적으로 물리 시뮬레이션 상태 확인 및 복구
+        this.lastFrameTime = Date.now();
+        this.stuckCounter = 0;
+        
+        this.recoveryInterval = setInterval(() => {
+            const now = Date.now();
+            const timeSinceLastFrame = now - this.lastFrameTime;
+            
+            // 5초 이상 프레임이 업데이트되지 않으면 문제로 판단
+            if (this.isActive && timeSinceLastFrame > 5000) {
+                this.stuckCounter++;
+                console.warn(`Physics simulation appears stuck (${this.stuckCounter}). Attempting recovery...`);
+                
+                // 3번의 복구 시도 후에도 문제가 지속되면 시스템 재시작
+                if (this.stuckCounter >= 3) {
+                    console.log('Physics simulation recovery: Full system restart');
+                    this.fullRestart();
+                    this.stuckCounter = 0;
+                } else {
+                    console.log('Physics simulation recovery: Animation loop restart');
+                    this.restartAnimationLoop();
+                }
+                
+                this.lastFrameTime = now;
+            } else if (timeSinceLastFrame < 1000) {
+                // 정상 작동 시 카운터 리셋
+                this.stuckCounter = 0;
+            }
+        }, 10000); // 10초마다 체크
+    }
+    
+    fullRestart() {
+        console.log('Performing full physics system restart...');
+        
+        // 기존 시스템 정리
+        this.stopAnimationLoop();
+        
+        // 상태 초기화
+        this.initializeNodeStates();
+        
+        // 시스템 재시작
+        this.isActive = true;
+        this.startAnimationLoop();
+        
+        // 활성화된 효과들 복원
+        if (this.vibrationActive) {
+            this.startContinuousVibration();
+        }
     }
 }
 
@@ -14920,10 +15311,27 @@ document.head.appendChild(styleSheet);
 
 // 🌟 인터랙티브 레전드 생성 함수
 function createInteractiveLegend() {
+    // 공통가치대응 탭이 활성화되어 있는지 확인
+    const commonValuesTab = document.getElementById('commonValues');
+    if (!commonValuesTab || !commonValuesTab.classList.contains('active')) {
+        return; // 공통가치대응 탭이 활성화되지 않았으면 레전드 생성하지 않음
+    }
+    
     // 기존 레전드가 있으면 제거
     const existingLegend = document.getElementById('network-legend');
     if (existingLegend) {
         existingLegend.remove();
+    }
+    
+    // 네트워크 그래프 컨테이너 찾기
+    const networkContainer = document.getElementById('commonValuesNetworkGraph');
+    if (!networkContainer) {
+        return; // 네트워크 그래프가 없으면 레전드 생성하지 않음
+    }
+    
+    // 네트워크 그래프 컨테이너의 위치를 relative로 설정 (absolute 포지셔닝을 위해)
+    if (networkContainer.style.position !== 'relative') {
+        networkContainer.style.position = 'relative';
     }
     
     // 레전드 컨테이너 생성
@@ -14931,23 +15339,23 @@ function createInteractiveLegend() {
     legend.id = 'network-legend';
     legend.className = 'network-legend';
     legend.style.cssText = `
-        position: fixed;
+        position: absolute;
         bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
+        right: 20px;
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(10px);
         border: 1px solid #e0e0e0;
         border-radius: 12px;
-        padding: 16px 24px;
+        padding: 12px 20px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
         z-index: 1000;
         display: flex;
-        gap: 24px;
+        gap: 16px;
         align-items: center;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         font-size: 14px;
         transition: all 0.3s ease;
+        pointer-events: auto;
     `;
     
     // 레전드 제목
@@ -15076,15 +15484,37 @@ function createInteractiveLegend() {
         legend.appendChild(itemContainer);
     });
     
-    // 레전드를 body에 추가
-    document.body.appendChild(legend);
+    // 레전드를 네트워크 그래프 컨테이너에 추가
+    networkContainer.appendChild(legend);
+    
+    // 레전드가 그래프 영역을 벗어나지 않도록 위치 조정
+    setTimeout(() => {
+        const legendRect = legend.getBoundingClientRect();
+        const containerRect = networkContainer.getBoundingClientRect();
+        
+        // 레전드가 컨테이너를 벗어나는 경우 위치 조정
+        if (legendRect.right > containerRect.right) {
+            legend.style.right = '10px';
+        }
+        if (legendRect.bottom > containerRect.bottom) {
+            legend.style.bottom = '10px';
+        }
+        if (legendRect.left < containerRect.left) {
+            legend.style.left = '10px';
+            legend.style.right = 'auto';
+        }
+        if (legendRect.top < containerRect.top) {
+            legend.style.top = '10px';
+            legend.style.bottom = 'auto';
+        }
+    }, 50);
     
     // 애니메이션 효과
     legend.style.opacity = '0';
-    legend.style.transform = 'translateX(-50%) translateY(20px)';
+    legend.style.transform = 'translateY(20px)';
     setTimeout(() => {
         legend.style.opacity = '1';
-        legend.style.transform = 'translateX(-50%) translateY(0)';
+        legend.style.transform = 'translateY(0)';
     }, 100);
 }
 
