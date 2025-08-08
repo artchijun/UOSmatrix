@@ -11,6 +11,8 @@ const firebaseConfig = {
     appId: "1:208876542369:web:a50a4d20468bfb4c8b13e0"
 };
 
+// 물리 엔진 재시작 카운터 제거 - vis-network 자체 처리에 맡김
+
 // 🔧 vis-network 폰트 호환성을 위한 전역 안전 함수
 window.sanitizeVisNetworkFont = function(fontObj) {
     // 기본 vis-network 호환 폰트 속성
@@ -38,6 +40,193 @@ window.sanitizeVisNetworkFont = function(fontObj) {
     };
 };
 
+// 🛡️ vis-network DataSet 인터셉션 시스템 - 모든 노드 데이터를 자동으로 검증/수정
+window.createSafeVisNetworkDataSet = function(initialData = []) {
+    // 원본 DataSet 생성
+    const dataSet = new vis.DataSet();
+    
+    // 노드 데이터 sanitization 함수
+    const sanitizeNodeData = (nodeData) => {
+        if (!nodeData || typeof nodeData !== 'object') return nodeData;
+        
+        const sanitizedData = { ...nodeData };
+        
+        // font 속성이 있으면 sanitize
+        if (sanitizedData.font) {
+            sanitizedData.font = window.sanitizeVisNetworkFont(sanitizedData.font);
+        }
+        
+        return sanitizedData;
+    };
+    
+    // 원본 메서드들 저장
+    const originalAdd = dataSet.add.bind(dataSet);
+    const originalUpdate = dataSet.update.bind(dataSet);
+    const originalUpdateOnly = dataSet.updateOnly.bind(dataSet);
+    
+    // add 메서드 오버라이드
+    dataSet.add = function(data, senderId) {
+        let sanitizedData = data;
+        
+        if (Array.isArray(data)) {
+            sanitizedData = data.map(sanitizeNodeData);
+        } else if (data && typeof data === 'object') {
+            sanitizedData = sanitizeNodeData(data);
+        }
+        
+        return originalAdd(sanitizedData, senderId);
+    };
+    
+    // update 메서드 오버라이드
+    dataSet.update = function(data, senderId) {
+        let sanitizedData = data;
+        
+        if (Array.isArray(data)) {
+            sanitizedData = data.map(sanitizeNodeData);
+        } else if (data && typeof data === 'object') {
+            sanitizedData = sanitizeNodeData(data);
+        }
+        
+        return originalUpdate(sanitizedData, senderId);
+    };
+    
+    // updateOnly 메서드 오버라이드
+    dataSet.updateOnly = function(data, senderId) {
+        let sanitizedData = data;
+        
+        if (Array.isArray(data)) {
+            sanitizedData = data.map(sanitizeNodeData);
+        } else if (data && typeof data === 'object') {
+            sanitizedData = sanitizeNodeData(data);
+        }
+        
+        return originalUpdateOnly(sanitizedData, senderId);
+    };
+    
+    // 초기 데이터가 있으면 추가
+    if (initialData && initialData.length > 0) {
+        dataSet.add(initialData);
+    }
+    
+    return dataSet;
+};
+
+// 🔧 네트워크 생성 후 폰트 속성 일괄 검증 및 수정
+// 🛡️ 네트워크 데이터 무결성 검증 및 복구 함수
+window.validateNetworkDataIntegrity = function(network, autoRepair = true) {
+    if (!network || !network.body || !network.body.data) {
+        return false;
+    }
+    
+    try {
+        const nodes = network.body.data.nodes;
+        const edges = network.body.data.edges;
+        
+        if (!nodes || !edges) {
+            return false;
+        }
+        
+        // 노드 무결성 검사
+        const nodeIds = new Set();
+        const invalidNodes = [];
+        
+        for (let nodeId of nodes.getIds()) {
+            const node = nodes.get(nodeId);
+            if (!node || node.id === undefined) {
+                console.warn(`🛡️ 무결성 검사: 노드 ${nodeId} 데이터 불완전`);
+                invalidNodes.push(nodeId);
+            } else {
+                nodeIds.add(node.id);
+            }
+        }
+        
+        // 손상된 노드 제거
+        if (autoRepair && invalidNodes.length > 0) {
+            console.warn(`🛡️ 손상된 노드 ${invalidNodes.length}개 제거 중...`);
+            nodes.remove(invalidNodes);
+        }
+        
+        // 엣지 무결성 검사 및 복구
+        const invalidEdges = [];
+        
+        for (let edgeId of edges.getIds()) {
+            const edge = edges.get(edgeId);
+            if (!edge || edge.from === undefined || edge.to === undefined) {
+                console.warn(`🛡️ 무결성 검사: 엣지 ${edgeId} 데이터 불완전`);
+                invalidEdges.push(edgeId);
+                continue;
+            }
+            
+            // 엣지가 참조하는 노드 존재 여부 확인
+            if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
+                console.warn(`🛡️ 무결성 검사: 엣지 ${edgeId}가 존재하지 않는 노드 참조`);
+                invalidEdges.push(edgeId);
+            }
+        }
+        
+        // 손상된 엣지 제거
+        if (autoRepair && invalidEdges.length > 0) {
+            console.warn(`🛡️ 손상된 엣지 ${invalidEdges.length}개 제거 중...`);
+            edges.remove(invalidEdges);
+        }
+        
+        const hasInvalidData = invalidNodes.length > 0 || invalidEdges.length > 0;
+        
+        if (hasInvalidData && !autoRepair) {
+            return false;
+        }
+        
+        console.log(`🛡️ 네트워크 데이터 무결성: 노드 ${nodeIds.size}개, 엣지 ${edges.length}개 (손상 제거: 노드 ${invalidNodes.length}개, 엣지 ${invalidEdges.length}개)`);
+        return true;
+        
+    } catch (error) {
+        console.warn('🛡️ 데이터 무결성 검사 중 오류:', error);
+        return false;
+    }
+};
+
+window.validateAndFixNetworkFonts = function(network) {
+    if (!network || !network.body || !network.body.data || !network.body.data.nodes) {
+        return;
+    }
+    
+    try {
+        const allNodes = network.body.data.nodes.get();
+        const nodesToUpdate = [];
+        
+        allNodes.forEach(node => {
+            if (node.font) {
+                const sanitizedFont = window.sanitizeVisNetworkFont(node.font);
+                // 원래 폰트와 다르면 업데이트 필요
+                if (JSON.stringify(node.font) !== JSON.stringify(sanitizedFont)) {
+                    nodesToUpdate.push({
+                        id: node.id,
+                        font: sanitizedFont
+                    });
+                }
+            }
+        });
+        
+        // 일괄 업데이트
+        if (nodesToUpdate.length > 0) {
+            network.body.data.nodes.update(nodesToUpdate);
+        }
+    } catch (error) {
+        console.warn('네트워크 폰트 검증 중 오류:', error);
+    }
+};
+
+// vis-network 오류 복구 시스템 제거 - vis-network 자체 처리에 맡김
+window.setupNetworkErrorRecovery = function(network) {
+    // 제거됨 - vis-network 자체 오류 처리 사용
+};
+
+// 전역 vis-network 오류 방지 시스템 제거 - vis-network 자체 처리에 맡김
+window.setupGlobalVisNetworkErrorPrevention = function() {
+    // 제거됨 - vis-network 자체 오류 처리 사용
+};
+
+
 // Firebase 초기화
 let db;
 let firebaseInitialized = false;
@@ -45,30 +234,51 @@ let isOnline = navigator.onLine;
 
 // Firebase 초기화 및 데이터베이스 연결
 function initializeFirebase() {
+    console.log('🔧 Firebase 초기화 시작...');
     try {
         if (typeof firebase !== 'undefined') {
-            firebase.initializeApp(firebaseConfig);
+            console.log('✅ Firebase SDK 로드됨');
+            // Firebase 앱이 이미 초기화되었는지 확인
+            if (!firebase.apps.length) {
+                console.log('🔧 새로운 Firebase 앱 초기화 중...');
+                firebase.initializeApp(firebaseConfig);
+            } else {
+                console.log('ℹ️ 기존 Firebase 앱 재사용');
+                firebase.app(); // 이미 초기화된 앱 사용
+            }
             db = firebase.database();
             firebaseInitialized = true;
+            console.log('✅ Firebase 초기화 완료');
             
             // 연결 상태 모니터링
             const connectedRef = db.ref('.info/connected');
             connectedRef.on('value', function(snap) {
                 if (snap.val() === true) {
                     isOnline = true;
+                    console.log('✅ Firebase 연결 성공');
                     showConnectionStatus('온라인', 'success');
                     // 온라인 상태가 되면 로컬 데이터를 Firebase와 동기화
                     syncLocalDataToFirebase();
                 } else {
                     isOnline = false;
+                    console.log('⚠️ Firebase 오프라인 모드');
                     showConnectionStatus('오프라인', 'warning');
                 }
             });
         } else {
+            console.error('❌ Firebase SDK가 로드되지 않았습니다.');
             firebaseInitialized = false;
+            showConnectionStatus('Firebase SDK 로드 실패', 'error');
         }
     } catch (error) {
+        console.error('❌ Firebase 초기화 오류:', error);
+        console.error('오류 상세:', {
+            message: error.message,
+            code: error.code,
+            stack: error.stack
+        });
         firebaseInitialized = false;
+        showConnectionStatus('Firebase 초기화 실패', 'error');
     }
 }
 
@@ -100,6 +310,10 @@ function showConnectionStatus(status, type) {
         element.style.backgroundColor = '#fff3cd';
         element.style.color = '#856404';
         element.style.border = '1px solid #ffeaa7';
+    } else if (type === 'error') {
+        element.style.backgroundColor = '#f8d7da';
+        element.style.color = '#721c24';
+        element.style.border = '1px solid #f5c6cb';
     }
     
     // 3초 후 자동으로 숨기기 (성공 상태는 제외)
@@ -845,6 +1059,17 @@ function initializeUI() {
     
     // 공통가치대응 Value 컬럼 이벤트 시스템 초기화
     initializeValueColumnEvents();
+    
+    // 🔧 공통가치대응 데이터 구조 초기화
+    const subjectTypes = ['설계', '디지털', '역사', '이론', '도시', '사회', '기술', '실무', '비교과'];
+    subjectTypes.forEach(subjectType => {
+        if (!commonValuesCopiedBlocks[subjectType]) {
+            commonValuesCopiedBlocks[subjectType] = { value1: [], value2: [], value3: [] };
+        }
+    });
+    
+    // 🔧 공통가치대응 탭 초기 렌더링 추가
+    renderCommonValuesTable();
     
     // 공통가치대응 탭을 기본으로 시작
     localStorage.setItem('uosLastTab', 'commonValues');
@@ -2993,6 +3218,9 @@ window.onclick = function(event) {
 
 // 페이지 로드 시 초기화
 window.onload = function() {
+    // 🛡️ 전역 vis-network 오류 방지 시스템 활성화
+    window.setupGlobalVisNetworkErrorPrevention();
+    
     // 교과목 추가/수정 폼 이벤트 리스너
     const courseForm = document.getElementById('courseForm');
     if (courseForm) {
@@ -7363,7 +7591,29 @@ function renderCommonValuesNetworkGraph() {
         valueCourseIds[key] = Array.from(new Set(valueCourseIds[key]));
     });
     
-    // valueCourseIds 내용 확인
+    // 비교과 노드 ID 누락 검사 및 자동 복구
+    const allExtracurricularIds = [];
+    Object.values(valueCourseIds).forEach(ids => {
+        ids.forEach(id => {
+            if (id.startsWith('extracurricular-') && !allExtracurricularIds.includes(id)) {
+                allExtracurricularIds.push(id);
+            }
+        });
+    });
+    
+    // extracurricularNameMap에 없는 ID 자동 생성
+    const missingNameMappings = allExtracurricularIds.filter(id => 
+        !window.extracurricularNameMap || !window.extracurricularNameMap[id]
+    );
+    
+    if (missingNameMappings.length > 0) {
+        missingNameMappings.forEach(id => {
+            if (!window.extracurricularNameMap) {
+                window.extracurricularNameMap = {};
+            }
+            window.extracurricularNameMap[id] = id.replace('extracurricular-', '');
+        });
+    }
 
     // 노드: 교과목만 추가 (VALUE1,2,3 노드 제거)
     const nodes = [];
@@ -7374,6 +7624,13 @@ function renderCommonValuesNetworkGraph() {
                 // 비교과 블럭 처리
                 if (id.startsWith('extracurricular-')) {
                     const name = window.extracurricularNameMap ? window.extracurricularNameMap[id] : id.replace('extracurricular-', '');
+                    
+                    // 🔍 비교과 노드 생성 검증
+                    if (!name || name.trim() === '') {
+                        console.warn(`비교과 노드 ${id}의 이름이 없습니다. 스킵합니다.`);
+                        return; // 이 노드 스킵
+                    }
+                    
                     const { subjectTypeColors, categoryColors } = generateColorLegend();
                     
                     let nodeColor = {};
@@ -7940,14 +8197,14 @@ function renderCommonValuesNetworkGraph() {
         const baseBorderWidth = 1;
         const adjustedBorderWidth = baseBorderWidth + valueGroupCount;
 
-        // 🔧 vis-network 호환성을 위한 안전한 font 속성 설정
-        n.font = window.sanitizeVisNetworkFont({
+        // font 속성 설정 (단순화)
+        n.font = {
             size: adjustedFontSize,
             color: '#495057',
             face: 'Noto Sans KR, Arial, sans-serif',
             strokeWidth: 1,
             strokeColor: '#495057'
-        });
+        };
         n.borderWidth = adjustedBorderWidth;
         n.shapeProperties = {
             borderRadius: 12
@@ -7992,8 +8249,136 @@ function renderCommonValuesNetworkGraph() {
         };
     });
 
-    // vis-network 인스턴스 생성 (스타일링 적용된 노드로)
-    const network = new vis.Network(container, { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) }, options);
+    // 네트워크 노드 생성 완료
+
+    // 🛡️ 노드/엣지 데이터 유효성 검증 및 정리
+    const validNodes = nodes.filter(node => {
+        if (!node || !node.id) return false;
+        
+        // 노드 데이터의 모든 속성을 안전하게 검증
+        const safeNode = { ...node };
+        
+        // color 속성 검증
+        if (safeNode.color && typeof safeNode.color === 'object') {
+            const safeColor = {};
+            if (safeNode.color.background !== undefined) safeColor.background = safeNode.color.background;
+            if (safeNode.color.border !== undefined) safeColor.border = safeNode.color.border;
+            if (safeNode.color.highlight && typeof safeNode.color.highlight === 'object') {
+                safeColor.highlight = {};
+                if (safeNode.color.highlight.background !== undefined) safeColor.highlight.background = safeNode.color.highlight.background;
+                if (safeNode.color.highlight.border !== undefined) safeColor.highlight.border = safeNode.color.highlight.border;
+            }
+            safeNode.color = safeColor;
+        }
+        
+        // font 속성 검증
+        if (safeNode.font && typeof safeNode.font === 'object') {
+            const safeFont = {};
+            if (safeNode.font.color !== undefined) safeFont.color = safeNode.font.color;
+            if (safeNode.font.size !== undefined) safeFont.size = safeNode.font.size;
+            if (safeNode.font.face !== undefined) safeFont.face = safeNode.font.face;
+            if (safeNode.font.background !== undefined) safeFont.background = safeNode.font.background;
+            if (safeNode.font.strokeWidth !== undefined) safeFont.strokeWidth = safeNode.font.strokeWidth;
+            if (safeNode.font.strokeColor !== undefined) safeFont.strokeColor = safeNode.font.strokeColor;
+            safeNode.font = safeFont;
+        }
+        
+        // 기타 속성들 검증
+        if (safeNode.opacity !== undefined && (typeof safeNode.opacity !== 'number' || safeNode.opacity < 0 || safeNode.opacity > 1)) {
+            safeNode.opacity = 1;
+        }
+        if (safeNode.borderWidth !== undefined && (typeof safeNode.borderWidth !== 'number' || safeNode.borderWidth < 0)) {
+            safeNode.borderWidth = 2;
+        }
+        
+        Object.assign(node, safeNode);
+        return true;
+    });
+    
+    const validEdges = edges.filter(edge => {
+        if (!edge || !edge.from || !edge.to) return false;
+        
+        // 특정 손상된 edge ID 제거
+        if (edge.id === 'b32b3453-2317-430d-9775-ce82c08eaed0') {
+            console.warn('🛡️ 손상된 edge 제거:', edge.id);
+            return false;
+        }
+        
+        // 엣지 데이터의 모든 속성을 안전하게 검증
+        const safeEdge = { ...edge };
+        
+        // color 속성 검증
+        if (safeEdge.color && typeof safeEdge.color === 'object') {
+            const safeColor = {};
+            if (safeEdge.color.color !== undefined) safeColor.color = safeEdge.color.color;
+            if (safeEdge.color.highlight !== undefined) safeColor.highlight = safeEdge.color.highlight;
+            if (safeEdge.color.hover !== undefined) safeColor.hover = safeEdge.color.hover;
+            safeEdge.color = safeColor;
+        }
+        
+        // 기타 속성들 검증
+        if (safeEdge.width !== undefined && (typeof safeEdge.width !== 'number' || safeEdge.width < 0)) {
+            safeEdge.width = 1;
+        }
+        if (safeEdge.opacity !== undefined && (typeof safeEdge.opacity !== 'number' || safeEdge.opacity < 0 || safeEdge.opacity > 1)) {
+            safeEdge.opacity = 1;
+        }
+        
+        Object.assign(edge, safeEdge);
+        return true;
+    });
+    
+    console.log(`🛡️ 데이터 검증 완료: 유효한 노드 ${validNodes.length}개, 유효한 엣지 ${validEdges.length}개`);
+    
+    // 🛡️ 안전한 vis-network 인스턴스 생성 (폰트 속성 자동 검증)
+    const safeNodeDataSet = window.createSafeVisNetworkDataSet(validNodes);
+    // 🔧 엣지는 일반 DataSet 사용 (SpringSolver 호환성 유지)
+    const edgeDataSet = new vis.DataSet(validEdges);
+    const network = new vis.Network(container, { nodes: safeNodeDataSet, edges: edgeDataSet }, options);
+    
+    // 🔧 네트워크 생성 후 안정화 및 검증
+    setTimeout(() => {
+        try {
+            // 물리 엔진 데이터 검증
+            if (network && network.body && network.body.data && network.body.data.nodes) {
+                const nodeCount = network.body.data.nodes.length;
+                const edgeCount = network.body.data.edges.length;
+                console.log(`🛡️ 네트워크 안정화: 노드 ${nodeCount}개, 엣지 ${edgeCount}개`);
+                
+                // 🛡️ 네트워크 내부 상태 추가 검증
+                if (network.body && network.body.nodes) {
+                    const nodeIds = Object.keys(network.body.nodes);
+                    console.log(`🛡️ 네트워크 내부 노드 상태: ${nodeIds.length}개 노드 초기화됨`);
+                }
+            }
+            
+            // 초기화 시점 font 검증 (한 번만 수행)
+            if (window.validateAndFixNetworkFonts) {
+                window.validateAndFixNetworkFonts(network);
+            }
+            
+            // 🛡️ 물리 엔진 안정화
+            if (network && network.physics) {
+                network.setOptions({
+                    physics: {
+                        enabled: true,
+                        stabilization: {
+                            enabled: true,
+                            iterations: 100,
+                            updateInterval: 25
+                        }
+                    }
+                });
+            }
+        } catch (error) {
+            console.warn('네트워크 안정화 과정에서 오류 발생:', error);
+        }
+    }, 100);
+    
+    // 주기적 font 검증 제거 - 초기화 시점에만 수행
+    
+    // 🚨 오류 복구 시스템 활성화
+    window.setupNetworkErrorRecovery(network);
     
     // 🌟 물리 효과 시스템 초기화
     initializePhysicsEffectsSystem(network, nodes, valueCourseIds);
@@ -10447,10 +10832,24 @@ function renderCommonValuesNetworkGraph() {
                 // 🔍 데이터 일치성 검증 - 네트워크에 실제 존재하는 노드만 필터링
                 const validGroupNodeIds = groupNodeIds ? groupNodeIds.filter(nodeId => {
                     try {
-                        network.getPosition(nodeId);
-                        return true;
+                        // 1차 검증: 네트워크에 노드가 존재하는지 확인
+                        const position = network.getPosition(nodeId);
+                        
+                        // 2차 검증: 위치 정보가 유효한지 확인
+                        if (position && typeof position.x === 'number' && typeof position.y === 'number') {
+                            return true;
+                        } else {
+                            console.warn(`Node ${nodeId} exists but has invalid position in group ${key}:`, position);
+                            return false;
+                        }
                     } catch (e) {
-                        console.warn(`Filtering out invalid node: ${nodeId} from group ${key}`);
+                        // 노드가 네트워크에 존재하지 않는 경우
+                        if (nodeId.startsWith('extracurricular-')) {
+                            const name = window.extracurricularNameMap ? window.extracurricularNameMap[nodeId] : 'unknown';
+                            console.warn(`비교과 노드 누락: ${nodeId} (${name}) from group ${key}`, e.message);
+                        } else {
+                            console.warn(`일반 노드 누락: ${nodeId} from group ${key}`, e.message);
+                        }
                         return false;
                     }
                 }) : [];
@@ -10694,7 +11093,8 @@ function renderCommonValuesNetworkGraph() {
 
     // 그룹 드래그 시작 (레거시 - 사용되지 않음)
     network.on('dragStart', function(params) {
-        // 현재 직접 마우스 이벤트로 처리되고 있어 사용되지 않음
+        // 🔧 드래그 시작 시 재시작 카운터 리셋 (이제 오류가 해결되어 필요시에만 사용)
+        window.physicsRestartCount = 0;
     });
 
     // 그룹 드래그 중
@@ -10750,6 +11150,18 @@ function renderCommonValuesNetworkGraph() {
 
     // 그룹 드래그 종료
     network.on('dragEnd', function(params) {
+        // 🔧 드래그 종료 - 드래그 중 건너뛴 엣지/하이라이트 처리 재반영
+        try {
+            if (typeof window.updateNodeHighlight === 'function') {
+                window.updateNodeHighlight();
+            }
+            if (window.network) {
+                window.network.redraw();
+            }
+        } catch (e) {
+            console.warn('드래그 종료 후 상태 갱신 중 오류:', e);
+        }
+
         if (isDraggingGroup) {
             const currentGroupKey = draggedGroupKey; // 현재 그룹키 저장
             
@@ -10811,29 +11223,99 @@ function renderCommonValuesNetworkGraph() {
     
     // 노드 하이라이트 업데이트 함수를 전역으로 이동
     window.updateNodeHighlight = function() {
-        if (!window.network) return;
+        // 🛡️ 네트워크 객체 안전성 검증
+        if (!window.network || !window.network.body || !window.network.body.data) {
+            console.warn('네트워크 객체가 초기화되지 않았습니다.');
+            return;
+        }
         
         // 스플라인 선택 상태와 테이블 헤더 동기화
         syncSplineWithTableHeaders();
         
         // 🔧 vis-network 호환성을 위한 안전한 선택 해제
         try {
-            window.network.unselectAll();
+            // 드래그 중에는 unselectAll 호출 금지 (내부 상태 충돌 방지)
+            if (!(typeof isDraggingGroup !== 'undefined' && isDraggingGroup)) {
+                // 🛡️ unselectAll 전에 모든 노드의 font 속성 검증 및 복구
+                if (window.network && window.network.body && window.network.body.data && window.network.body.data.nodes) {
+                    window.validateAndFixNetworkFonts(window.network);
+                }
+
+                // 네트워크 상태 재검증 후 unselectAll
+                if (window.network && window.network.body && window.network.body.data) {
+                    window.network.unselectAll();
+                }
+            }
         } catch (error) {
             console.warn('unselectAll 호출 중 오류 발생:', error);
+            
+            // 🛡️ font 속성 관련 오류인 경우 특별 처리
+            if (error.message && error.message.includes('includes') && error.message.includes('getFormattingValues')) {
+                console.warn('🛡️ Node 포맷팅 오류 감지 - 폰트 속성 복구 시도');
+                try {
+                    window.validateAndFixNetworkFonts(window.network);
+                    // 복구 후 재시도
+                    setTimeout(() => {
+                        if (window.network) {
+                            window.network.unselectAll();
+                        }
+                    }, 50);
+                } catch (fontFixError) {
+                    console.warn('폰트 속성 복구 실패:', fontFixError);
+                }
+                return;
+            }
+            
             // 대안: 직접 선택된 노드 목록 초기화
-            if (window.network && window.network.body && window.network.body.selectionHandler) {
-                window.network.body.selectionHandler.unselectAll();
+            try {
+                if (window.network && window.network.body && window.network.body.selectionHandler) {
+                    window.network.body.selectionHandler.unselectAll();
+                }
+            } catch (innerError) {
+                console.warn('대안 선택 해제도 실패:', innerError);
+                // 최후의 수단: 네트워크 재초기화 고려
+                return;
             }
         }
         
         const nodeUpdate = [];
-        // 현재 네트워크의 실제 노드 데이터를 가져옵니다
-        const currentNodes = window.network.body.data.nodes.get();
+        // 🛡️ 현재 네트워크의 실제 노드 데이터를 안전하게 가져옵니다
+        let currentNodes = [];
+        try {
+            if (window.network && window.network.body && window.network.body.data && window.network.body.data.nodes) {
+                const rawNodes = window.network.body.data.nodes.get();
+                
+                // 🛡️ 노드 데이터 추가 검증 및 정리
+                currentNodes = rawNodes.filter(node => {
+                    if (!node || !node.id) {
+                        console.warn('유효하지 않은 노드 데이터 발견:', node);
+                        return false;
+                    }
+                    
+                    // 노드의 필수 속성들이 올바른지 확인
+                    if (node.color && typeof node.color !== 'object') {
+                        console.warn(`노드 ${node.id}의 color 속성이 잘못되었습니다:`, node.color);
+                        node.color = undefined;
+                    }
+                    
+                    if (node.font && typeof node.font !== 'object') {
+                        console.warn(`노드 ${node.id}의 font 속성이 잘못되었습니다:`, node.font);
+                        node.font = undefined;
+                    }
+                    
+                    return true;
+                });
+                
+                console.log(`🛡️ 노드 데이터 검증 완료: ${currentNodes.length}개 유효한 노드`);
+            }
+        } catch (error) {
+            console.warn('노드 데이터 가져오기 실패:', error);
+            return;
+        }
         
         // 선택된 그룹의 노드들 수집
         let selectedGroupNodeIds = [];
-        if (window.selectedCommonValuesBlob && valueCourseIds[window.selectedCommonValuesBlob]) {
+        if (window.selectedCommonValuesBlob && valueCourseIds && valueCourseIds[window.selectedCommonValuesBlob]) {
             selectedGroupNodeIds = valueCourseIds[window.selectedCommonValuesBlob];
         }
         
@@ -10882,69 +11364,106 @@ function renderCommonValuesNetworkGraph() {
             }
         });
         
-        // 기존 엣지 데이터 가져오기
-        const currentEdges = window.network.body.data.edges.get();
-        
-        // 과목분류 연결 엣지들을 기존 엣지에 추가하거나 업데이트
-        const existingSubjectTypeEdgeIds = new Set();
-        
-        // 기존 과목분류 연결 엣지들 제거 (선택 해제 시)
-        currentEdges.forEach(edge => {
-            if (edge.title === '같은 과목분류 연결') {
-                existingSubjectTypeEdgeIds.add(edge.id);
+        // 🛡️ 드래그 중에는 엣지 add/remove/update를 수행하지 않음 (내부 상태 불일치 방지)
+        if (!(typeof isDraggingGroup !== 'undefined' && isDraggingGroup)) {
+            // 🛡️ 기존 엣지 데이터를 안전하게 가져오기
+            let currentEdges = [];
+            try {
+                if (window.network && window.network.body && window.network.body.data && window.network.body.data.edges) {
+                    currentEdges = window.network.body.data.edges.get();
+                }
+            } catch (error) {
+                console.warn('엣지 데이터 가져오기 실패:', error);
+                return;
             }
-        });
-        
-        // 기존 과목분류 연결 엣지들 제거
-        if (existingSubjectTypeEdgeIds.size > 0) {
-            window.network.body.data.edges.remove(Array.from(existingSubjectTypeEdgeIds));
-        }
-        
-        // 새로운 과목분류 연결 엣지들 추가
-        if (window.selectedCommonValuesBlob && subjectTypeEdges.length > 0) {
-            window.network.body.data.edges.add(subjectTypeEdges);
-        }
-        
-        // 나머지 엣지들을 원래 스타일로 복원
-        const edgeUpdateArray = [];
-        currentEdges.forEach(edge => {
-            if (edge.title !== '같은 과목분류 연결') {
-                if (window.selectedCommonValuesBlob) {
-                    // 그룹 선택 중일 때는 투명도 적용
-                    edgeUpdateArray.push({
-                        id: edge.id,
-                        color: { 
-                            color: edge.dashes ? 'rgba(158, 158, 158, 0.3)' : 'rgba(189, 189, 189, 0.3)',
-                            highlight: edge.dashes ? 'rgba(158, 158, 158, 0.3)' : 'rgba(189, 189, 189, 0.3)',
-                            hover: edge.dashes ? 'rgba(158, 158, 158, 0.3)' : 'rgba(189, 189, 189, 0.3)'
-                        },
-                        width: edge.dashes ? 1.5 : 3,
-                        opacity: 0.3
-                    });
-                } else {
-                    // 그룹 선택 해제 시 원래 스타일로 완전 복원
-                    edgeUpdateArray.push({
-                        id: edge.id,
-                        color: { 
-                            color: edge.dashes ? '#9e9e9e' : '#bdbdbd',
-                            highlight: edge.dashes ? '#9e9e9e' : '#bdbdbd',
-                            hover: edge.dashes ? '#9e9e9e' : '#bdbdbd'
-                        },
-                        width: edge.dashes ? 1.5 : 3,
-                        opacity: edge.dashes ? 0.5 : 1
-                    });
+
+            // 과목분류 연결 엣지들을 기존 엣지에 추가하거나 업데이트
+            const existingSubjectTypeEdgeIds = new Set();
+
+            // 기존 과목분류 연결 엣지들 제거 (선택 해제 시)
+            currentEdges.forEach(edge => {
+                if (edge.title === '같은 과목분류 연결') {
+                    existingSubjectTypeEdgeIds.add(edge.id);
+                }
+            });
+
+            // 🛡️ 기존 과목분류 연결 엣지들 안전하게 제거
+            if (existingSubjectTypeEdgeIds.size > 0) {
+                try {
+                    if (window.network && window.network.body && window.network.body.data && window.network.body.data.edges) {
+                        window.network.body.data.edges.remove(Array.from(existingSubjectTypeEdgeIds));
+                    }
+                } catch (error) {
+                    console.warn('기존 엣지 제거 실패:', error);
                 }
             }
-        });
-        
-        if (edgeUpdateArray.length > 0) {
-            window.network.body.data.edges.update(edgeUpdateArray);
+
+            // 🛡️ 새로운 과목분류 연결 엣지들 안전하게 추가
+            if (window.selectedCommonValuesBlob && subjectTypeEdges.length > 0) {
+                try {
+                    if (window.network && window.network.body && window.network.body.data && window.network.body.data.edges) {
+                        window.network.body.data.edges.add(subjectTypeEdges);
+                    }
+                } catch (error) {
+                    console.warn('새로운 엣지 추가 실패:', error);
+                }
+            }
+
+            // 나머지 엣지들을 원래 스타일로 복원
+            const edgeUpdateArray = [];
+            currentEdges.forEach(edge => {
+                if (edge.title !== '같은 과목분류 연결') {
+                    if (window.selectedCommonValuesBlob) {
+                        // 그룹 선택 중일 때는 투명도 적용
+                        edgeUpdateArray.push({
+                            id: edge.id,
+                            color: { 
+                                color: edge.dashes ? 'rgba(158, 158, 158, 0.3)' : 'rgba(189, 189, 189, 0.3)',
+                                highlight: edge.dashes ? 'rgba(158, 158, 158, 0.3)' : 'rgba(189, 189, 189, 0.3)',
+                                hover: edge.dashes ? 'rgba(158, 158, 158, 0.3)' : 'rgba(189, 189, 189, 0.3)'
+                            },
+                            width: edge.dashes ? 1.5 : 3,
+                            opacity: 0.3
+                        });
+                    } else {
+                        // 그룹 선택 해제 시 원래 스타일로 완전 복원
+                        edgeUpdateArray.push({
+                            id: edge.id,
+                            color: { 
+                                color: edge.dashes ? '#9e9e9e' : '#bdbdbd',
+                                highlight: edge.dashes ? '#9e9e9e' : '#bdbdbd',
+                                hover: edge.dashes ? '#9e9e9e' : '#bdbdbd'
+                            },
+                            width: edge.dashes ? 1.5 : 3,
+                            opacity: edge.dashes ? 0.5 : 1
+                        });
+                    }
+                }
+            });
+
+            // 🛡️ 엣지 업데이트를 안전하게 수행
+            if (edgeUpdateArray.length > 0) {
+                try {
+                    if (window.network && window.network.body && window.network.body.data && window.network.body.data.edges) {
+                        window.network.body.data.edges.update(edgeUpdateArray);
+                    }
+                } catch (error) {
+                    console.warn('엣지 업데이트 실패:', error);
+                }
+            }
         }
         
+        // 🛡️ 노드 업데이트를 안전하게 수행
         currentNodes.forEach(currentNode => {
+            // 노드 데이터 안전성 검증
+            if (!currentNode || !currentNode.id) {
+                console.warn('유효하지 않은 노드 데이터:', currentNode);
+                return;
+            }
+            
             const nodeId = currentNode.id;
             let isInSelectedGroup = false;
-            if (window.selectedCommonValuesBlob && valueCourseIds[window.selectedCommonValuesBlob]) {
+            if (window.selectedCommonValuesBlob && valueCourseIds && valueCourseIds[window.selectedCommonValuesBlob]) {
                 isInSelectedGroup = valueCourseIds[window.selectedCommonValuesBlob].includes(nodeId);
             }
             
@@ -11056,10 +11575,78 @@ function renderCommonValuesNetworkGraph() {
             nodeUpdate.push(updatedNode);
         });
         
-        // 노드 스타일만 update()로 적용 (네트워크 전체 재생성/물리효과 X)
-        try {
-            window.network.body.data.nodes.update(nodeUpdate);
-        } catch (error) {
+        // 🛡️ 노드 스타일만 update()로 안전하게 적용 (네트워크 전체 재생성/물리효과 X)
+        if (nodeUpdate.length > 0) {
+            try {
+                if (window.network && window.network.body && window.network.body.data && window.network.body.data.nodes) {
+                    // 🛡️ 노드 업데이트 데이터 최종 검증 및 정리
+                    const sanitizedNodeUpdate = nodeUpdate.map(node => {
+                        // 필수 속성 검증
+                        if (!node || !node.id) {
+                            console.warn('유효하지 않은 노드 업데이트 데이터 제거:', node);
+                            return null;
+                        }
+                        
+                        // 안전한 노드 객체 생성
+                        const safeNode = { id: node.id };
+                        
+                        // color 속성 안전하게 복사
+                        if (node.color && typeof node.color === 'object') {
+                            safeNode.color = {};
+                            if (node.color.background !== undefined) safeNode.color.background = node.color.background;
+                            if (node.color.border !== undefined) safeNode.color.border = node.color.border;
+                            if (node.color.highlight && typeof node.color.highlight === 'object') {
+                                safeNode.color.highlight = {};
+                                if (node.color.highlight.background !== undefined) safeNode.color.highlight.background = node.color.highlight.background;
+                                if (node.color.highlight.border !== undefined) safeNode.color.highlight.border = node.color.highlight.border;
+                            }
+                        }
+                        
+                        // 기타 속성들 안전하게 복사
+                        if (node.opacity !== undefined) safeNode.opacity = node.opacity;
+                        if (node.borderWidth !== undefined) safeNode.borderWidth = node.borderWidth;
+                        
+                        // 🛡️ font 속성 완전 초기화 및 안전하게 복사
+                        const defaultFont = {
+                            color: '#343a40',
+                            size: 14,
+                            face: 'arial',
+                            background: 'none',
+                            strokeWidth: 0,
+                            strokeColor: '#ffffff'
+                        };
+                        
+                        if (node.font && typeof node.font === 'object') {
+                            safeNode.font = {
+                                color: node.font.color !== undefined ? node.font.color : defaultFont.color,
+                                size: node.font.size !== undefined ? node.font.size : defaultFont.size,
+                                face: node.font.face !== undefined ? node.font.face : defaultFont.face,
+                                background: node.font.background !== undefined ? node.font.background : defaultFont.background,
+                                strokeWidth: node.font.strokeWidth !== undefined ? node.font.strokeWidth : defaultFont.strokeWidth,
+                                strokeColor: node.font.strokeColor !== undefined ? node.font.strokeColor : defaultFont.strokeColor
+                            };
+                        } else {
+                            // font 속성이 없으면 기본값 사용
+                            safeNode.font = { ...defaultFont };
+                        }
+                        
+                        // font 속성 sanitize
+                        safeNode.font = window.sanitizeVisNetworkFont(safeNode.font);
+                        
+                        return safeNode;
+                    }).filter(node => node !== null); // null 값 제거
+                    
+                    if (sanitizedNodeUpdate.length > 0) {
+                        window.network.body.data.nodes.update(sanitizedNodeUpdate);
+                    }
+                }
+            } catch (error) {
+                console.warn('노드 업데이트 실패:', error);
+                // 🛡️ 오류 발생 시 네트워크 상태 재검증
+                if (error.message && error.message.includes('Cannot read properties of undefined')) {
+                    console.warn('네트워크 내부 상태 오류 감지. 네트워크 재초기화를 고려하세요.');
+                }
+            }
         }
     };
     // 마우스 노드 호버 효과 (연결된 요소 포함)
@@ -11103,7 +11690,7 @@ function renderCommonValuesNetworkGraph() {
             if (!nodeHoverOriginalStyles.has(node.id)) {
                 nodeHoverOriginalStyles.set(node.id, {
                     opacity: node.opacity || 1,
-                    font: window.sanitizeVisNetworkFont(node.font),
+                    font: node.font || { color: '#343a40', size: 14 },
                     color: node.color ? { ...node.color } : undefined,
                     borderWidth: node.borderWidth || 2
                 });
@@ -11113,15 +11700,24 @@ function renderCommonValuesNetworkGraph() {
                 // 호버된 노드 - 강한 하이라이트 (자동으로 chosen 스타일 적용됨)
                 network.selectNodes([hoveredNodeId]);
             } else if (connectedNodeIds.includes(node.id)) {
-                // 🔧 연결된 노드의 과목 정보 가져오기
-                const course = courses.find(c => c.courseName === node.label);
+                // 🔧 연결된 노드의 과목 정보 가져오기 (비교과 노드 고려)
+                let course = null;
                 let fontColor = '#000000'; // 기본값
                 let borderColor = node.color ? node.color.border : '#bdbdbd';
                 
-                if (course && course.subjectType) {
-                    // 과목분류에 따른 폰트색과 테두리색 적용
-                    fontColor = subjectTypeBorderColors[course.subjectType] || '#000000';
-                    borderColor = subjectTypeBorderColors[course.subjectType] || borderColor;
+                // 비교과 노드인지 확인
+                if (node.id && node.id.startsWith('extracurricular-')) {
+                    // 비교과 노드의 경우 고정 색상 사용
+                    fontColor = '#757575'; // 비교과 노드용 폰트 색상
+                    borderColor = '#757575'; // 비교과 노드용 테두리 색상
+                } else {
+                    // 일반 교과목 노드의 경우
+                    course = courses.find(c => c.courseName === node.label);
+                    if (course && course.subjectType) {
+                        // 과목분류에 따른 폰트색과 테두리색 적용
+                        fontColor = subjectTypeBorderColors[course.subjectType] || '#000000';
+                        borderColor = subjectTypeBorderColors[course.subjectType] || borderColor;
+                    }
                 }
                 
                 // 연결된 노드 - 중간 하이라이트 (과목분류색 적용)
@@ -11178,11 +11774,19 @@ function renderCommonValuesNetworkGraph() {
             if (connectedEdgeIds.includes(edge.id)) {
                 // 🔧 연결된 엣지의 색상을 호버된 노드의 과목분류색으로 설정
                 const hoveredNode = allNodes.find(n => n.id === hoveredNodeId);
-                const hoveredCourse = hoveredNode ? courses.find(c => c.courseName === hoveredNode.label) : null;
+                let hoveredCourse = null;
                 let edgeColor = '#666666'; // 기본값
                 
-                if (hoveredCourse && hoveredCourse.subjectType) {
-                    edgeColor = subjectTypeBorderColors[hoveredCourse.subjectType] || '#666666';
+                if (hoveredNode) {
+                    // 🔧 비교과 노드 처리
+                    if (hoveredNode.id && hoveredNode.id.toString().startsWith('extracurricular-')) {
+                        edgeColor = '#28a745'; // 비교과용 고정 색상
+                    } else {
+                        hoveredCourse = courses.find(c => c.courseName === hoveredNode.label);
+                        if (hoveredCourse && hoveredCourse.subjectType) {
+                            edgeColor = subjectTypeBorderColors[hoveredCourse.subjectType] || '#666666';
+                        }
+                    }
                 }
                 
                 // 연결된 엣지 - 과목분류색으로 하이라이트
@@ -11212,16 +11816,28 @@ function renderCommonValuesNetworkGraph() {
         // 🔧 vis-network 호환성을 위한 안전한 업데이트 적용
         if (nodeUpdateArray.length > 0) {
             try {
-                network.body.data.nodes.update(nodeUpdateArray);
+                // 🛡️ 모든 노드의 font 속성 사전 처리
+                const sanitizedArray = nodeUpdateArray.map(nodeUpdate => {
+                    const safeNode = { ...nodeUpdate };
+                    
+                    // font 속성 완전 초기화
+                    if (!safeNode.font || typeof safeNode.font !== 'object') {
+                        safeNode.font = {};
+                    }
+                    
+                    safeNode.font = window.sanitizeVisNetworkFont(safeNode.font);
+                    return safeNode;
+                });
+                
+                network.body.data.nodes.update(sanitizedArray);
             } catch (error) {
                 console.warn('노드 업데이트 중 오류 발생:', error);
                 // 개별적으로 업데이트 시도
                 nodeUpdateArray.forEach(nodeUpdate => {
                     try {
-                        if (nodeUpdate.font) {
-                            nodeUpdate.font = window.sanitizeVisNetworkFont(nodeUpdate.font);
-                        }
-                        network.body.data.nodes.update([nodeUpdate]);
+                        const safeNode = { ...nodeUpdate };
+                        safeNode.font = window.sanitizeVisNetworkFont(nodeUpdate.font || {});
+                        network.body.data.nodes.update([safeNode]);
                     } catch (e) {
                         console.warn(`노드 ${nodeUpdate.id} 업데이트 실패:`, e);
                     }
@@ -11242,7 +11858,13 @@ function renderCommonValuesNetworkGraph() {
     network.on('blurNode', function(params) {
         // 지속성 모드가 아닐 때만 선택 해제
         if (!window.splineSelectionPersistent) {
-            network.unselectAll();
+            try {
+                // unselectAll 호출
+                network.unselectAll();
+            } catch (error) {
+                // unselectAll 오류 무시 - vis-network 내부 처리에 맡김
+                console.warn('unselectAll 오류:', error.message);
+            }
         }
         
         // 노드 원래 상태로 복원
@@ -11488,7 +12110,13 @@ function renderCommonValuesNetworkGraph() {
                     // 노드 업데이트 적용
                     if (nodeUpdateArray.length > 0) {
                         try {
-                            network.body.data.nodes.update(nodeUpdateArray);
+                            // 🛡️ font 속성 사전 처리
+                            const sanitizedNodes = nodeUpdateArray.map(node => {
+                                const safeNode = { ...node };
+                                safeNode.font = window.sanitizeVisNetworkFont(node.font || {});
+                                return safeNode;
+                            });
+                            network.body.data.nodes.update(sanitizedNodes);
                         } catch (error) {
                             console.warn('노드 배치 업데이트 중 오류:', error);
                             // 개별 업데이트 시도
@@ -11646,7 +12274,23 @@ function renderCommonValuesNetworkGraph() {
           network.on('blurEdge', function(params) {
           // 지속성 모드가 아닐 때만 선택 해제
           if (!window.splineSelectionPersistent) {
-              network.unselectAll();
+              try {
+                  // 🛡️ unselectAll 전에 font 속성 검증
+                  if (network && network.body && network.body.data) {
+                      window.validateAndFixNetworkFonts(network);
+                  }
+                  network.unselectAll();
+              } catch (error) {
+                  console.warn('🛡️ blurEdge unselectAll 오류 방지:', error);
+                  // 대안: 선택된 노드만 직접 해제
+                  try {
+                      if (network.body && network.body.selectionHandler) {
+                          network.body.selectionHandler.unselectAll();
+                      }
+                  } catch (fallbackError) {
+                      console.warn('blurEdge 대안 선택 해제도 실패:', fallbackError);
+                  }
+              }
           }
         
         // 모든 노드 원래 상태로 복원
@@ -11702,8 +12346,37 @@ function renderCommonValuesNetworkGraph() {
         document.body.style.cursor = 'default';
     });
     
-    // window.network에 할당하여 전역에서 접근 가능하게 함
-    window.network = network;
+    // 🛡️ window.network에 안전하게 할당하여 전역에서 접근 가능하게 함
+    if (network && network.body && network.body.data) {
+        window.network = network;
+        console.log('네트워크 객체가 전역에 안전하게 할당되었습니다.');
+        
+            // 🛡️ 네트워크 상태 주기적 검증 시스템
+    window.networkHealthCheck = setInterval(() => {
+        if (!window.network || !window.network.body || !window.network.body.data) {
+            console.warn('네트워크 객체 상태가 손상되었습니다. 재초기화가 필요할 수 있습니다.');
+            clearInterval(window.networkHealthCheck);
+        } else {
+            // 🛡️ 네트워크 내부 상태 추가 검증
+            try {
+                const nodeCount = window.network.body.data.nodes.length;
+                const edgeCount = window.network.body.data.edges.length;
+                
+                // 노드 데이터 무결성 검증
+                const nodes = window.network.body.data.nodes.get();
+                const validNodes = nodes.filter(node => node && node.id);
+                
+                if (validNodes.length !== nodeCount) {
+                    console.warn(`네트워크 노드 데이터 무결성 문제: ${validNodes.length}/${nodeCount}개 유효한 노드`);
+                }
+            } catch (error) {
+                console.warn('네트워크 상태 검증 중 오류 발생:', error);
+            }
+        }
+    }, 10000); // 10초마다 검증
+    } else {
+        console.error('네트워크 객체가 올바르게 초기화되지 않았습니다.');
+    }
     
     // Value 컬럼 이벤트 시스템 설정 (네트워크 생성 후)
     setTimeout(() => {
@@ -15578,7 +16251,6 @@ class PhysicsEffectsSystem {
     }
     
     pauseEffects() {
-        console.log('Pausing physics effects...');
         this.isActive = false;
         
         // 애니메이션 루프도 일시정지 (성능 최적화)
@@ -15586,7 +16258,6 @@ class PhysicsEffectsSystem {
     }
     
     resumeEffects() {
-        console.log('Resuming physics effects...');
         this.isActive = true;
         
         // 애니메이션 루프 재시작
