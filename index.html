@@ -952,17 +952,39 @@
             
             console.log('앱 초기화 시도 중...');
             
-            // init 함수 가용성 확인
+            // init 함수 가용성 확인 (async 함수 지원)
             if (typeof window.init === 'function') {
                 console.log('✓ window.init 함수 발견, 실행 중...');
-                window.init();
-                isInitialized = true;
-                return true;
+                try {
+                    const result = window.init();
+                    if (result && typeof result.then === 'function') {
+                        // async 함수인 경우
+                        result.catch(error => {
+                            console.error('Init 함수 실행 중 오류:', error);
+                        });
+                    }
+                    isInitialized = true;
+                    return true;
+                } catch (error) {
+                    console.error('Init 함수 실행 오류:', error);
+                    return false;
+                }
             } else if (typeof init === 'function') {
                 console.log('✓ init 함수 발견, 실행 중...');
-                init();
-                isInitialized = true;
-                return true;
+                try {
+                    const result = init();
+                    if (result && typeof result.then === 'function') {
+                        // async 함수인 경우
+                        result.catch(error => {
+                            console.error('Init 함수 실행 중 오류:', error);
+                        });
+                    }
+                    isInitialized = true;
+                    return true;
+                } catch (error) {
+                    console.error('Init 함수 실행 오류:', error);
+                    return false;
+                }
             } else {
                 console.warn('⚠️ init 함수를 아직 찾을 수 없습니다. 재시도 중...');
                 return false;
@@ -1129,11 +1151,11 @@
         panel.style.left = newLeft + 'px';
         panel.style.top = newTop + 'px';
         panel.style.right = 'auto';
-    });
+    }, { passive: false });
     document.addEventListener('mouseup', function() {
         isDragging = false;
         document.body.style.userSelect = '';
-    });
+    }, { passive: true });
 })();
 </script>
 <script>
