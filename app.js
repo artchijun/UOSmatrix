@@ -214,6 +214,9 @@ async function loadAllDataFromFirebase() {
         if (firebaseCurrentVersion) {
             currentVersion = firebaseCurrentVersion;
             localStorage.setItem('uosCurrentVersion', firebaseCurrentVersion);
+        } else {
+            // Firebase에 currentVersion이 없으면 최신 버전 자동 선택
+            selectLatestVersion();
         }
         
         // 설정 데이터 로드
@@ -7609,8 +7612,26 @@ function renderCommonValuesNetworkGraph() {
         for (let i = 0; i < groupIds.length; i++) {
             for (let j = i + 1; j < groupIds.length; j++) {
                 // 같은 학년-학기 연결은 더 두껍게, yearSemester 텍스트 팝업
-                edges.push({ from: groupIds[i], to: groupIds[j], width: 4, title: yearSemester });
-                edges.push({ from: groupIds[j], to: groupIds[i], width: 4, title: yearSemester });
+                edges.push({ 
+                    from: groupIds[i], 
+                    to: groupIds[j], 
+                    width: 4, 
+                    title: yearSemester,
+                    physics: {
+                        springLength: 20000, // 더 긴 스프링 길이
+                        springConstant: 0.0001 // 더 약한 스프링 상수
+                    }
+                });
+                edges.push({ 
+                    from: groupIds[j], 
+                    to: groupIds[i], 
+                    width: 4, 
+                    title: yearSemester,
+                    physics: {
+                        springLength: 20000, // 더 긴 스프링 길이
+                        springConstant: 0.0001 // 더 약한 스프링 상수
+                    }
+                });
             }
         }
     });
@@ -7627,8 +7648,22 @@ function renderCommonValuesNetworkGraph() {
     Object.values(subjectTypeGroups).forEach(groupIds => {
         for (let i = 0; i < groupIds.length; i++) {
             for (let j = i + 1; j < groupIds.length; j++) {
-                edges.push({ from: groupIds[i], to: groupIds[j] });
-                edges.push({ from: groupIds[j], to: groupIds[i] });
+                edges.push({ 
+                    from: groupIds[i], 
+                    to: groupIds[j],
+                    physics: {
+                        springLength: 20000, // 더 긴 스프링 길이
+                        springConstant: 0.0001 // 더 약한 스프링 상수
+                    }
+                });
+                edges.push({ 
+                    from: groupIds[j], 
+                    to: groupIds[i],
+                    physics: {
+                        springLength: 20000, // 더 긴 스프링 길이
+                        springConstant: 0.0001 // 더 약한 스프링 상수
+                    }
+                });
             }
         }
     });
@@ -7661,9 +7696,9 @@ function renderCommonValuesNetworkGraph() {
             enabled: true,
             barnesHut: {
                 gravitationalConstant: -1500, // 반발력을 약간 줄임
-                centralGravity: 0.1, // 중앙 중력 더 감소
-                springLength: 12000, // 적당한 스프링 길이
-                springConstant: 0.0005, // 스프링 상수를 줄여 떨림 감소
+                centralGravity: 0.5, // 중앙 중력 증가 (0.1 → 0.5)
+                springLength: 15000, // 스프링 길이 늘림 (12000 → 15000)
+                springConstant: 0.0002, // 스프링 상수 더 감소 (0.0005 → 0.0002)
                 damping: 0.98, // 더 강한 감쇠로 떨림 최소화
                 avoidOverlap: 1.5 // 겹침 방지 약간 감소
             },
@@ -7675,10 +7710,10 @@ function renderCommonValuesNetworkGraph() {
                 fit: true
             },
             adaptiveTimestep: true, // 적응형 시간 간격
-            maxVelocity: 50, // 최대 속도 제한
+            maxVelocity: 30, // 최대 속도 더 제한 (50 → 30)
             minVelocity: 0.1, // 최소 속도 설정
             solver: 'barnesHut',
-            timestep: 0.5 // 시간 간격을 줄여 부드러운 움직임
+            timestep: 0.3 // 시간 간격을 더 줄여 부드러운 움직임 (0.5 → 0.3)
         },
         interaction: {
             hover: true,
@@ -7867,6 +7902,68 @@ function renderCommonValuesNetworkGraph() {
     let lastNodePositions = new Map(); // 이전 노드 위치 저장
     const stabilityThreshold = 0.5; // 안정화 임계값 (픽셀 단위)
     
+    // 단순하고 강력한 침입 노드 제거 시스템
+    function forceExpelIntruders() {
+        if (!network || !network.body || !network.body.nodes) return;
+        if (!commonValuesBlobData || Object.keys(commonValuesBlobData).length === 0) return;
+        if (isDraggingGroup) return;
+        
+        const activeNetwork = network || window.commonValuesNetwork;
+        
+        // 모든 노드를 검사
+        Object.keys(activeNetwork.body.nodes).forEach(nodeId => {
+            const node = activeNetwork.body.nodes[nodeId];
+            if (!node) return;
+            
+            const nodePosition = { x: node.x, y: node.y };
+            
+            // 각 그룹에 대해 검사
+            valueKeys.forEach(groupKey => {
+                const groupNodeIds = valueCourseIds[groupKey] || [];
+                const groupBoundary = commonValuesBlobData[groupKey];
+                
+                if (!groupBoundary || groupBoundary.length < 3) return;
+                
+                const nodeInThisGroup = groupNodeIds.includes(nodeId);
+                const nodeInsideBoundary = isPointInPolygon(nodePosition, groupBoundary);
+                
+                // 그룹에 속하지 않는데 경계 안에 있으면 즉시 강하게 밀어냄
+                if (!nodeInThisGroup && nodeInsideBoundary) {
+                    // 중심점 계산
+                    let centerX = 0, centerY = 0;
+                    groupBoundary.forEach(point => {
+                        centerX += point.x;
+                        centerY += point.y;
+                    });
+                    centerX /= groupBoundary.length;
+                    centerY /= groupBoundary.length;
+                    
+                    // 밀어낼 방향 계산
+                    const dx = nodePosition.x - centerX;
+                    const dy = nodePosition.y - centerY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance > 0) {
+                        const normalizedX = dx / distance;
+                        const normalizedY = dy / distance;
+                        
+                        // 매우 강한 힘으로 즉시 밀어냄
+                        const pushDistance = 10; // 한번에 10픽셀씩 밀어냄
+                        
+                        try {
+                            network.moveNode(nodeId, 
+                                node.x + normalizedX * pushDistance, 
+                                node.y + normalizedY * pushDistance
+                            );
+                        } catch (e) {
+                            // 이동 실패 시 무시
+                        }
+                    }
+                }
+            });
+        });
+    }
+    
     // 반발력 시스템을 즉시 시작 (네트워크 안정화와 무관하게)
     
     // 스플라인 데이터가 없는 경우를 대비한 테스트 데이터 생성
@@ -7888,6 +7985,8 @@ function renderCommonValuesNetworkGraph() {
             });
         }
         startRepulsionSystem();
+        // 즉시 한번 더 강제 실행
+        forceExpelIntruders();
     }, 500); // 0.5초 후 즉시 시작
     
     // 네트워크 안정화 완료 후에도 다시 한번 확인
@@ -7910,6 +8009,22 @@ function renderCommonValuesNetworkGraph() {
             startRepulsionSystem();
         }
     }, 2000);
+    
+    // 헬퍼 함수: 폴리곤 중심점 계산
+    function getPolygonCenter(polygon) {
+        if (!polygon || polygon.length === 0) return { x: 0, y: 0 };
+        const centerX = polygon.reduce((sum, point) => sum + point.x, 0) / polygon.length;
+        const centerY = polygon.reduce((sum, point) => sum + point.y, 0) / polygon.length;
+        return { x: centerX, y: centerY };
+    }
+    
+    // 헬퍼 함수: 중심으로부터 최대 반지름 계산
+    function getMaxRadiusFromCenter(polygon, center) {
+        if (!polygon || polygon.length === 0) return 0;
+        return Math.max(...polygon.map(point => 
+            Math.sqrt(Math.pow(point.x - center.x, 2) + Math.pow(point.y - center.y, 2))
+        ));
+    }
     
     // 그룹 스플라인 침입 방지 및 밀어내기 함수
     function calculateBoundaryRepulsion() {
@@ -8030,22 +8145,41 @@ function renderCommonValuesNetworkGraph() {
                         let forceMultiplier = 1.0;
                         let baseForceStrength = 200; // 기본 반발력 강화
                         
+                        // 강화된 거리 비례 반발력 시스템
+                        const splineCenter = getPolygonCenter(groupBoundary);
+                        const maxRadius = getMaxRadiusFromCenter(groupBoundary, splineCenter);
+                        
+                        // 중심으로부터의 거리 계산
+                        const distanceFromCenter = Math.sqrt(
+                            Math.pow(position.x - splineCenter.x, 2) + 
+                            Math.pow(position.y - splineCenter.y, 2)
+                        );
+                        
                         if (isInsideSpline) {
-                            // 스플라인 내부에 있는 경우 - 부드러운 반발력
-                            forceMultiplier = 3.0; // 과도한 반발력 감소
-                            baseForceStrength = 250; // 기본 강도 감소
-                        } else if (distanceToSpline < 30) {
-                            // 경계 매우 근처 - 중간 반발력
-                            forceMultiplier = 2.0; // 감소
-                            baseForceStrength = 200; // 감소
-                        } else if (distanceToSpline < 60) {
-                            // 경계 근처 - 약한 반발력
-                            forceMultiplier = 1.5; // 감소
-                            baseForceStrength = 150; // 감소
+                            // 스플라인 내부에 있는 외부 노드 - 거리에 반비례하는 강력한 밀어내기
+                            const normalizedDistance = Math.min(distanceFromCenter / maxRadius, 1.0);
+                            
+                            // 중심에 가까울수록 지수적으로 증가하는 반발력
+                            const proximityFactor = Math.pow(1.0 - normalizedDistance, 2); // 지수적 증가
+                            forceMultiplier = 8.0 + (proximityFactor * 12.0); // 8-20배 강력한 반발력
+                            baseForceStrength = 400 + (proximityFactor * 600); // 400-1000 강도
+                            
+                        } else if (distanceToSpline < 40) {
+                            // 경계 매우 근처 - 침입 방지를 위한 강력한 장벽
+                            const proximityToEdge = 1.0 - (distanceToSpline / 40.0);
+                            forceMultiplier = 5.0 + (proximityToEdge * 10.0); // 5-15배 반발력  
+                            baseForceStrength = 300 + (proximityToEdge * 400); // 300-700 강도
+                            
+                        } else if (distanceToSpline < 80) {
+                            // 경계 근처 - 예방적 반발력
+                            const proximityToEdge = 1.0 - (distanceToSpline / 80.0);
+                            forceMultiplier = 2.0 + (proximityToEdge * 3.0); // 2-5배 반발력
+                            baseForceStrength = 150 + (proximityToEdge * 150); // 150-300 강도
+                            
                         } else {
-                            // 멀리 있지만 영향권 내 - 매우 약한 반발력
-                            forceMultiplier = 1.0; // 감소
-                            baseForceStrength = 100; // 감소
+                            // 멀리 있지만 영향권 내 - 약한 예방적 반발력
+                            forceMultiplier = 1.0;
+                            baseForceStrength = 80;
                         }
                         
                         // 거리에 따른 추가 감쇠
@@ -8059,10 +8193,44 @@ function renderCommonValuesNetworkGraph() {
                         
                         const finalForceStrength = baseForceStrength * forceMultiplier * distanceDecay * groupMembershipFactor;
                         
-                        const repulsionForce = calculateSplineRepulsion(position, groupBoundary, finalForceStrength);
+                        let repulsionForce;
+                        
+                        if (isInsideSpline) {
+                            // 스플라인 내부 노드: 중심에서 직접 밖으로 밀어내기
+                            const dx = position.x - splineCenter.x;
+                            const dy = position.y - splineCenter.y;
+                            const distanceFromCenter = Math.sqrt(dx * dx + dy * dy);
+                            
+                            // 디버깅 로그 (필요시 활성화)
+                            // console.log(`내부 노드 ${nodeId}: 중심거리=${distanceFromCenter.toFixed(1)}, 힘=${finalForceStrength.toFixed(1)}`);
+                            
+                            if (distanceFromCenter > 0) {
+                                // 중심에서 노드로 향하는 정규화된 방향 벡터
+                                const normalizedX = dx / distanceFromCenter;
+                                const normalizedY = dy / distanceFromCenter;
+                                
+                                // 직접적인 밀어내기 힘 적용
+                                repulsionForce = {
+                                    x: normalizedX * finalForceStrength,
+                                    y: normalizedY * finalForceStrength
+                                };
+                            } else {
+                                // 중심에 정확히 위치한 경우 랜덤 방향으로 밀어내기
+                                const randomAngle = Math.random() * 2 * Math.PI;
+                                repulsionForce = {
+                                    x: Math.cos(randomAngle) * finalForceStrength,
+                                    y: Math.sin(randomAngle) * finalForceStrength
+                                };
+                            }
+                        } else {
+                            // 스플라인 외부 노드: 기존 경계 반발력 시스템 사용
+                            repulsionForce = calculateSplineRepulsion(position, groupBoundary, finalForceStrength);
+                        }
                         
                         // 힘이 너무 작으면 무시 (미세한 떨림 방지)
-                        if (Math.abs(repulsionForce.x) < 0.3 && Math.abs(repulsionForce.y) < 0.3) {
+                        // 단, 스플라인 내부 노드는 더 관대한 임계값 적용
+                        const forceThreshold = isInsideSpline ? 0.1 : 0.3;
+                        if (Math.abs(repulsionForce.x) < forceThreshold && Math.abs(repulsionForce.y) < forceThreshold) {
                             return;
                         }
                         
@@ -8566,7 +8734,13 @@ function renderCommonValuesNetworkGraph() {
         }
         
         if (repulsionInterval) clearInterval(repulsionInterval);
-        repulsionInterval = setInterval(applyBoundaryRepulsion, 150); // 150ms마다 실행 (6.7fps) - 매우 안정적인 속도
+        
+        // 세 가지 반발 시스템을 모두 활성화
+        repulsionInterval = setInterval(() => {
+            forceExpelIntruders(); // 가장 강력한 침입자 제거 시스템
+            applyBoundaryRepulsion();
+            applyContinuousRepulsion(); // 지속적인 반발력도 함께 적용
+        }, 50); // 50ms마다 실행 (20fps) - 더 빠른 반응
         repulsionSystemActive = true;
     }
     
@@ -8635,11 +8809,13 @@ function renderCommonValuesNetworkGraph() {
         if (isDraggingGroup) {
             return true; // 드래그 중이므로 검사 패스
         }
+        
+        const activeNetwork = network || window.commonValuesNetwork;
 
-        const baseRepulsionForce = 80; // 기존 30 → 80으로 증가 (더 빠르게)
-        const springK = 0.08; // 스프링 상수(조절 가능)
-        const minDistanceFromBoundary = 600; // 경계에서 더 가까운 거리
-        const boundaryOffset = 150; // 경계 확장 오프셋 (줄임)
+        const baseRepulsionForce = 200; // 반발력 대폭 증가 (80 → 200)
+        const springK = 0.15; // 스프링 상수 증가 (0.08 → 0.15)
+        const minDistanceFromBoundary = 100; // 경계에서의 최소 거리
+        const boundaryOffset = 50; // 경계 확장 오프셋 감소
         let totalForceApplied = 0;
         let detectedIntruders = [];
         
@@ -8694,7 +8870,7 @@ function renderCommonValuesNetworkGraph() {
                         return;
                     }
                 }
-                // 그룹에 속하지 않지만 경계 내부에 있는 노드 처리 (새로운 침입자)
+                // 그룹에 속하지 않지만 경계 내부에 있는 노드 처리 (침입자)
                 if (!nodeInThisGroup && nodeInsideOriginalBoundary) {
                     const exclusions = nodeGroupExclusions.get(nodeId);
                     const isExcluded = exclusions && exclusions.has(groupKey);
@@ -8709,22 +8885,34 @@ function renderCommonValuesNetworkGraph() {
                         detectedIntruders.push(nodeId);
                         // 중심점 계산
                         let centerX = 0, centerY = 0;
-                        expandedBoundary.forEach(point => {
+                        groupBoundary.forEach(point => {
                             centerX += point.x;
                             centerY += point.y;
                         });
-                        centerX /= expandedBoundary.length;
-                        centerY /= expandedBoundary.length;
+                        centerX /= groupBoundary.length;
+                        centerY /= groupBoundary.length;
                         const dx = nodePosition.x - centerX;
                         const dy = nodePosition.y - centerY;
                         const distance = Math.sqrt(dx * dx + dy * dy);
                         if (distance > 0) {
                             const dirX = dx / distance;
                             const dirY = dy / distance;
-                            // spring force: F = -k * x (x: 경계 중심~노드 거리)
-                            const springForce = springK * distance + baseRepulsionForce * 0.8;
+                            // 매우 강한 반발력 적용
+                            const springForce = springK * distance + baseRepulsionForce * 2; // 2배로 증가
                             node.vx = (node.vx || 0) + dirX * springForce;
                             node.vy = (node.vy || 0) + dirY * springForce;
+                            
+                            // 직접 위치 업데이트 (더 강력한 효과)
+                            const pushDistance = 5; // 매 프레임마다 5픽셀씩 밀어냄
+                            try {
+                                network.moveNode(nodeId, 
+                                    node.x + dirX * pushDistance, 
+                                    node.y + dirY * pushDistance
+                                );
+                            } catch (e) {
+                                // 이동 실패 시 무시
+                            }
+                            
                             totalForceApplied += springForce;
                             // 스플라인 버텍스 포인트와의 추가 반발력
                             const vertexForce = applySplineVertexRepulsion(nodeId, nodePosition, groupKey, groupBoundary);
@@ -8869,6 +9057,9 @@ function renderCommonValuesNetworkGraph() {
         return expandedBoundary;
     }
 
+    // 스플라인 제어점 저장
+    const splineControlPoints = {};
+    
     // 특정 그룹의 경계만 업데이트하는 함수
     function updateGroupBoundary(groupKey) {
         if (!groupKey || !valueCourseIds[groupKey]) return;
@@ -8910,6 +9101,10 @@ function renderCommonValuesNetworkGraph() {
         // 스플라인 버텍스 포인트 개수 증가
         hull = increaseSplineVertices(hull);
         for (let i = 0; i < 3; i++) hull = smoothHull(hull);
+        
+        // 반응형 제어점 추가
+        hull = addAdaptiveControlPoints(hull, groupKey);
+        
         commonValuesBlobData[groupKey] = hull;
         
         // requestAnimationFrame을 사용하여 부드러운 렌더링
@@ -9186,6 +9381,331 @@ function renderCommonValuesNetworkGraph() {
     // 전역 변수 사용 (상태 유지)
     
     // 네트워크가 그려진 후 그룹 blob을 그림
+    // 라벨이 다른 요소와 겹치지 않는 위치 찾기
+    function findNonOverlappingLabelPosition(centerX, centerY, labelWidth, labelHeight, groupKey) {
+        const padding = 10; // 라벨 간 최소 여백
+        const maxAttempts = 50; // 최대 시도 횟수
+        const searchRadius = 100; // 검색 반경
+        
+        // 초기 위치 확인
+        if (!isLabelOverlapping(centerX, centerY, labelWidth, labelHeight, groupKey, padding)) {
+            return { x: centerX, y: centerY };
+        }
+        
+        // 나선형으로 위치 검색
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            const angle = (attempt * 0.5) * Math.PI; // 나선형 각도
+            const radius = (attempt / maxAttempts) * searchRadius;
+            
+            // 8방향으로 시도
+            const directions = [
+                { x: radius, y: 0 },           // 오른쪽
+                { x: radius, y: radius },      // 오른쪽 아래
+                { x: 0, y: radius },           // 아래
+                { x: -radius, y: radius },     // 왼쪽 아래
+                { x: -radius, y: 0 },          // 왼쪽
+                { x: -radius, y: -radius },    // 왼쪽 위
+                { x: 0, y: -radius },          // 위
+                { x: radius, y: -radius }      // 오른쪽 위
+            ];
+            
+            for (const dir of directions) {
+                const testX = centerX + dir.x;
+                const testY = centerY + dir.y;
+                
+                if (!isLabelOverlapping(testX, testY, labelWidth, labelHeight, groupKey, padding)) {
+                    return { x: testX, y: testY };
+                }
+            }
+        }
+        
+        // 위치를 찾지 못한 경우 원래 위치 반환
+        return { x: centerX, y: centerY };
+    }
+    
+    // 라벨이 다른 요소와 겹치는지 확인
+    function isLabelOverlapping(x, y, width, height, currentGroupKey, padding) {
+        const labelRect = {
+            left: x - width / 2 - padding,
+            right: x + width / 2 + padding,
+            top: y - height / 2 - padding,
+            bottom: y + height / 2 + padding
+        };
+        
+        // 다른 라벨과의 충돌 검사
+        for (const [groupKey, labelPos] of groupLabelPositions) {
+            if (groupKey !== currentGroupKey) {
+                const otherRect = {
+                    left: labelPos.x - labelPos.width / 2 - padding,
+                    right: labelPos.x + labelPos.width / 2 + padding,
+                    top: labelPos.y - labelPos.height / 2 - padding,
+                    bottom: labelPos.y + labelPos.height / 2 + padding
+                };
+                
+                if (isRectOverlapping(labelRect, otherRect)) {
+                    return true;
+                }
+            }
+        }
+        
+        // 노드와의 충돌 검사
+        if (network && network.body && network.body.nodes) {
+            for (const nodeId in network.body.nodes) {
+                const node = network.body.nodes[nodeId];
+                if (node) {
+                    const nodeSize = node.options.size || 20;
+                    const nodeRect = {
+                        left: node.x - nodeSize - padding,
+                        right: node.x + nodeSize + padding,
+                        top: node.y - nodeSize - padding,
+                        bottom: node.y + nodeSize + padding
+                    };
+                    
+                    if (isRectOverlapping(labelRect, nodeRect)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    // 두 사각형이 겹치는지 확인
+    function isRectOverlapping(rect1, rect2) {
+        return !(rect1.right < rect2.left || 
+                 rect1.left > rect2.right || 
+                 rect1.bottom < rect2.top || 
+                 rect1.top > rect2.bottom);
+    }
+    
+    // 반응형 제어점 추가 함수
+    function addAdaptiveControlPoints(hull, groupKey) {
+        if (!hull || hull.length < 3) return hull;
+        
+        const controlPointDistance = 300; // 제어점 간격 (50px → 300px로 증가)
+        const avoidanceRadius = 150; // 회피 반경 (60px → 150px로 증가)
+        const newHull = [];
+        let totalControlPointsAdded = 0;
+        
+        // 각 세그먼트마다 제어점 추가
+        for (let i = 0; i < hull.length; i++) {
+            const p1 = hull[i];
+            const p2 = hull[(i + 1) % hull.length];
+            
+            newHull.push(p1);
+            
+            // 세그먼트 길이 계산
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const segmentLength = Math.sqrt(dx * dx + dy * dy);
+            
+            // 필요한 제어점 개수 계산
+            const numControlPoints = Math.floor(segmentLength / controlPointDistance);
+            
+            if (numControlPoints > 0) {
+                // 제어점들 생성
+                for (let j = 1; j <= numControlPoints; j++) {
+                    const t = j / (numControlPoints + 1);
+                    let controlPoint = {
+                        x: p1.x + dx * t,
+                        y: p1.y + dy * t
+                    };
+                    
+                    // 침입 노드 회피 로직
+                    controlPoint = avoidIntrudingNodes(controlPoint, groupKey, avoidanceRadius);
+                    
+                    newHull.push(controlPoint);
+                    totalControlPointsAdded++;
+                }
+            }
+        }
+        
+        // 디버깅용 로그
+        console.log(`[${groupKey}] 제어점 추가 완료: 원래 ${hull.length}개 → 현재 ${newHull.length}개 (추가된 제어점: ${totalControlPointsAdded}개)`);
+        
+        // 제어점 저장
+        splineControlPoints[groupKey] = newHull;
+        
+        return newHull;
+    }
+    
+    // 침입 노드를 회피하도록 제어점 이동
+    function avoidIntrudingNodes(controlPoint, groupKey, avoidanceRadius) {
+        if (!network || !network.body || !network.body.nodes) return controlPoint;
+        
+        const groupNodeIds = valueCourseIds[groupKey] || [];
+        let adjustedPoint = { ...controlPoint };
+        let totalPushX = 0;
+        let totalPushY = 0;
+        let pushCount = 0;
+        
+        // 모든 노드 검사
+        Object.keys(network.body.nodes).forEach(nodeId => {
+            // 그룹에 속한 노드는 무시
+            if (groupNodeIds.includes(nodeId)) return;
+            
+            const node = network.body.nodes[nodeId];
+            if (!node) return;
+            
+            const nodePos = { x: node.x, y: node.y };
+            const dx = nodePos.x - controlPoint.x;
+            const dy = nodePos.y - controlPoint.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // 노드가 회피 반경 내에 있으면
+            if (distance < avoidanceRadius && distance > 0) {
+                // 반대 방향으로 밀어냄
+                const pushForce = (avoidanceRadius - distance) / avoidanceRadius;
+                const pushX = -(dx / distance) * pushForce * 80; // 반발력 강도 증가 (30 → 80)
+                const pushY = -(dy / distance) * pushForce * 80; // 반발력 강도 증가 (30 → 80)
+                
+                totalPushX += pushX;
+                totalPushY += pushY;
+                pushCount++;
+            }
+        });
+        
+        // 평균 밀어내기 적용
+        if (pushCount > 0) {
+            adjustedPoint.x += totalPushX;
+            adjustedPoint.y += totalPushY;
+        }
+        
+        return adjustedPoint;
+    }
+    
+    // 라벨 위치를 미리 계산하는 함수
+    function calculateAllLabelPositions() {
+        const tempLabelPositions = new Map();
+        
+        // 먼저 모든 라벨의 기본 위치와 크기를 계산
+        valueKeys.forEach(key => {
+            const ids = valueCourseIds[key];
+            if (!ids.length || !commonValuesBlobData[key] || commonValuesBlobData[key].length < 3) {
+                return;
+            }
+            
+            // 그룹의 중심점 계산
+            let centerX = 0, centerY = 0;
+            let validNodeCount = 0;
+            ids.forEach(id => {
+                try {
+                    const position = network.getPosition(id);
+                    if (position) {
+                        centerX += position.x;
+                        centerY += position.y;
+                        validNodeCount++;
+                    }
+                } catch (e) {
+                    // 노드가 존재하지 않는 경우 무시
+                }
+            });
+            
+            if (validNodeCount > 0) {
+                centerX /= validNodeCount; 
+                centerY /= validNodeCount;
+                
+                const groupLabel = commonValuesGroupNames[key] || key;
+                const ctx = document.createElement('canvas').getContext('2d');
+                ctx.font = 'bold 26px Noto Sans KR, sans-serif';
+                const textMetrics = ctx.measureText(groupLabel);
+                const labelWidth = textMetrics.width;
+                const labelHeight = 40; // 폰트 크기 26px + 여백
+                
+                tempLabelPositions.set(key, {
+                    x: centerX,
+                    y: centerY,
+                    width: labelWidth,
+                    height: labelHeight,
+                    originalX: centerX,
+                    originalY: centerY
+                });
+            }
+        });
+        
+        // 충돌을 해결하면서 위치 조정
+        const maxIterations = 100; // 더 많은 반복으로 확실한 분리
+        for (let iter = 0; iter < maxIterations; iter++) {
+            let hasCollision = false;
+            
+            tempLabelPositions.forEach((pos1, key1) => {
+                // 다른 라벨과의 충돌 검사 및 조정
+                tempLabelPositions.forEach((pos2, key2) => {
+                    if (key1 !== key2) {
+                        const dx = pos2.x - pos1.x;
+                        const dy = pos2.y - pos1.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        const minDistance = (pos1.width + pos2.width) / 2 + 50; // 더 큰 여백
+                        
+                        if (distance < minDistance && distance > 0) {
+                            hasCollision = true;
+                            // 반발력 적용
+                            const pushX = (dx / distance) * (minDistance - distance) * 0.5;
+                            const pushY = (dy / distance) * (minDistance - distance) * 0.5;
+                            pos1.x -= pushX;
+                            pos1.y -= pushY;
+                            pos2.x += pushX;
+                            pos2.y += pushY;
+                        }
+                    }
+                });
+                
+                // 노드와의 충돌 검사 및 조정
+                if (network && network.body && network.body.nodes) {
+                    Object.values(network.body.nodes).forEach(node => {
+                        if (node) {
+                            const dx = node.x - pos1.x;
+                            const dy = node.y - pos1.y;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+                            const nodeSize = node.options.size || 20;
+                            const minDistance = pos1.width / 2 + nodeSize + 40; // 더 큰 여백
+                            
+                            if (distance < minDistance && distance > 0) {
+                                hasCollision = true;
+                                // 라벨을 노드로부터 밀어냄
+                                const pushX = (dx / distance) * (minDistance - distance);
+                                const pushY = (dy / distance) * (minDistance - distance);
+                                pos1.x -= pushX;
+                                pos1.y -= pushY;
+                            }
+                        }
+                    });
+                }
+            });
+            
+            if (!hasCollision) break;
+        }
+        
+        // 계산된 위치를 groupLabelPositions에 저장
+        groupLabelPositions.clear();
+        tempLabelPositions.forEach((pos, key) => {
+            groupLabelPositions.set(key, pos);
+        });
+    }
+    
+    // 네트워크가 안정화될 때마다 라벨 위치 재계산
+    network.on('stabilized', function() {
+        calculateAllLabelPositions();
+    });
+    
+    // 노드가 드래그될 때마다 라벨 위치 재계산
+    network.on('dragging', function() {
+        calculateAllLabelPositions();
+    });
+    
+    // 초기 라벨 위치 계산
+    setTimeout(() => {
+        calculateAllLabelPositions();
+    }, 100);
+    
+    // 주기적으로 라벨 위치 업데이트 (부드러운 애니메이션)
+    setInterval(() => {
+        if (!isDraggingGroup) {
+            calculateAllLabelPositions();
+        }
+    }, 200);
+    
     network.on('beforeDrawing', function(ctx) {
         // 1. blob 영역 먼저 그림 (노드/엣지 아래)
         valueKeys.forEach(key => {
@@ -9211,6 +9731,10 @@ function renderCommonValuesNetworkGraph() {
             hull = increaseSplineVertices(hull);
             // 더 부드러운 스플라인을 위해 스무싱 활성화
             for (let i = 0; i < 3; i++) hull = smoothHull(hull); // smoothing 3회
+            
+            // 반응형 제어점 추가 (updateGroupBoundary와 동일하게)
+            hull = addAdaptiveControlPoints(hull, key);
+            
             commonValuesBlobData[key] = hull;
             
             // blob 색상 및 강조 효과 개선
@@ -9243,6 +9767,20 @@ function renderCommonValuesNetworkGraph() {
             ctx.stroke();
             // ctx.setLineDash([]); // 점선 패턴 초기화 제거
             ctx.restore();
+            
+            // 디버그 모드: 제어점 시각화 (개발 중)
+            if (window.debugControlPoints) {
+                ctx.save();
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                hull.forEach((point, index) => {
+                    // 원래 hull 점과 추가된 제어점 구분
+                    const isOriginal = index % 3 === 0; // increaseSplineVertices가 3배로 늘리므로
+                    ctx.beginPath();
+                    ctx.arc(point.x, point.y, isOriginal ? 4 : 2, 0, 2 * Math.PI);
+                    ctx.fill();
+                });
+                ctx.restore();
+            }
 
             
             // 그룹명 라벨 표시 (중앙)
@@ -9289,19 +9827,16 @@ function renderCommonValuesNetworkGraph() {
                 ctx.lineWidth = 5;
                 const groupLabel = commonValuesGroupNames[key] || key;
                 
-                // 라벨 텍스트 크기 측정 및 위치 저장
-                const textMetrics = ctx.measureText(groupLabel);
-                const labelWidth = textMetrics.width;
-                const labelHeight = 24; // 폰트 크기 기준 추정
-                groupLabelPositions.set(key, {
-                    x: centerX,
-                    y: centerY,
-                    width: labelWidth,
-                    height: labelHeight
-                });
-                
-                ctx.strokeText(groupLabel, centerX, centerY);
-                ctx.fillText(groupLabel, centerX, centerY);
+                // 미리 계산된 라벨 위치 가져오기
+                const labelPosition = groupLabelPositions.get(key);
+                if (labelPosition) {
+                    ctx.strokeText(groupLabel, labelPosition.x, labelPosition.y);
+                    ctx.fillText(groupLabel, labelPosition.x, labelPosition.y);
+                } else {
+                    // 위치가 없으면 기본 위치에 그리기
+                    ctx.strokeText(groupLabel, centerX, centerY);
+                    ctx.fillText(groupLabel, centerX, centerY);
+                }
                 ctx.restore();
             }
         });
@@ -9321,6 +9856,89 @@ function renderCommonValuesNetworkGraph() {
             }
         }
         return inside;
+    }
+    
+    // 점을 폴리곤 경계 밖으로 밀어내는 힘 계산
+    function calculatePushBackForce(point, polygon) {
+        if (!point || !polygon || polygon.length < 3) {
+            return null;
+        }
+        
+        // 폴리곤의 중심점 계산
+        let centerX = 0, centerY = 0;
+        polygon.forEach(p => {
+            centerX += p.x;
+            centerY += p.y;
+        });
+        centerX /= polygon.length;
+        centerY /= polygon.length;
+        
+        // 점에서 폴리곤 경계까지의 가장 가까운 점 찾기
+        let minDistance = Infinity;
+        let closestPoint = null;
+        let closestSegment = null;
+        
+        for (let i = 0; i < polygon.length; i++) {
+            const j = (i + 1) % polygon.length;
+            const p1 = polygon[i];
+            const p2 = polygon[j];
+            
+            // 선분에서 점까지의 가장 가까운 점 계산
+            const closest = closestPointOnSegment(point, p1, p2);
+            const distance = Math.sqrt(
+                Math.pow(closest.x - point.x, 2) + 
+                Math.pow(closest.y - point.y, 2)
+            );
+            
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestPoint = closest;
+                closestSegment = { p1, p2 };
+            }
+        }
+        
+        // 반발력 방향 계산 (폴리곤 중심에서 점으로의 방향)
+        const dirX = point.x - centerX;
+        const dirY = point.y - centerY;
+        const dirLength = Math.sqrt(dirX * dirX + dirY * dirY);
+        
+        if (dirLength === 0) {
+            // 점이 정확히 중심에 있는 경우 임의의 방향
+            return { x: 10, y: 0 };
+        }
+        
+        // 정규화된 반발 방향
+        const pushX = (dirX / dirLength);
+        const pushY = (dirY / dirLength);
+        
+        // 경계로부터의 거리에 비례한 반발력 (가까울수록 강함)
+        const forceMagnitude = Math.max(20, 50 / (minDistance + 1));
+        
+        return {
+            x: pushX * forceMagnitude,
+            y: pushY * forceMagnitude
+        };
+    }
+    
+    // 선분 위의 점까지의 가장 가까운 점 찾기
+    function closestPointOnSegment(point, p1, p2) {
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        
+        if (dx === 0 && dy === 0) {
+            // p1과 p2가 같은 점인 경우
+            return { x: p1.x, y: p1.y };
+        }
+        
+        const t = Math.max(0, Math.min(1, 
+            ((point.x - p1.x) * dx + (point.y - p1.y) * dy) / 
+            (dx * dx + dy * dy)
+        ));
+        
+        return {
+            x: p1.x + t * dx,
+            y: p1.y + t * dy
+        };
     }
 
     // 그룹 드래그 관련 변수
@@ -9662,30 +10280,92 @@ function renderCommonValuesNetworkGraph() {
     network.on('dragging', function(params) {
         if (isDraggingGroup && draggedGroupKey && dragStartPosition) {
             const currentPosition = params.pointer.canvas;
-            const deltaX = currentPosition.x - dragStartPosition.x;
-            const deltaY = currentPosition.y - dragStartPosition.y;
+            let deltaX = currentPosition.x - dragStartPosition.x;
+            let deltaY = currentPosition.y - dragStartPosition.y;
             
             // 그룹 내 모든 노드들을 같이 이동
             const groupNodeIds = valueCourseIds[draggedGroupKey];
             
             if (groupNodeIds && groupNodeIds.length > 0) {
-                // 배치로 노드 위치 업데이트 (성능 개선)
-                const updatePositions = {};
+                // 이동 가능한 최대 거리 계산
+                let maxSafeDistance = { x: deltaX, y: deltaY };
+                const step = 5; // 검사 단계 (픽셀)
+                const maxSteps = Math.ceil(Math.sqrt(deltaX * deltaX + deltaY * deltaY) / step);
+                
+                // 이동 경로를 따라 단계별로 검사
+                for (let stepNum = 1; stepNum <= maxSteps; stepNum++) {
+                    const ratio = stepNum / maxSteps;
+                    const testDeltaX = deltaX * ratio;
+                    const testDeltaY = deltaY * ratio;
+                    let collision = false;
+                    
+                    // 모든 노드의 테스트 위치 계산
+                    for (const nodeId of groupNodeIds) {
+                        const originalPos = groupOriginalPositions[nodeId];
+                        if (!originalPos) continue;
+                        
+                        const testX = originalPos.x + testDeltaX;
+                        const testY = originalPos.y + testDeltaY;
+                        const testPos = { x: testX, y: testY };
+                        
+                        // 다른 그룹들과의 충돌 검사
+                        for (const groupKey of valueKeys) {
+                            if (groupKey === draggedGroupKey) continue;
+                            
+                            const otherGroupBoundary = commonValuesBlobData[groupKey];
+                            if (!otherGroupBoundary || otherGroupBoundary.length < 3) continue;
+                            
+                            // 경계로부터의 거리 계산
+                            let minDistance = Infinity;
+                            for (let i = 0; i < otherGroupBoundary.length; i++) {
+                                const j = (i + 1) % otherGroupBoundary.length;
+                                const p1 = otherGroupBoundary[i];
+                                const p2 = otherGroupBoundary[j];
+                                const closest = closestPointOnSegment(testPos, p1, p2);
+                                const distance = Math.sqrt(
+                                    Math.pow(closest.x - testPos.x, 2) + 
+                                    Math.pow(closest.y - testPos.y, 2)
+                                );
+                                minDistance = Math.min(minDistance, distance);
+                            }
+                            
+                            // 버퍼 영역까지 고려한 충돌 검사
+                            const bufferDistance = 20; // 경계로부터의 최소 거리
+                            if (isPointInPolygon(testPos, otherGroupBoundary) || minDistance < bufferDistance) {
+                                collision = true;
+                                break;
+                            }
+                        }
+                        if (collision) break;
+                    }
+                    
+                    // 충돌이 발생하면 이전 단계까지만 이동 가능
+                    if (collision) {
+                        const prevRatio = Math.max(0, (stepNum - 1) / maxSteps);
+                        maxSafeDistance.x = deltaX * prevRatio * 0.9; // 90%만 이동 (안전 여유)
+                        maxSafeDistance.y = deltaY * prevRatio * 0.9;
+                        break;
+                    }
+                }
+                
+                // 안전한 거리만큼만 이동
+                const safePositions = {};
                 groupNodeIds.forEach(nodeId => {
                     const originalPos = groupOriginalPositions[nodeId];
                     if (originalPos) {
-                        const newX = originalPos.x + deltaX;
-                        const newY = originalPos.y + deltaY;
-                        updatePositions[nodeId] = { x: newX, y: newY };
+                        safePositions[nodeId] = {
+                            x: originalPos.x + maxSafeDistance.x,
+                            y: originalPos.y + maxSafeDistance.y
+                        };
                     }
                 });
                 
-                // 한 번에 모든 노드 위치 업데이트
+                // 노드 위치 업데이트
                 try {
-                    network.moveNode(Object.keys(updatePositions), Object.values(updatePositions));
+                    network.moveNode(Object.keys(safePositions), Object.values(safePositions));
                 } catch (error) {
                     // 개별 노드 업데이트 방식으로 폴백
-                    Object.entries(updatePositions).forEach(([nodeId, pos]) => {
+                    Object.entries(safePositions).forEach(([nodeId, pos]) => {
                         try {
                             network.moveNode(nodeId, pos.x, pos.y);
                         } catch (e) {
@@ -11671,9 +12351,48 @@ async function init() {
             await loadAllDataFromFirebase();
         }
         
+        // 로컬 버전 데이터 로드
+        loadAllVersions();
+        
+        // 버전이 선택되지 않은 경우 최신 버전 자동 선택
+        if (!currentVersion || currentVersion === '기본') {
+            selectLatestVersion();
+        }
+        
+        // 선택된 버전의 데이터를 메모리에 복원
+        restoreSelectedVersionData();
+        
+        // UI 초기화 및 렌더링
+        initializeUI();
+        renderCourses();
+        renderMatrix();
+        renderCurriculumTable();
+        if (typeof renderCommonValuesTable === 'function') {
+            renderCommonValuesTable();
+        }
+        if (typeof renderAnalysis === 'function') {
+            renderAnalysis();
+        }
+        updateCurrentVersionDisplay();
+        
         console.log('앱 초기화 완료!');
     } catch (error) {
         console.error('앱 초기화 중 오류:', error);
+        
+        // 오류 발생 시에도 기본 데이터로 UI 렌더링
+        loadAllVersions();
+        restoreSelectedVersionData();
+        initializeUI();
+        renderCourses();
+        renderMatrix();
+        renderCurriculumTable();
+        if (typeof renderCommonValuesTable === 'function') {
+            renderCommonValuesTable();
+        }
+        if (typeof renderAnalysis === 'function') {
+            renderAnalysis();
+        }
+        updateCurrentVersionDisplay();
     }
 }
 
