@@ -9382,9 +9382,35 @@ function handleCommonValuesDrop(e) {
                 const index = commonValuesCopiedBlocks[sourceSubjectType][sourceColumn].indexOf(course.id);
                 if (index > -1) {
                     commonValuesCopiedBlocks[sourceSubjectType][sourceColumn].splice(index, 1);
+                    
+                    // 원래 위치의 commonValuesCellTexts도 업데이트
+                    const remainingCourseNames = commonValuesCopiedBlocks[sourceSubjectType][sourceColumn]
+                        .map(courseId => {
+                            const c = courses.find(course => course.id === courseId);
+                            return c ? c.courseName : null;
+                        })
+                        .filter(name => name);
+                    
+                    if (!commonValuesCellTexts[sourceSubjectType]) {
+                        commonValuesCellTexts[sourceSubjectType] = {};
+                    }
+                    commonValuesCellTexts[sourceSubjectType][sourceColumn] = remainingCourseNames.join(', ');
                 }
             }
         }
+        
+        // 대상 위치의 commonValuesCellTexts도 업데이트
+        const targetCourseNames = commonValuesCopiedBlocks[subjectType][targetColumn]
+            .map(courseId => {
+                const c = courses.find(course => course.id === courseId);
+                return c ? c.courseName : null;
+            })
+            .filter(name => name);
+        
+        if (!commonValuesCellTexts[subjectType]) {
+            commonValuesCellTexts[subjectType] = {};
+        }
+        commonValuesCellTexts[subjectType][targetColumn] = targetCourseNames.join(', ');
         
         // 변경 기록 추가
         addChangeHistory('이동', course.courseName, [{field: '공통가치대응', before: sourceCell || '미배치', after: `${subjectType}-${targetColumn}`}]);
@@ -9413,6 +9439,19 @@ function handleCommonValuesDrop(e) {
                 const index = commonValuesCopiedBlocks[sourceSubjectType][sourceColumn].indexOf(course.id);
                 if (index > -1) {
                     commonValuesCopiedBlocks[sourceSubjectType][sourceColumn].splice(index, 1);
+                    
+                    // commonValuesCellTexts도 업데이트
+                    const remainingCourseNames = commonValuesCopiedBlocks[sourceSubjectType][sourceColumn]
+                        .map(courseId => {
+                            const c = courses.find(course => course.id === courseId);
+                            return c ? c.courseName : null;
+                        })
+                        .filter(name => name);
+                    
+                    if (!commonValuesCellTexts[sourceSubjectType]) {
+                        commonValuesCellTexts[sourceSubjectType] = {};
+                    }
+                    commonValuesCellTexts[sourceSubjectType][sourceColumn] = remainingCourseNames.join(', ');
                 }
             }
         }
@@ -9685,6 +9724,27 @@ function showDeleteZone() {
                         const index = commonValuesCopiedBlocks[subjectType][valueKey].indexOf(course.id);
                         if (index > -1) {
                             commonValuesCopiedBlocks[subjectType][valueKey].splice(index, 1);
+                        }
+                    }
+                    
+                    // commonValuesCellTexts도 업데이트 (남은 블럭들로 텍스트 재생성)
+                    if (commonValuesCopiedBlocks[subjectType] && commonValuesCopiedBlocks[subjectType][valueKey]) {
+                        const remainingCourseNames = commonValuesCopiedBlocks[subjectType][valueKey]
+                            .map(courseId => {
+                                const c = courses.find(course => course.id === courseId);
+                                return c ? c.courseName : null;
+                            })
+                            .filter(name => name);
+                        
+                        // commonValuesCellTexts 업데이트
+                        if (!commonValuesCellTexts[subjectType]) {
+                            commonValuesCellTexts[subjectType] = {};
+                        }
+                        commonValuesCellTexts[subjectType][valueKey] = remainingCourseNames.join(', ');
+                    } else {
+                        // 블럭이 모두 삭제된 경우 텍스트도 비우기
+                        if (commonValuesCellTexts[subjectType]) {
+                            commonValuesCellTexts[subjectType][valueKey] = '';
                         }
                     }
                 }
