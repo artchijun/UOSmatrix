@@ -7616,8 +7616,8 @@ function renderCommonValuesNetworkGraph() {
                     let node2ValueGroup = null;
                     
                     for (const [valueKey, valueNodeIds] of Object.entries(valueCourseIds)) {
-                        if (valueNodeIds.includes(nodeId1)) node1ValueGroup = valueKey;
-                        if (valueNodeIds.includes(nodeId2)) node2ValueGroup = valueKey;
+                        if (Array.isArray(valueNodeIds) && valueNodeIds.includes(nodeId1)) node1ValueGroup = valueKey;
+                        if (Array.isArray(valueNodeIds) && valueNodeIds.includes(nodeId2)) node2ValueGroup = valueKey;
                     }
                     
                     // 다른 value 그룹에 속한 경우에만 점선으로 연결
@@ -7791,7 +7791,7 @@ function renderCommonValuesNetworkGraph() {
         // 해당 노드가 몇 개의 VALUE 그룹에 속하는지 계산
         let valueGroupCount = 0;
         valueKeys.forEach(key => {
-            if (valueCourseIds[key].includes(n.id)) {
+            if (valueCourseIds[key] && Array.isArray(valueCourseIds[key]) && valueCourseIds[key].includes(n.id)) {
                 valueGroupCount++;
             }
         });
@@ -9033,7 +9033,7 @@ function renderCommonValuesNetworkGraph() {
             // 노드가 속한 value 그룹 찾기
             let nodeValueGroup = null;
             for (const [valueKey, nodeIds] of Object.entries(valueCourseIds)) {
-                if (nodeIds.includes(nodeId)) {
+                if (Array.isArray(nodeIds) && nodeIds.includes(nodeId)) {
                     nodeValueGroup = valueKey;
                     break;
                 }
@@ -10307,8 +10307,12 @@ function renderCommonValuesNetworkGraph() {
         // 스플라인 선택 상태와 테이블 헤더 동기화
         syncSplineWithTableHeaders();
         
-        // 먼저 모든 선택 해제
-        window.network.unselectAll();
+        // 먼저 모든 선택 해제 (에러 방지를 위한 try-catch 추가)
+        try {
+            window.network.unselectAll();
+        } catch (error) {
+            // vis.js 내부 오류 발생 시 무시하고 계속 진행
+        }
         
         const nodeUpdate = [];
         // 현재 네트워크의 실제 노드 데이터를 가져옵니다
@@ -10316,7 +10320,7 @@ function renderCommonValuesNetworkGraph() {
         
         // 선택된 그룹의 노드들 수집
         let selectedGroupNodeIds = [];
-        if (window.selectedCommonValuesBlob && valueCourseIds[window.selectedCommonValuesBlob]) {
+        if (window.selectedCommonValuesBlob && valueCourseIds[window.selectedCommonValuesBlob] && Array.isArray(valueCourseIds[window.selectedCommonValuesBlob])) {
             selectedGroupNodeIds = valueCourseIds[window.selectedCommonValuesBlob];
         }
         
@@ -10427,7 +10431,7 @@ function renderCommonValuesNetworkGraph() {
         currentNodes.forEach(currentNode => {
             const nodeId = currentNode.id;
             let isInSelectedGroup = false;
-            if (window.selectedCommonValuesBlob && valueCourseIds[window.selectedCommonValuesBlob]) {
+            if (window.selectedCommonValuesBlob && valueCourseIds[window.selectedCommonValuesBlob] && Array.isArray(valueCourseIds[window.selectedCommonValuesBlob])) {
                 isInSelectedGroup = valueCourseIds[window.selectedCommonValuesBlob].includes(nodeId);
             }
             
