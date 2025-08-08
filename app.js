@@ -7227,6 +7227,10 @@ function renderCommonValuesNetworkGraph() {
     let lastNodePositions = new Map(); // 이전 노드 위치 저장
     const stabilityThreshold = 0.5; // 안정화 임계값 (픽셀 단위)
     
+    // 동적 제어점 시스템
+    let dynamicControlPoints = new Map(); // groupKey -> [{x, y, vx, vy, originalX, originalY}]
+    let controlPointForces = new Map(); // controlPointId -> {x, y} force vectors
+    
     // 반발력 시스템을 즉시 시작 (네트워크 안정화와 무관하게)
     
     // 스플라인 데이터가 없는 경우를 대비한 테스트 데이터 생성
@@ -7264,6 +7268,45 @@ function renderCommonValuesNetworkGraph() {
             startRepulsionSystem();
         }
     }, 2000);
+    
+    // 동적 제어점 초기화 및 업데이트 함수
+    function updateDynamicControlPoints(groupKey, splineBoundary) {
+        if (!splineBoundary || splineBoundary.length < 3) return;
+        
+        const controlPoints = [];
+        const targetSpacing = 100; // 제어점 간격
+        
+        // 각 스플라인 선분을 따라 제어점 생성
+        for (let i = 0; i < splineBoundary.length; i++) {
+            const p1 = splineBoundary[i];
+            const p2 = splineBoundary[(i + 1) % splineBoundary.length];
+            
+            const segmentLength = Math.sqrt(
+                Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)
+            );
+            
+            const numControlPoints = Math.max(1, Math.floor(segmentLength / targetSpacing));
+            
+            for (let j = 0; j < numControlPoints; j++) {
+                const t = j / numControlPoints;
+                const x = p1.x + t * (p2.x - p1.x);
+                const y = p1.y + t * (p2.y - p1.y);
+                
+                controlPoints.push({
+                    x: x,
+                    y: y,
+                    vx: 0,
+                    vy: 0,
+                    originalX: x,
+                    originalY: y,
+                    segmentIndex: i,
+                    t: t
+                });
+            }
+        }
+        
+        dynamicControlPoints.set(groupKey, controlPoints);
+    }
     
     // 그룹 스플라인 침입 방지 및 밀어내기 함수
     function calculateBoundaryRepulsion() {
@@ -7342,7 +7385,63 @@ function renderCommonValuesNetworkGraph() {
                 }
             });
             
-            // 2. 침입 노드 감지 및 강제 추출 시스템
+            // 2. 동적 제어점과 노드 사이의 양방향 반발력
+            valueKeys.forEach(groupKey => {
+                const groupBoundary = commonValuesBlobData[groupKey];
+                if (!groupBoundary || groupBoundary.length < 3) return;
+                
+                // 제어점이 없으면 초기화
+                if (!dynamicControlPoints.has(groupKey)) {
+                    updateDynamicControlPoints(groupKey, groupBoundary);
+                }
+                
+                const controlPoints = dynamicControlPoints.get(groupKey);
+                const groupNodeIds = valueCourseIds[groupKey] || [];
+                const isGroupMember = groupNodeIds.includes(nodeId);
+                
+                // 그룹 외부 노드만 제어점과 상호작용
+                if (!isGroupMember && controlPoints) {
+                    controlPoints.forEach((controlPoint, cpIndex) => {
+                        const dx = position.x - controlPoint.x;
+                        const dy = position.y - controlPoint.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distance > 0 && distance < 150) { // 상호작용 범위
+                            // 반발력 계산
+                            let forceStrength = 0;
+                            if (distance < 50) {
+                                forceStrength = 800 / Math.pow(distance + 1, 1.5);
+                            } else if (distance < 100) {
+                                forceStrength = 400 / Math.pow(distance + 5, 1.8);
+                            } else {
+                                forceStrength = 200 / Math.pow(distance + 10, 2);
+                            }
+                            
+                            const normalizedX = dx / distance;
+                            const normalizedY = dy / distance;
+                            
+                            // 노드에 가해지는 힘
+                            if (!boundaryForces.has(nodeId)) {
+                                boundaryForces.set(nodeId, { x: 0, y: 0 });
+                            }
+                            const nodeForce = boundaryForces.get(nodeId);
+                            nodeForce.x += normalizedX * forceStrength;
+                            nodeForce.y += normalizedY * forceStrength;
+                            
+                            // 제어점에 가해지는 반대 방향 힘
+                            const cpId = `${groupKey}_${cpIndex}`;
+                            if (!controlPointForces.has(cpId)) {
+                                controlPointForces.set(cpId, { x: 0, y: 0 });
+                            }
+                            const cpForce = controlPointForces.get(cpId);
+                            cpForce.x -= normalizedX * forceStrength * 0.5; // 제어점은 더 적게 움직임
+                            cpForce.y -= normalizedY * forceStrength * 0.5;
+                        }
+                    });
+                }
+            });
+            
+            // 3. 침입 노드 감지 및 강제 추출 시스템
             let isIntruder = false;
             valueKeys.forEach(groupKey => {
                 const groupBoundary = commonValuesBlobData[groupKey];
@@ -7430,23 +7529,23 @@ function renderCommonValuesNetworkGraph() {
                             // 스플라인 밖에 있는 노드가 가까이 오면 조절점에서의 강한 반발력 적용
                             
                             let forceMultiplier = 1.0;
-                            let baseForceStrength = 1200; // 기본 반발력 증가
+                            let baseForceStrength = 800;
                             
                             if (distanceToSpline < 20) {
-                                forceMultiplier = 20.0; // 더 강한 반발
-                                baseForceStrength = 2000;
-                            } else if (distanceToSpline < 40) {
                                 forceMultiplier = 15.0;
                                 baseForceStrength = 1500;
-                            } else if (distanceToSpline < 60) {
+                            } else if (distanceToSpline < 40) {
                                 forceMultiplier = 10.0;
                                 baseForceStrength = 1000;
+                            } else if (distanceToSpline < 60) {
+                                forceMultiplier = 7.0;
+                                baseForceStrength = 700;
                             } else if (distanceToSpline < 100) {
-                                forceMultiplier = 6.0;
-                                baseForceStrength = 600;
-                            } else {
-                                forceMultiplier = 3.0;
+                                forceMultiplier = 4.0;
                                 baseForceStrength = 400;
+                            } else {
+                                forceMultiplier = 2.0;
+                                baseForceStrength = 250;
                             }
                             
                             const distanceDecay = Math.pow((maxRepulsionDistance - distanceToSpline) / maxRepulsionDistance, 2);
@@ -7590,30 +7689,15 @@ function renderCommonValuesNetworkGraph() {
             const dy = nodePosition.y - controlPoint.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
             
-            if (distance > 0 && distance < 200) { // 각 제어점의 영향 범위 확대
-                // 거리에 따른 강한 반발력
-                let repulsionStrength = 0;
-                
-                if (distance < 50) {
-                    // 매우 가까움 - 극도로 강한 반발력
-                    repulsionStrength = force * 3.0 / Math.pow(distance + 1, 1.5);
-                } else if (distance < 100) {
-                    // 가까움 - 강한 반발력
-                    repulsionStrength = force * 2.0 / Math.pow(distance + 5, 1.8);
-                } else if (distance < 150) {
-                    // 중간 거리 - 중간 반발력
-                    repulsionStrength = force * 1.0 / Math.pow(distance + 10, 2);
-                } else {
-                    // 멀리 - 약한 반발력
-                    repulsionStrength = force * 0.5 / Math.pow(distance + 20, 2.2);
-                }
-                
+            if (distance > 0 && distance < 150) { // 각 제어점의 영향 범위
+                // 거리에 반비례하는 반발력
+                const forceStrength = force / Math.pow(distance + 10, 2); // 부드러운 감쇠
                 const normalizedX = dx / distance;
                 const normalizedY = dy / distance;
                 
                 // 각 제어점에서의 반발력 누적
-                totalForceX += normalizedX * repulsionStrength;
-                totalForceY += normalizedY * repulsionStrength;
+                totalForceX += normalizedX * forceStrength;
+                totalForceY += normalizedY * forceStrength;
             }
         });
         
@@ -7696,11 +7780,83 @@ function renderCommonValuesNetworkGraph() {
         };
     }
     
+    // 제어점에 힘을 적용하고 위치 업데이트
+    function applyControlPointForces() {
+        controlPointForces.forEach((force, cpId) => {
+            const [groupKey, indexStr] = cpId.split('_');
+            const index = parseInt(indexStr);
+            const controlPoints = dynamicControlPoints.get(groupKey);
+            
+            if (controlPoints && controlPoints[index]) {
+                const cp = controlPoints[index];
+                
+                // 속도 업데이트 (감쇠 적용)
+                const damping = 0.8;
+                cp.vx = (cp.vx + force.x * 0.1) * damping;
+                cp.vy = (cp.vy + force.y * 0.1) * damping;
+                
+                // 위치 업데이트
+                cp.x += cp.vx;
+                cp.y += cp.vy;
+                
+                // 원래 위치로의 복원력 (스프링)
+                const restoreForce = 0.05;
+                const dx = cp.originalX - cp.x;
+                const dy = cp.originalY - cp.y;
+                cp.vx += dx * restoreForce;
+                cp.vy += dy * restoreForce;
+            }
+        });
+        
+        // 힘 초기화
+        controlPointForces.clear();
+        
+        // 변형된 제어점을 기반으로 스플라인 재계산
+        valueKeys.forEach(groupKey => {
+            const controlPoints = dynamicControlPoints.get(groupKey);
+            if (controlPoints && controlPoints.length > 0) {
+                // 제어점 위치를 기반으로 새로운 스플라인 생성
+                const newBoundary = [];
+                const originalBoundary = commonValuesBlobData[groupKey];
+                
+                if (originalBoundary && originalBoundary.length >= 3) {
+                    // 각 원래 선분에 대해 변형된 제어점들의 평균 변위 계산
+                    for (let i = 0; i < originalBoundary.length; i++) {
+                        const p1 = originalBoundary[i];
+                        let offsetX = 0, offsetY = 0, count = 0;
+                        
+                        // 이 선분에 속한 제어점들의 평균 변위 계산
+                        controlPoints.forEach(cp => {
+                            if (cp.segmentIndex === i) {
+                                offsetX += cp.x - cp.originalX;
+                                offsetY += cp.y - cp.originalY;
+                                count++;
+                            }
+                        });
+                        
+                        if (count > 0) {
+                            newBoundary.push({
+                                x: p1.x + offsetX / count,
+                                y: p1.y + offsetY / count
+                            });
+                        } else {
+                            newBoundary.push({x: p1.x, y: p1.y});
+                        }
+                    }
+                    
+                    // 변형된 스플라인 저장
+                    commonValuesBlobData[groupKey] = newBoundary;
+                }
+            }
+        });
+    }
+    
     // 지속적 반발력 적용 함수
     function applyBoundaryRepulsion() {
         if (!repulsionSystemActive) return;
         
         calculateBoundaryRepulsion();
+        applyControlPointForces();
         
         // 안정화 상태 체크
         const stabilityInfo = checkStability();
