@@ -3956,10 +3956,9 @@ th, td, .matrix-table th, .matrix-table td {
     color: #0bb5af !important;
 }
 
-/* vis-network 기본 스타일 완전 제거 */
+/* vis-network 기본 스타일 제거 (배경색은 보존) */
 .vis-network .vis-node {
     border-color: inherit !important;
-    background-color: inherit !important;
     color: inherit !important;
 }
 
@@ -3968,20 +3967,18 @@ th, td, .matrix-table th, .matrix-table td {
     color: inherit !important;
 }
 
-/* 모든 vis-network 요소에 대한 기본 스타일 재정의 */
-.vis-network * {
+/* vis-network 기본 스타일 재정의 (배경색 보존) */
+.vis-network .vis-node * {
     border-color: inherit !important;
-    background-color: inherit !important;
     color: inherit !important;
 }
 
-/* vis-network 기본 스타일 완전 무력화 */
+/* vis-network 기본 스타일 무력화 (배경색은 보존) */
 .vis-network .vis-node,
 .vis-network .vis-node *,
 .vis-network .vis-edge,
 .vis-network .vis-edge * {
     border: none !important;
-    background: none !important;
     color: inherit !important;
     stroke: inherit !important;
     fill: inherit !important;
@@ -3995,7 +3992,6 @@ th, td, .matrix-table th, .matrix-table td {
 .vis-network .vis-button:hover,
 .vis-network .vis-button:active {
     border: none !important;
-    background: none !important;
     color: inherit !important;
 }
 
@@ -4006,7 +4002,6 @@ th, td, .matrix-table th, .matrix-table td {
 .vis-network .vis-node.vis-dragLeft,
 .vis-network .vis-node.vis-dragRight {
     border: 2px solid !important;
-    background-color: inherit !important;
     color: inherit !important;
 }
 

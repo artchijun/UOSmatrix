@@ -7587,27 +7587,28 @@ function renderCommonValuesNetworkGraph() {
         nodes: {
             chosen: {
                 node: function(values, id, selected, hovering) {
-                    // 기본 스타일 유지
+                    // 기본 스타일 유지 (배경색은 변경하지 않음)
                     if (selected) {
-                        values.borderColor = '#454545ff';  // 초록색으로 선택 상태 표시
+                        values.borderColor = '#454545ff';  // 검은색으로 선택 상태 표시
                         values.borderWidth = 3;
                         if (values.font) {
-                            values.font.color = '#be2626ff';
+                            values.font.color = '#020202ff';
                         }
                     } else if (hovering) {
-                        values.borderColor = '#e11111';  // 빨간색으로 호버 상태 표시
+                        values.borderColor = '#000000ff';  // 빨간색으로 호버 상태 표시
                         values.borderWidth = 2;
                         if (values.font) {
-                            values.font.color = '#e11111';
+                            values.font.color = '#000000ff';
                         }
                     } else {
-                        // 기본 상태에서는 그룹별 색상 유지
+                        // 기본 상태에서는 그룹별 색상 유지 (배경색은 그대로)
                         values.borderColor = values.color ? values.color.border : '#01579b';
                         values.borderWidth = 2;
                         if (values.font) {
                             values.font.color = values.color ? values.color.border : '#01579b';
                         }
                     }
+                    // 배경색은 절대 변경하지 않음 - 원래 그룹 색상 유지
                 }
             },
             shadow: {
@@ -7643,7 +7644,7 @@ function renderCommonValuesNetworkGraph() {
             color: { 
                 color: '#bdbdbd', 
                 highlight: '#0d30be',  // 호버 시 파란색
-                hover: '#0d30be'       // 호버 시 파란색
+                hover: '#bdbdbd'       // 호버 시 파란색
             },
             chosen: {
                 edge: function(values, id, selected, hovering) {
@@ -7651,7 +7652,7 @@ function renderCommonValuesNetworkGraph() {
                         values.color = '#545454ff';  // 선택 시 청록색
                         values.width = 3;
                     } else if (hovering) {
-                        values.color = '#0d30be';  // 호버 시 파란색
+                        values.color = '#414141ff';  // 호버 시 파란색
                         values.width = 2;
                     } else {
                         values.color = '#bdbdbd';  // 기본 회색
@@ -7661,7 +7662,7 @@ function renderCommonValuesNetworkGraph() {
             },
             arrows: { to: { enabled: true, scaleFactor: 0.35 } },
             smooth: { type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.4 },
-            length: 220 // 엣지 길이 더 길게
+            length: 20 // 엣지 길이 더 길게
         },
         layout: {
             improvedLayout: true,
@@ -9713,8 +9714,11 @@ function renderCommonValuesNetworkGraph() {
     // 노드 하이라이트 업데이트 함수
     function updateNodeHighlight() {
         const nodeUpdate = [];
-        nodes.forEach(node => {
-            const nodeId = node.id;
+        // 현재 네트워크의 실제 노드 데이터를 가져옵니다
+        const currentNodes = network.body.data.nodes.get();
+        
+        currentNodes.forEach(currentNode => {
+            const nodeId = currentNode.id;
             let isInSelectedGroup = false;
             if (selectedCommonValuesBlob && valueCourseIds[selectedCommonValuesBlob]) {
                 isInSelectedGroup = valueCourseIds[selectedCommonValuesBlob].includes(nodeId);
@@ -9731,24 +9735,24 @@ function renderCommonValuesNetworkGraph() {
                     value3: '#388e3c'
                 }[selectedCommonValuesBlob] || '#1d1d1dff';
                 
-                // 하이라이트 스타일 적용
+                // 하이라이트 스타일 적용 - 현재 노드의 색상 유지
                 updatedNode.color = {
-                    background: node.color ? node.color.background : '#f8f9fa',
+                    background: currentNode.color ? currentNode.color.background : '#f8f9fa',
                     border: groupColor,
                     highlight: {
-                        background: node.color ? node.color.background : '#f8f9fa',
+                        background: currentNode.color ? currentNode.color.background : '#f8f9fa',
                         border: groupColor
                     }
                 };
                 updatedNode.borderWidth = 3; // 선택된 노드는 테두리 두껍게
             } else {
-                // 선택되지 않은 노드는 원래 스타일로 복원
+                // 선택되지 않은 노드는 원래 스타일로 복원 - 현재 노드의 색상 유지
                 updatedNode.color = {
-                    background: node.color ? node.color.background : '#f8f9fa',
-                    border: node.color ? node.color.border : '#bdbdbd',
+                    background: currentNode.color ? currentNode.color.background : '#f8f9fa',
+                    border: currentNode.color ? currentNode.color.border : '#bdbdbd',
                     highlight: {
-                        background: node.color ? node.color.background : '#f8f9fa',
-                        border: node.color ? node.color.border : '#bdbdbd'
+                        background: currentNode.color ? currentNode.color.background : '#f8f9fa',
+                        border: currentNode.color ? currentNode.color.border : '#bdbdbd'
                     }
                 };
                 updatedNode.borderWidth = 2; // 기본 테두리 두께
@@ -9785,12 +9789,13 @@ function renderCommonValuesNetworkGraph() {
         const nodeUpdateArray = [];
         
         allNodes.forEach(node => {
-            // 원래 스타일 저장
+            // 원래 스타일 저장 (호버 전 상태)
             if (!nodeHoverOriginalStyles.has(node.id)) {
                 nodeHoverOriginalStyles.set(node.id, {
                     opacity: node.opacity || 1,
                     font: { ...node.font },
-                    color: node.color ? { ...node.color } : undefined
+                    color: node.color ? { ...node.color } : undefined,
+                    borderWidth: node.borderWidth || 2
                 });
             }
             
@@ -9798,23 +9803,40 @@ function renderCommonValuesNetworkGraph() {
                 // 호버된 노드 - 강한 하이라이트 (자동으로 chosen 스타일 적용됨)
                 network.selectNodes([hoveredNodeId]);
             } else if (connectedNodeIds.includes(node.id)) {
-                // 연결된 노드 - 중간 하이라이트
+                // 연결된 노드 - 중간 하이라이트 (배경색은 유지, 테두리만 강조)
                 nodeUpdateArray.push({
                     id: node.id,
-                    opacity: 0.8,
+                    opacity: 0.6,
+                    borderWidth: 2,
+                    color: {
+                        background: node.color ? node.color.background : '#f8f9fa',
+                        border: '#000000',
+                        highlight: {
+                            background: node.color ? node.color.background : '#f8f9fa',
+                            border: '#000000'
+                        }
+                    },
                     font: {
                         ...node.font,
                         color: '#000000'
                     }
                 });
             } else {
-                // 나머지 노드 - 흐리게
+                // 나머지 노드 - 흐리게 (배경색은 유지, 투명도만 조정)
                 nodeUpdateArray.push({
                     id: node.id,
-                    opacity: 0.2,
+                    opacity: 0.3,  // 엣지 호버와 동일한 투명도
+                    color: {
+                        background: node.color ? node.color.background : '#f8f9fa',
+                        border: node.color ? node.color.border : '#bdbdbd',
+                        highlight: {
+                            background: node.color ? node.color.background : '#f8f9fa',
+                            border: node.color ? node.color.border : '#bdbdbd'
+                        }
+                    },
                     font: {
                         ...node.font,
-                        color: 'rgba(73, 80, 87, 0.2)'
+                        color: 'rgba(73, 80, 87, 0.3)'  // 폰트도 같은 투명도로
                     }
                 });
             }
@@ -9877,11 +9899,12 @@ function renderCommonValuesNetworkGraph() {
             const restoreData = {
                 id: nodeId,
                 opacity: originalStyle.opacity,
-                font: originalStyle.font
+                font: originalStyle.font,
+                borderWidth: originalStyle.borderWidth || 2 // 원래 테두리 두께로 복원
             };
             
             if (originalStyle.color) {
-                restoreData.color = originalStyle.color;
+                restoreData.color = originalStyle.color; // 원래 배경색 복원
             }
             
             nodeRestoreArray.push(restoreData);
@@ -9927,40 +9950,69 @@ function renderCommonValuesNetworkGraph() {
             const dimNodeIds = [];
             const nodeUpdateArray = [];
             
+            // 현재 네트워크의 모든 노드 가져오기
+            const allCurrentNodes = network.body.data.nodes.get();
+            
             // 모든 노드의 원래 상태 저장 및 업데이트 준비
-            nodes.forEach(n => {
-                const currentNode = network.body.data.nodes.get(n.id);
+            allCurrentNodes.forEach(currentNode => {
                 
                 // 원래 스타일 저장 (처음 호버 시에만)
-                if (!edgeHoverOriginalNodeStyles.has(n.id)) {
-                    edgeHoverOriginalNodeStyles.set(n.id, {
+                if (!edgeHoverOriginalNodeStyles.has(currentNode.id)) {
+                    edgeHoverOriginalNodeStyles.set(currentNode.id, {
                         opacity: currentNode.opacity || 1,
                         font: { ...currentNode.font },
                         color: currentNode.color ? { ...currentNode.color } : undefined
                     });
                 }
                 
-                const course = courses.find(c => c.id === n.id);
+                const course = courses.find(c => c.id === currentNode.id);
                 if (course && course.yearSemester === yearSemester) {
-                    highlightNodeIds.push(n.id);
+                    highlightNodeIds.push(currentNode.id);
                 } else {
-                    dimNodeIds.push(n.id);
+                    dimNodeIds.push(currentNode.id);
                     // 디밍할 노드 업데이트 배열에 추가
                     nodeUpdateArray.push({
-                        id: n.id,
-                        opacity: 0.2,
+                        id: currentNode.id,
+                        opacity: 0.3,  // 더 강한 투명도 적용
                         font: { 
                             ...currentNode.font,
-                            color: 'rgba(73, 80, 87, 0.2)' 
+                            color: 'rgba(73, 80, 87, 0.3)'  // 폰트도 같은 투명도로
+                        },
+                        color: {
+                            background: currentNode.color ? currentNode.color.background : '#f8f9fa',
+                            border: currentNode.color ? currentNode.color.border : '#bdbdbd',
+                            highlight: {
+                                background: currentNode.color ? currentNode.color.background : '#f8f9fa',
+                                border: currentNode.color ? currentNode.color.border : '#bdbdbd'
+                            }
                         }
                     });
                 }
             });
             
-            // 하이라이트할 노드 선택
-            network.selectNodes(highlightNodeIds);
+            // 하이라이트할 노드들도 업데이트 배열에 추가 (색상 체계 유지)
+            highlightNodeIds.forEach(nodeId => {
+                const currentNode = network.body.data.nodes.get(nodeId);
+                nodeUpdateArray.push({
+                    id: nodeId,
+                    opacity: 1,
+                    borderWidth: 3,
+                    color: {
+                        background: currentNode.color ? currentNode.color.background : '#f8f9fa',
+                        border: '#454545ff',
+                        highlight: {
+                            background: currentNode.color ? currentNode.color.background : '#f8f9fa',
+                            border: '#454545ff'
+                        }
+                    },
+                    font: {
+                        ...currentNode.font,
+                        color: '#000000ff'
+                    }
+                });
+            });
             
-            // 나머지 노드들 투명도 적용 (배치 업데이트)
+            // 모든 노드들 업데이트 (배치 처리)
             if (nodeUpdateArray.length > 0) {
                 network.body.data.nodes.update(nodeUpdateArray);
             }
@@ -9984,11 +10036,11 @@ function renderCommonValuesNetworkGraph() {
                     edgeUpdateArray.push({
                         id: e.id,
                         color: { 
-                            color: '#654242ff', 
+                            color: '#525252ff', 
                             highlight: '#313131ff',
-                            hover: '#281198ff'
+                            hover: '#333333ff'
                         },
-                        width: 2
+                        width: 3
                     });
                 } else {
                     // 다른 엣지들은 투명도 적용
