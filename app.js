@@ -2511,6 +2511,8 @@ function handleCourseSubmit(e) {
         matrixData[course.courseName] = new Array(18).fill(0);
         // 추가 이력 기록
         addChangeHistory('추가', course.courseName, Object.keys(course).map(k => ({field: k, before: '', after: course[k]})));
+        // 새로운 교과목 추가 후 공통가치대응 블록 정리
+        cleanupCommonValuesCopiedBlocks();
         alert('교과목이 추가되었습니다.');
     } else {
         const oldCourse = courses[editingIndex];
@@ -2545,6 +2547,13 @@ function handleCourseSubmit(e) {
     // 셀 편집 중이 아닐 때만 테이블 렌더링
     if (!isCommonValuesCellEditing) {
     renderCommonValuesTable(); // 공통가치대응표 업데이트 추가
+    
+    // 네트워크 그래프도 지연 렌더링으로 완전 새로고침
+    setTimeout(() => {
+        if (typeof renderCommonValuesNetworkGraph === 'function') {
+            renderCommonValuesNetworkGraph();
+        }
+    }, 100);
     }
     updateStats();
     closeModal();
@@ -7654,7 +7663,15 @@ function renderCommonValuesNetworkGraph() {
         width: '100%',
     };
 
-    // 기존 네트워크 제거
+    // 기존 네트워크 제거 및 정리
+    if (window.commonValuesNetwork) {
+        try {
+            window.commonValuesNetwork.destroy();
+        } catch (e) {
+            // 네트워크가 이미 제거된 경우 무시
+        }
+        window.commonValuesNetwork = null;
+    }
     container.innerHTML = '';
     container.style.display = 'block';
     
@@ -7733,6 +7750,9 @@ function renderCommonValuesNetworkGraph() {
     // vis-network 인스턴스 생성 (스타일링 적용된 노드로)
     const network = new vis.Network(container, { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) }, options);
     
+    // 전역 변수에 네트워크 저장
+    window.commonValuesNetwork = network;
+    
     // 그룹 경계 반발력 시스템
     let boundaryForces = new Map(); // nodeId -> {x, y} force vectors
     let repulsionSystemActive = true;
@@ -7782,8 +7802,13 @@ function renderCommonValuesNetworkGraph() {
     function calculateBoundaryRepulsion() {
         boundaryForces.clear();
         
+        // 네트워크 객체 존재 확인
+        if (!window.commonValuesNetwork) {
+            return;
+        }
+        
         // 모든 노드에 대해 반발력 계산
-        const allNodes = network.getPositions();
+        const allNodes = window.commonValuesNetwork.getPositions();
         let totalNodesProcessed = 0;
         let nodesWithForces = 0;
         
@@ -7929,7 +7954,6 @@ function renderCommonValuesNetworkGraph() {
                             return pos;
                         } catch (e) {
                             // 노드가 존재하지 않는 경우 무시
-                            console.warn(`Node ${id} not found in network`);
                             return null;
                         }
                     }).filter(pos => pos);
@@ -8045,7 +8069,19 @@ function renderCommonValuesNetworkGraph() {
     
     // 노드 위치 안정화 상태 체크 함수
     function checkStability() {
-        const currentPositions = network.getPositions();
+        let currentPositions;
+        try {
+            currentPositions = network.getPositions();
+        } catch (e) {
+            console.warn('네트워크에서 노드 위치를 가져오는 중 오류 발생:', e.message);
+            return { 
+                isStable: false, 
+                maxMovement: 0, 
+                checkCount: 0, 
+                hasIntruders: false 
+            };
+        }
+        
         let isStable = true;
         let maxMovement = 0;
         let hasSplineIntruders = false;
@@ -8129,7 +8165,11 @@ function renderCommonValuesNetworkGraph() {
                 if (!skipNode && (Math.abs(force.x) > 0.1 || Math.abs(force.y) > 0.1)) { // 임계값 낮춤 (더 민감한 반응)
                     hasSignificantForces = true;
                     try {
-                        const currentPos = network.getPosition(nodeId);
+                        // 네트워크 객체 존재 확인
+                        if (!window.commonValuesNetwork) {
+                            return;
+                        }
+                        const currentPos = window.commonValuesNetwork.getPosition(nodeId);
                         if (currentPos) {
                             // 안정화 정도와 노드 위치에 따라 dampening 조정
                             let dampening = 0.18;
@@ -8169,7 +8209,10 @@ function renderCommonValuesNetworkGraph() {
             // 배치로 노드 위치 업데이트
             Object.entries(nodesToUpdate).forEach(([nodeId, pos]) => {
                 try {
-                    network.moveNode(nodeId, pos.x, pos.y);
+                    // 네트워크 객체 존재 확인
+                    if (window.commonValuesNetwork) {
+                        window.commonValuesNetwork.moveNode(nodeId, pos.x, pos.y);
+                    }
                 } catch (error) {
                     // 노드 이동 실패 시 무시
                 }
@@ -8990,13 +9033,25 @@ function renderCommonValuesNetworkGraph() {
         };
         
         // 해당 위치의 노드 확인 - 노드가 있으면 스플라인 드래그 방지
-        const nodeAtPosition = network.getNodeAt(canvasPosition);
-        if (nodeAtPosition) {
+        let nodeAtPosition;
+        try {
+            nodeAtPosition = network.getNodeAt(canvasPosition);
+            if (nodeAtPosition) {
+                return;
+            }
+        } catch (e) {
+            console.warn('네트워크에서 노드 위치 확인 중 오류:', e.message);
             return;
         }
         
         // vis.js 캔버스 좌표계로 직접 변환
-        const canvasPos = network.DOMtoCanvas(canvasPosition);
+        let canvasPos;
+        try {
+            canvasPos = network.DOMtoCanvas(canvasPosition);
+        } catch (e) {
+            console.warn('캔버스 좌표 변환 중 오류:', e.message);
+            return;
+        }
         
         // 폴리곤 내부 클릭 확인
         for (const key of valueKeys) {
@@ -9025,13 +9080,17 @@ function renderCommonValuesNetworkGraph() {
                 }
                 
                 // 물리 시뮬레이션과 상호작용 비활성화, 반발력 시스템 일시 정지
-                network.setOptions({
-                    physics: { enabled: false },
-                    interaction: {
-                        dragNodes: false,
-                        dragView: false
-                    }
-                });
+                try {
+                    network.setOptions({
+                        physics: { enabled: false },
+                        interaction: {
+                            dragNodes: false,
+                            dragView: false
+                        }
+                    });
+                } catch (e) {
+                    console.warn('네트워크 옵션 설정 중 오류:', e.message);
+                }
                 
                 // 그룹 드래그 중에도 반발력 시스템 계속 작동
                 
@@ -9054,7 +9113,13 @@ function renderCommonValuesNetworkGraph() {
         };
         
         // vis.js 캔버스 좌표계로 직접 변환
-        const canvasPos = network.DOMtoCanvas(canvasPosition);
+        let canvasPos;
+        try {
+            canvasPos = network.DOMtoCanvas(canvasPosition);
+        } catch (e) {
+            console.warn('캔버스 좌표 변환 중 오류 (mousemove):', e.message);
+            return;
+        }
         
         // 드래그 중인 경우
         if (isDraggingGroup && draggedGroupKey && dragStartPosition) {
@@ -9672,14 +9737,32 @@ function cleanupCommonValuesCopiedBlocks() {
             valueKeys.forEach(key => {
                 if (Array.isArray(commonValuesCopiedBlocks[subjectType][key])) {
                     // 실제로 존재하는 course ID만 남기기
+                    const originalLength = commonValuesCopiedBlocks[subjectType][key].length;
                     commonValuesCopiedBlocks[subjectType][key] = 
                         commonValuesCopiedBlocks[subjectType][key].filter(courseId => {
                             return courses.some(c => c.id === courseId);
                         });
+                    
+                    // 정리된 항목이 있으면 로그
+                    const newLength = commonValuesCopiedBlocks[subjectType][key].length;
+                    if (originalLength !== newLength) {
+                        console.log(`Cleaned up ${originalLength - newLength} invalid course IDs from ${subjectType}-${key}`);
+                    }
                 }
             });
         }
     });
+    
+    // 전역 valueCourseIds도 함께 정리
+    if (typeof valueCourseIds === 'object' && valueCourseIds) {
+        valueKeys.forEach(key => {
+            if (Array.isArray(valueCourseIds[key])) {
+                valueCourseIds[key] = valueCourseIds[key].filter(courseId => {
+                    return courses.some(c => c.id === courseId);
+                });
+            }
+        });
+    }
 }
 
 // [추가] 드래그 시작한 셀 정보를 저장하는 전역 변수
