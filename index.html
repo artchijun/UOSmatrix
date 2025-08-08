@@ -163,53 +163,168 @@
             <div class="filters">
                 <div class="filter-group">
                     <label>학년</label>
-                    <select id="yearFilter" onchange="filterCourses()">
-                        <option value="">전체</option>
-                        <option value="1">1학년</option>
-                        <option value="2">2학년</option>
-                        <option value="3">3학년</option>
-                        <option value="4">4학년</option>
-                        <option value="5">5학년</option>
-                    </select>
+                    <div class="checkbox-filter-dropdown">
+                        <button class="filter-dropdown-btn" onclick="toggleFilterDropdown(event, 'yearFilterDropdown')">
+                            <span id="yearFilterText">전체</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </button>
+                        <div id="yearFilterDropdown" class="filter-dropdown-content">
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="yearFilter" value="1" onchange="updateYearFilter()">
+                                <span>1학년</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="yearFilter" value="2" onchange="updateYearFilter()">
+                                <span>2학년</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="yearFilter" value="3" onchange="updateYearFilter()">
+                                <span>3학년</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="yearFilter" value="4" onchange="updateYearFilter()">
+                                <span>4학년</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="yearFilter" value="5" onchange="updateYearFilter()">
+                                <span>5학년</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
                 <div class="filter-group">
                     <label>학기</label>
-                    <select id="semesterFilter" onchange="filterCourses()">
-                        <option value="">전체</option>
-                        <option value="1">1학기</option>
-                        <option value="2">2학기</option>
-                        <option value="계절">계절학기</option>
-                    </select>
+                    <div class="checkbox-filter-dropdown">
+                        <button class="filter-dropdown-btn" onclick="toggleFilterDropdown(event, 'semesterFilterDropdown')">
+                            <span id="semesterFilterText">전체</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </button>
+                        <div id="semesterFilterDropdown" class="filter-dropdown-content">
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="semesterFilter" value="1" onchange="updateSemesterFilter()">
+                                <span>1학기</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="semesterFilter" value="2" onchange="updateSemesterFilter()">
+                                <span>2학기</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="semesterFilter" value="계절" onchange="updateSemesterFilter()">
+                                <span>계절학기</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
                 <div class="filter-group">
                     <label>구분</label>
-                    <select id="categoryFilter" onchange="filterCourses()">
-                        <option value="">전체</option>
-                        <option value="건축적사고">건축적사고</option>
-                        <option value="설계">설계</option>
-                        <option value="기술">기술</option>
-                        <option value="실무">실무</option>
-                        <option value="기타">기타</option>
-                    </select>
+                    <div class="checkbox-filter-dropdown">
+                        <button class="filter-dropdown-btn" onclick="toggleFilterDropdown(event, 'categoryFilterDropdown')">
+                            <span id="categoryFilterText">전체</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </button>
+                        <div id="categoryFilterDropdown" class="filter-dropdown-content">
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="categoryFilter" value="건축적사고" onchange="updateCategoryFilter()">
+                                <span>건축적사고</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="categoryFilter" value="설계" onchange="updateCategoryFilter()">
+                                <span>설계</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="categoryFilter" value="기술" onchange="updateCategoryFilter()">
+                                <span>기술</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="categoryFilter" value="실무" onchange="updateCategoryFilter()">
+                                <span>실무</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="categoryFilter" value="교양" onchange="updateCategoryFilter()">
+                                <span>교양</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="categoryFilter" value="기타" onchange="updateCategoryFilter()">
+                                <span>기타</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
                 <div class="filter-group">
                     <label>과목분류</label>
-                    <select id="subjectTypeFilter" onchange="filterCourses()">
-                        <option value="">전체</option>
-                        <option value="설계">설계</option>
-                        <option value="디지털">디지털</option>
-                        <option value="역사">역사</option>
-                        <option value="이론">이론</option>
-                        <option value="도시">도시</option>
-                        <option value="사회">사회</option>
-                        <option value="기술">기술</option>
-                        <option value="실무">실무</option>
-                        <option value="비교과">비교과</option>
-                    </select>
+                    <div class="checkbox-filter-dropdown">
+                        <button class="filter-dropdown-btn" onclick="toggleFilterDropdown(event, 'subjectTypeFilterDropdown')">
+                            <span id="subjectTypeFilterText">전체</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </button>
+                        <div id="subjectTypeFilterDropdown" class="filter-dropdown-content">
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="subjectTypeFilter" value="설계" onchange="updateSubjectTypeFilter()">
+                                <span>설계</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="subjectTypeFilter" value="디지털" onchange="updateSubjectTypeFilter()">
+                                <span>디지털</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="subjectTypeFilter" value="역사" onchange="updateSubjectTypeFilter()">
+                                <span>역사</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="subjectTypeFilter" value="이론" onchange="updateSubjectTypeFilter()">
+                                <span>이론</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="subjectTypeFilter" value="도시" onchange="updateSubjectTypeFilter()">
+                                <span>도시</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="subjectTypeFilter" value="사회" onchange="updateSubjectTypeFilter()">
+                                <span>사회</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="subjectTypeFilter" value="기술" onchange="updateSubjectTypeFilter()">
+                                <span>기술</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="subjectTypeFilter" value="실무" onchange="updateSubjectTypeFilter()">
+                                <span>실무</span>
+                            </label>
+                            <label class="filter-checkbox-item">
+                                <input type="checkbox" name="subjectTypeFilter" value="비교과" onchange="updateSubjectTypeFilter()">
+                                <span>비교과</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
                 <div class="filter-group">
                     <label>검색</label>
                     <input type="text" id="searchInput" placeholder="과목명 검색" onkeyup="filterCourses()">
+                </div>
+                <div class="filter-group change-status-filter">
+                    <label>변경 상태</label>
+                    <div class="change-status-checkboxes">
+                        <label class="inline-checkbox">
+                            <input type="checkbox" id="showAdded" onchange="filterCourses()" checked>
+                            <span class="color-indicator" style="background: #28a745;"></span>
+                            <span>추가</span>
+                        </label>
+                        <label class="inline-checkbox">
+                            <input type="checkbox" id="showModified" onchange="filterCourses()" checked>
+                            <span class="color-indicator" style="background: #07bdff;"></span>
+                            <span>수정</span>
+                        </label>
+                        <label class="inline-checkbox">
+                            <input type="checkbox" id="showDeleted" onchange="filterCourses()" checked>
+                            <span class="color-indicator" style="background: #dc3545;"></span>
+                            <span>삭제</span>
+                        </label>
+                        <label class="inline-checkbox">
+                            <input type="checkbox" id="showUnchanged" onchange="filterCourses()" checked>
+                            <span class="color-indicator" style="background: #6c757d;"></span>
+                            <span>변경없음</span>
+                        </label>
+                    </div>
                 </div>
             </div>
             <div class="table-container">
@@ -286,6 +401,46 @@
                                 <input type="checkbox" value="선택" onchange="filterMatrix()">
                                 <span class="checkmark"></span>
                                 <span class="label-text">선택</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="filter-section">
+                        <div class="filter-label">
+                            <i class="filter-icon">🔍</i>
+                            <span>변경 상태</span>
+                        </div>
+                        <div class="checkbox-group">
+                            <label class="modern-checkbox">
+                                <input type="checkbox" value="added" onchange="filterMatrix()" checked>
+                                <span class="checkmark"></span>
+                                <span class="label-text">
+                                    <span class="color-indicator" style="background: #28a745;"></span>
+                                    추가
+                                </span>
+                            </label>
+                            <label class="modern-checkbox">
+                                <input type="checkbox" value="modified" onchange="filterMatrix()" checked>
+                                <span class="checkmark"></span>
+                                <span class="label-text">
+                                    <span class="color-indicator" style="background: #07bdff;"></span>
+                                    수정
+                                </span>
+                            </label>
+                            <label class="modern-checkbox">
+                                <input type="checkbox" value="deleted" onchange="filterMatrix()" checked>
+                                <span class="checkmark"></span>
+                                <span class="label-text">
+                                    <span class="color-indicator" style="background: #dc3545;"></span>
+                                    삭제
+                                </span>
+                            </label>
+                            <label class="modern-checkbox">
+                                <input type="checkbox" value="unchanged" onchange="filterMatrix()" checked>
+                                <span class="checkmark"></span>
+                                <span class="label-text">
+                                    <span class="color-indicator" style="background: #6c757d;"></span>
+                                    변경없음
+                                </span>
                             </label>
                         </div>
                     </div>
@@ -845,7 +1000,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>교과목 수정</h2>
-                <button class="close-btn" onclick="closeModal()">&times;</button>
+                <button class="close-btn" onclick="confirmCloseModal()">&times;</button>
             </div>
             <form id="courseForm">
                 <div class="form-group">

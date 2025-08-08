@@ -702,6 +702,7 @@ function restoreSelectedVersionData() {
         // 4. 공통가치대응 탭 데이터 복원
         if (v.commonValuesTab) {
             commonValuesCellTexts = v.commonValuesTab.commonValuesCellTexts || {};
+            commonValuesCopiedBlocks = v.commonValuesTab.commonValuesCopiedBlocks || {};
             if (v.commonValuesTab.commonValuesTitleText) {
                 localStorage.setItem('commonValuesTitleText', v.commonValuesTab.commonValuesTitleText);
             }
@@ -1847,22 +1848,66 @@ function renderCourses() {
     const tbody = document.getElementById('coursesTableBody');
     tbody.innerHTML = '';
     
-    // 정렬된 데이터 사용 (필터링된 데이터가 있으면 그것을, 없으면 전체 데이터를)
-    const list = filteredCourses || courses;
+    // 필터가 적용된 경우 filteredCourses 사용, 아니면 전체 과목 + 삭제된 과목 표시
+    let list;
+    const diffSummary = getCurrentDiffSummary();
+    const deletedCourses = diffSummary.filter(entry => entry.type === '삭제').map(entry => entry.course);
+    
+    if (filteredCourses !== null && filteredCourses !== undefined) {
+        // 필터링이 적용된 경우 - filteredCourses에 이미 삭제된 교과목이 포함되어 있음
+        list = filteredCourses;
+    } else {
+        // 필터링이 적용되지 않은 경우 - 현재 교과목 + 삭제된 교과목 모두 표시
+        list = [...courses, ...deletedCourses];
+    }
     
     list.forEach((course, idx) => {
         // 원본 배열에서의 인덱스 찾기
-        const originalIndex = courses.findIndex(c => c === course);
+        const originalIndex = courses.findIndex(c => c.id === course.id);
+        const isDeleted = deletedCourses.some(d => d.id === course.id); // 삭제된 과목인지 확인
         
         // 매트릭스 데이터 가져오기
         const matrixValues = matrixData[course.courseName] || new Array(18).fill(0);
         const performanceCriteria = getPerformanceCriteria(matrixValues);
         
         const row = tbody.insertRow();
+        
+        // 삭제된 과목인 경우 스타일 적용
+        if (isDeleted) {
+            row.classList.add('deleted-course-row');
+        }
+        
+        // 변경 상태 확인
+        const diffSummary = getCurrentDiffSummary();
+        const courseDiff = diffSummary.find(diff => diff.course.id === course.id);
+        let courseNameClass = '';
+        let rowClass = '';
+        if (courseDiff) {
+            if (courseDiff.type === '추가') {
+                courseNameClass = 'course-added';
+                rowClass = 'added-course';
+            } else if (courseDiff.type === '수정') {
+                courseNameClass = 'course-modified';
+                rowClass = 'modified-course';
+            } else if (courseDiff.type === '삭제') {
+                courseNameClass = 'course-deleted';
+                rowClass = 'deleted-course';
+            }
+        } else if (isDeleted) {
+            // 삭제된 교과목인 경우
+            courseNameClass = 'course-deleted';
+            rowClass = 'deleted-course';
+        }
+        
+        // 행에 클래스 추가
+        if (rowClass) {
+            row.classList.add(rowClass);
+        }
+        
         row.innerHTML = `
             <td class="no-edit">${course.yearSemester}</td>
             <td class="no-edit">${course.courseNumber}</td>
-            <td><strong ondblclick="editCourse(${originalIndex})">${course.courseName}</strong></td>
+            <td class="no-edit course-title-cell"><strong class="${courseNameClass}" ${!isDeleted ? `ondblclick="editCourse(${originalIndex})"` : ''}>${course.courseName}</strong></td>
             <td>${course.professor || '-'}</td>
             <td class="no-edit">${course.credits}</td>
             <td class="no-edit">
@@ -1874,8 +1919,10 @@ function renderCourses() {
             <td class="no-edit">${course.isRequired}</td>
             <td class="performance-criteria no-edit" title="${performanceCriteria.fullText}">${performanceCriteria.detailedText}</td>
             <td class="no-edit">
-                <button class="btn btn-sm" onclick="editCourse(${originalIndex})" style="font-size: 12px; padding: 5px 10px;">수정</button>
-                <button class="btn btn-sm btn-secondary" onclick="deleteCourse(${originalIndex})" style="font-size: 12px; padding: 5px 10px;">삭제</button>
+                ${!isDeleted ? `
+                    <button class="btn btn-sm" onclick="editCourse(${originalIndex})" style="font-size: 12px; padding: 5px 10px;">수정</button>
+                    <button class="btn btn-sm btn-secondary" onclick="deleteCourse(${originalIndex})" style="font-size: 12px; padding: 5px 10px;">삭제</button>
+                ` : ''}
             </td>
         `;
         // 수행평가기준 컬럼에 HTML 적용
@@ -1920,25 +1967,91 @@ function getCategoryClass(category) {
 
 // 교과목 필터링
 function filterCourses() {
-    const yearFilter = document.getElementById('yearFilter').value;
-    const semesterFilter = document.getElementById('semesterFilter').value;
-    const categoryFilter = document.getElementById('categoryFilter').value;
-    const subjectTypeFilter = document.getElementById('subjectTypeFilter').value;
+    // 체크박스 필터에서 선택된 값들 가져오기
+    const selectedYears = [];
+    document.querySelectorAll('input[name="yearFilter"]:checked').forEach(cb => {
+        selectedYears.push(cb.value);
+    });
+    
+    const selectedSemesters = [];
+    document.querySelectorAll('input[name="semesterFilter"]:checked').forEach(cb => {
+        selectedSemesters.push(cb.value);
+    });
+    
+    const selectedCategories = [];
+    document.querySelectorAll('input[name="categoryFilter"]:checked').forEach(cb => {
+        selectedCategories.push(cb.value);
+    });
+    
+    const selectedSubjectTypes = [];
+    document.querySelectorAll('input[name="subjectTypeFilter"]:checked').forEach(cb => {
+        selectedSubjectTypes.push(cb.value);
+    });
+    
     const searchInput = document.getElementById('searchInput').value.toLowerCase();
     
-    filteredCourses = courses.filter(course => {
+    // 변경 상태 필터
+    const showAdded = document.getElementById('showAdded').checked;
+    const showModified = document.getElementById('showModified').checked;
+    const showDeleted = document.getElementById('showDeleted').checked;
+    const showUnchanged = document.getElementById('showUnchanged').checked;
+    
+    // 현재 버전의 변경 사항 가져오기
+    const diffSummary = getCurrentDiffSummary();
+    
+    // 모든 변경 상태 필터가 해제되어 있으면 빈 배열 반환
+    if (!showAdded && !showModified && !showDeleted && !showUnchanged) {
+        filteredCourses = [];
+        renderCourses();
+        updateStats();
+        return;
+    }
+    
+    // 현재 교과목들 필터링
+    const currentFilteredCourses = courses.filter(course => {
         const [year, semester] = course.yearSemester.split('-');
-        const matchesYear = !yearFilter || year === yearFilter;
-        const matchesSemester = !semesterFilter || semester === semesterFilter;
-        const matchesCategory = !categoryFilter || course.category === categoryFilter;
-        const matchesSubjectType = !subjectTypeFilter || course.subjectType === subjectTypeFilter;
+        const matchesYear = selectedYears.length === 0 || selectedYears.includes(year);
+        const matchesSemester = selectedSemesters.length === 0 || selectedSemesters.includes(semester);
+        const matchesCategory = selectedCategories.length === 0 || selectedCategories.includes(course.category);
+        const matchesSubjectType = selectedSubjectTypes.length === 0 || selectedSubjectTypes.includes(course.subjectType);
         const matchesSearch = !searchInput || 
             course.courseName.toLowerCase().includes(searchInput) ||
             course.professor.toLowerCase().includes(searchInput) ||
             course.courseNumber.toLowerCase().includes(searchInput);
         
-        return matchesYear && matchesSemester && matchesCategory && matchesSubjectType && matchesSearch;
+        // 변경 상태 필터링
+        const courseDiff = diffSummary.find(diff => diff.course.id === course.id);
+        let matchesChangeStatus = false;
+        if (courseDiff) {
+            if (courseDiff.type === '추가' && showAdded) matchesChangeStatus = true;
+            else if (courseDiff.type === '수정' && showModified) matchesChangeStatus = true;
+        } else if (showUnchanged) {
+            matchesChangeStatus = true;
+        }
+        
+        return matchesYear && matchesSemester && matchesCategory && matchesSubjectType && matchesSearch && matchesChangeStatus;
     });
+    
+    // 삭제된 교과목들 필터링
+    const deletedFilteredCourses = showDeleted ? diffSummary
+        .filter(diff => diff.type === '삭제')
+        .map(diff => diff.course)
+        .filter(course => {
+            const [year, semester] = course.yearSemester.split('-');
+            const matchesYear = selectedYears.length === 0 || selectedYears.includes(year);
+            const matchesSemester = selectedSemesters.length === 0 || selectedSemesters.includes(semester);
+            const matchesCategory = selectedCategories.length === 0 || selectedCategories.includes(course.category);
+            const matchesSubjectType = selectedSubjectTypes.length === 0 || selectedSubjectTypes.includes(course.subjectType);
+            const matchesSearch = !searchInput || 
+                course.courseName.toLowerCase().includes(searchInput) ||
+                course.professor.toLowerCase().includes(searchInput) ||
+                course.courseNumber.toLowerCase().includes(searchInput);
+            
+            return matchesYear && matchesSemester && matchesCategory && matchesSubjectType && matchesSearch;
+        }) : [];
+    
+    // 현재 과목과 삭제된 과목을 합치기
+    filteredCourses = [...currentFilteredCourses, ...deletedFilteredCourses];
     
     renderCourses();
     updateStats();
@@ -1946,11 +2059,26 @@ function filterCourses() {
 
 // 필터 초기화
 function resetFilters() {
-    document.getElementById('yearFilter').value = '';
-    document.getElementById('semesterFilter').value = '';
-    document.getElementById('categoryFilter').value = '';
-    document.getElementById('subjectTypeFilter').value = '';
+    // 체크박스 필터 초기화
+    document.querySelectorAll('input[name="yearFilter"]').forEach(cb => cb.checked = false);
+    document.querySelectorAll('input[name="semesterFilter"]').forEach(cb => cb.checked = false);
+    document.querySelectorAll('input[name="categoryFilter"]').forEach(cb => cb.checked = false);
+    document.querySelectorAll('input[name="subjectTypeFilter"]').forEach(cb => cb.checked = false);
+    
+    // 필터 텍스트 업데이트
+    document.getElementById('yearFilterText').textContent = '전체';
+    document.getElementById('semesterFilterText').textContent = '전체';
+    document.getElementById('categoryFilterText').textContent = '전체';
+    document.getElementById('subjectTypeFilterText').textContent = '전체';
+    
     document.getElementById('searchInput').value = '';
+    
+    // 변경 상태 체크박스 모두 체크
+    document.getElementById('showAdded').checked = true;
+    document.getElementById('showModified').checked = true;
+    document.getElementById('showDeleted').checked = true;
+    document.getElementById('showUnchanged').checked = true;
+    
     filteredCourses = null;
     
     // 정렬 상태도 초기화
@@ -1968,6 +2096,9 @@ function resetFilters() {
     
     // 화살표 초기화
     clearMoveArrows();
+    
+    // 필터 적용
+    filterCourses();
 }
 
 // 교과목 수정
@@ -2126,13 +2257,47 @@ function renderMatrix() {
     // 필터링된 데이터 사용
     const coursesToRender = filteredMatrixCourses || courses;
     
+    // 선택된 학년들 가져오기 (필터링용)
+    const selectedYears = [];
+    document.querySelectorAll('.matrix-filters input[type="checkbox"][value^="1"], .matrix-filters input[type="checkbox"][value^="2"], .matrix-filters input[type="checkbox"][value^="3"], .matrix-filters input[type="checkbox"][value^="4"], .matrix-filters input[type="checkbox"][value^="5"]').forEach(checkbox => {
+        if (checkbox.checked) {
+            selectedYears.push(checkbox.value);
+        }
+    });
+    
+    // 선택된 필수여부들 가져오기 (필터링용)
+    const selectedRequired = [];
+    document.querySelectorAll('.matrix-filters input[type="checkbox"][value="필수"], .matrix-filters input[type="checkbox"][value="선택"]').forEach(checkbox => {
+        if (checkbox.checked) {
+            selectedRequired.push(checkbox.value);
+        }
+    });
+    
+    // 삭제된 교과목들 가져오기
+    const diffSummary = getCurrentDiffSummary();
+    const deletedCourses = diffSummary.filter(entry => entry.type === '삭제').map(entry => entry.course);
+    
+    // 삭제된 교과목 필터가 선택되어 있는지 확인
+    const showDeleted = document.querySelector('.matrix-filters input[value="deleted"]:checked') !== null;
+    
+    // 삭제된 교과목들도 필터링 적용
+    const filteredDeletedCourses = showDeleted ? deletedCourses.filter(course => {
+        const [year] = course.yearSemester.split('-');
+        const yearMatch = selectedYears.length === 0 || selectedYears.includes(year);
+        const requiredMatch = selectedRequired.length === 0 || selectedRequired.includes(course.isRequired);
+        return yearMatch && requiredMatch;
+    }) : [];
+    
+    // 현재 교과목들과 필터링된 삭제된 교과목들을 합치기
+    const allCoursesToRender = [...coursesToRender, ...filteredDeletedCourses];
+    
     const coursesByCategory = {
         '건축적사고': [],
         '설계': [],
         '기술': [],
         '실무': []
     };
-    coursesToRender.forEach(course => {
+    allCoursesToRender.forEach(course => {
         // 교양과목은 매트릭스에서 제외
         if (course.category === '교양') {
             return;
@@ -2162,6 +2327,13 @@ function renderMatrix() {
     Object.entries(coursesByCategory).forEach(([category, categoryCourses]) => {
         if (categoryCourses.length === 0) return;
         categoryCourses.forEach((course, index) => {
+            // 삭제된 교과목인지 먼저 확인
+            const isDeleted = deletedCourses.some(deletedCourse => deletedCourse.id === course.id);
+            
+            // 추가된 교과목인지 확인
+            const courseDiff = diffSummary.find(diff => diff.course.id === course.id);
+            const isAdded = courseDiff && courseDiff.type === '추가';
+            
             const row = tbody.insertRow();
             const categoryClass = getCategoryClass(course.category);
             row.classList.add(`category-${categoryClass}`);
@@ -2193,12 +2365,13 @@ function renderMatrix() {
             nameCell.addEventListener('mouseenter', (e) => showCourseTooltip(e, course));
             nameCell.addEventListener('mouseleave', hideCourseTooltip);
             nameCell.addEventListener('mousemove', moveCourseTooltip);
-            nameCell.onclick = () => editCourseFromMatrix(course);
+            
+            if (!isDeleted) {
+                nameCell.onclick = () => editCourseFromMatrix(course);
+            }
             nameCell.classList.add('no-edit');
             
-            // 교과목 변경 상태에 따른 색상 적용
-            const diffSummary = getCurrentDiffSummary();
-            const courseDiff = diffSummary.find(diff => diff.course.id === course.id);
+            // 교과목 변경 상태에 따른 색상 적용 (이미 위에서 courseDiff 선언됨)
             if (courseDiff) {
                 if (courseDiff.type === '추가') {
                     nameCell.classList.add('course-added');
@@ -2207,6 +2380,10 @@ function renderMatrix() {
                 } else if (courseDiff.type === '수정') {
                     nameCell.classList.add('course-modified');
                 }
+            } else if (isDeleted) {
+                // 삭제된 교과목 스타일 적용
+                nameCell.classList.add('course-deleted');
+                row.classList.add('deleted-course-row');
             }
             const creditsCell = row.insertCell();
             creditsCell.textContent = course.credits;
@@ -2227,9 +2404,25 @@ function renderMatrix() {
                     markClass = 'matrix-mark-practice';
                 }
                 if (value === 1) {
-                    cell.innerHTML = `<span class=\"matrix-mark ${markClass}\">●</span>`;
+                    // 삭제된 교과목인 경우 빨간색으로 표시
+                    if (isDeleted) {
+                        cell.innerHTML = `<span class=\"matrix-mark matrix-mark-deleted\">●</span>`;
+                    } else if (isAdded) {
+                        // 추가된 교과목인 경우 녹색으로 표시
+                        cell.innerHTML = `<span class=\"matrix-mark matrix-mark-added\">●</span>`;
+                    } else {
+                        cell.innerHTML = `<span class=\"matrix-mark ${markClass}\">●</span>`;
+                    }
                 } else if (value === 0.5) {
-                    cell.innerHTML = `<span class=\"matrix-mark ${markClass}\">◐</span>`;
+                    // 삭제된 교과목인 경우 빨간색으로 표시
+                    if (isDeleted) {
+                        cell.innerHTML = `<span class=\"matrix-mark matrix-mark-deleted\">◐</span>`;
+                    } else if (isAdded) {
+                        // 추가된 교과목인 경우 녹색으로 표시
+                        cell.innerHTML = `<span class=\"matrix-mark matrix-mark-added\">◐</span>`;
+                    } else {
+                        cell.innerHTML = `<span class=\"matrix-mark ${markClass}\">◐</span>`;
+                    }
                 } else {
                     cell.innerHTML = '';
                 }
@@ -2250,14 +2443,22 @@ function renderMatrix() {
             // 전공필수여부 셀 추가
             const requiredCell = row.insertCell();
             if (course.isRequired === '필수') {
-                requiredCell.innerHTML = '<span class="major-required-dot">●</span>';
+                // 삭제된 교과목인 경우 빨간색으로 표시
+                if (isDeleted) {
+                    requiredCell.innerHTML = '<span class="major-required-dot deleted-course-dot">●</span>';
+                } else if (isAdded) {
+                    // 추가된 교과목인 경우 녹색으로 표시
+                    requiredCell.innerHTML = '<span class="major-required-dot matrix-mark-added">●</span>';
+                } else {
+                    requiredCell.innerHTML = '<span class="major-required-dot">●</span>';
+                }
             } else {
                 requiredCell.innerHTML = '';
             }
             requiredCell.style.textAlign = 'center';
             requiredCell.classList.add('no-edit');
-            // 수정모드에서 클릭 시 토글
-            if (isEditModeMatrix) {
+            // 수정모드에서 클릭 시 토글 (삭제된 교과목은 제외)
+            if (isEditModeMatrix && !isDeleted) {
                 requiredCell.style.cursor = 'pointer';
                 requiredCell.onclick = function() {
                     course.isRequired = (course.isRequired === '필수') ? '선택' : '필수';
@@ -2477,6 +2678,32 @@ function closeModal() {
     editingIndex = -1;
 }
 
+// X 버튼 클릭 시 확인 후 닫기
+function confirmCloseModal() {
+    const form = document.getElementById('courseForm');
+    let hasChanges = false;
+    
+    // 폼의 모든 입력 필드 확인
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        if (input.value && input.value.trim() !== '') {
+            // ID 필드는 제외 (자동 생성되는 값)
+            if (input.id !== 'courseId') {
+                hasChanges = true;
+            }
+        }
+    });
+    
+    // 편집 중인 내용이 있으면 확인 메시지 표시
+    if (hasChanges || editingIndex !== -1) {
+        if (confirm('편집 중인 내용이 있습니다. 정말로 닫으시겠습니까?\n저장하지 않은 변경사항은 사라집니다.')) {
+            closeModal();
+        }
+    } else {
+        closeModal();
+    }
+}
+
 // 교과목 추가/수정 처리
 function handleCourseSubmit(e) {
     e.preventDefault();
@@ -2677,7 +2904,29 @@ function initCoursesTableResize() {
 window.onclick = function(event) {
     const modal = document.getElementById('courseModal');
     if (event.target === modal) {
-        closeModal();
+        // 편집 중인 내용이 있는지 확인
+        const form = document.getElementById('courseForm');
+        let hasChanges = false;
+        
+        // 폼의 모든 입력 필드 확인
+        const inputs = form.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => {
+            if (input.value && input.value.trim() !== '') {
+                // ID 필드는 제외 (자동 생성되는 값)
+                if (input.id !== 'courseId') {
+                    hasChanges = true;
+                }
+            }
+        });
+        
+        // 편집 중인 내용이 있으면 확인 메시지 표시
+        if (hasChanges || editingIndex !== -1) {
+            if (confirm('편집 중인 내용이 있습니다. 정말로 닫으시겠습니까?\n저장하지 않은 변경사항은 사라집니다.')) {
+                closeModal();
+            }
+        } else {
+            closeModal();
+        }
     }
 }
 
@@ -2701,6 +2950,12 @@ window.onload = function() {
     document.getElementById('categoryFilter').addEventListener('change', filterCourses);
     document.getElementById('subjectTypeFilter').addEventListener('change', filterCourses);
     document.getElementById('searchInput').addEventListener('keyup', filterCourses);
+    
+    // 변경상태 필터 초기화 (모두 체크된 상태로 시작)
+    document.getElementById('showAdded').checked = true;
+    document.getElementById('showModified').checked = true;
+    document.getElementById('showDeleted').checked = true;
+    document.getElementById('showUnchanged').checked = true;
     init();
     initColumnResize();
     updateFontSize(); // 폰트 사이즈 초기화
@@ -3503,6 +3758,28 @@ function filterMatrix() {
         }
     });
     
+    // 선택된 변경 상태들 가져오기
+    const selectedChangeStatus = [];
+    document.querySelectorAll('.matrix-filters input[type="checkbox"][value="added"], .matrix-filters input[type="checkbox"][value="modified"], .matrix-filters input[type="checkbox"][value="deleted"], .matrix-filters input[type="checkbox"][value="unchanged"]').forEach(checkbox => {
+        if (checkbox.checked) {
+            selectedChangeStatus.push(checkbox.value);
+        }
+    });
+    
+    // 현재 버전의 변경 사항 가져오기
+    const diffSummary = getCurrentDiffSummary();
+    
+    // 모든 변경 상태 필터가 해제되어 있으면 빈 결과
+    if (selectedChangeStatus.length === 0) {
+        filteredMatrixCourses = [];
+        const tbody = document.querySelector('#matrixTable tbody');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="24" style="text-align: center; padding: 20px; color: #999;">필터 조건에 맞는 교과목이 없습니다.</td></tr>';
+        }
+        updateFontSize();
+        return;
+    }
+    
     filteredMatrixCourses = courses.filter(course => {
         const [year] = course.yearSemester.split('-');
         
@@ -3512,10 +3789,39 @@ function filterMatrix() {
         // 필수여부 필터링: 선택된 필수여부가 없으면 모든 과목 표시, 있으면 선택된 것만
         const requiredMatch = selectedRequired.length === 0 || selectedRequired.includes(course.isRequired);
         
-        return yearMatch && requiredMatch;
+        // 변경 상태 필터링
+        let changeStatusMatch = false;
+        const courseDiff = diffSummary.find(diff => diff.course.id === course.id);
+        if (courseDiff) {
+            if (courseDiff.type === '추가' && selectedChangeStatus.includes('added')) {
+                changeStatusMatch = true;
+            } else if (courseDiff.type === '수정' && selectedChangeStatus.includes('modified')) {
+                changeStatusMatch = true;
+            }
+        } else if (selectedChangeStatus.includes('unchanged')) {
+            // 변경사항이 없는 경우
+            changeStatusMatch = true;
+        }
+        
+        return yearMatch && requiredMatch && changeStatusMatch;
     });
     
+    // 삭제된 교과목 필터링
+    const deletedCourses = diffSummary.filter(entry => entry.type === '삭제').map(entry => entry.course);
+    if (selectedChangeStatus.includes('deleted')) {
+        deletedCourses.forEach(deletedCourse => {
+            const [year] = deletedCourse.yearSemester.split('-');
+            const yearMatch = selectedYears.length === 0 || selectedYears.includes(year);
+            const requiredMatch = selectedRequired.length === 0 || selectedRequired.includes(deletedCourse.isRequired);
+            
+            if (yearMatch && requiredMatch) {
+                filteredMatrixCourses.push(deletedCourse);
+            }
+        });
+    }
+    
     renderMatrix();
+    updateFontSize(); // 필터 적용 후 글씨 크기 재적용
 }
 
 // 매트릭스 필터 초기화
@@ -3525,8 +3831,14 @@ function resetMatrixFilters() {
         checkbox.checked = false;
     });
     
+    // 변경 상태 체크박스는 다시 체크
+    document.querySelectorAll('.matrix-filters input[value="added"], .matrix-filters input[value="modified"], .matrix-filters input[value="deleted"], .matrix-filters input[value="unchanged"]').forEach(checkbox => {
+        checkbox.checked = true;
+    });
+    
     filteredMatrixCourses = null;
     renderMatrix();
+    updateFontSize(); // 필터 초기화 후 글씨 크기 재적용
 }
 
 // =========================
@@ -11055,5 +11367,117 @@ function updateColorLegendCommonValues() {
         legendItem.appendChild(label);
         legendContainer.appendChild(legendItem);
     });
+}
+
+// 중복 함수 제거 - 위에 이미 정의됨
+
+// 체크박스 드롭다운 토글 함수
+function toggleFilterDropdown(event, dropdownId) {
+    event.stopPropagation();
+    const dropdown = document.getElementById(dropdownId);
+    const isOpen = dropdown.classList.contains('show');
+    
+    // 모든 드롭다운 닫기
+    document.querySelectorAll('.filter-dropdown-content').forEach(d => d.classList.remove('show'));
+    
+    // 클릭한 드롭다운만 토글
+    if (!isOpen) {
+        dropdown.classList.add('show');
+    }
+}
+
+// 학년 필터 업데이트 함수
+function updateYearFilter() {
+    const selectedYears = [];
+    document.querySelectorAll('input[name="yearFilter"]:checked').forEach(cb => {
+        selectedYears.push(cb.value + '학년');
+    });
+    
+    const yearFilterText = document.getElementById('yearFilterText');
+    if (selectedYears.length === 0) {
+        yearFilterText.textContent = '전체';
+    } else if (selectedYears.length === 1) {
+        yearFilterText.textContent = selectedYears[0];
+    } else {
+        yearFilterText.textContent = `${selectedYears[0]} 외 ${selectedYears.length - 1}개`;
+    }
+    
+    filterCourses();
+}
+
+// 학기 필터 업데이트 함수
+function updateSemesterFilter() {
+    const selectedSemesters = [];
+    document.querySelectorAll('input[name="semesterFilter"]:checked').forEach(cb => {
+        const value = cb.value === '계절' ? '계절학기' : cb.value + '학기';
+        selectedSemesters.push(value);
+    });
+    
+    const semesterFilterText = document.getElementById('semesterFilterText');
+    if (selectedSemesters.length === 0) {
+        semesterFilterText.textContent = '전체';
+    } else if (selectedSemesters.length === 1) {
+        semesterFilterText.textContent = selectedSemesters[0];
+    } else {
+        semesterFilterText.textContent = `${selectedSemesters[0]} 외 ${selectedSemesters.length - 1}개`;
+    }
+    
+    filterCourses();
+}
+
+// 구분 필터 업데이트 함수
+function updateCategoryFilter() {
+    const selectedCategories = [];
+    document.querySelectorAll('input[name="categoryFilter"]:checked').forEach(cb => {
+        selectedCategories.push(cb.value);
+    });
+    
+    const categoryFilterText = document.getElementById('categoryFilterText');
+    if (selectedCategories.length === 0) {
+        categoryFilterText.textContent = '전체';
+    } else if (selectedCategories.length === 1) {
+        categoryFilterText.textContent = selectedCategories[0];
+    } else {
+        categoryFilterText.textContent = `${selectedCategories[0]} 외 ${selectedCategories.length - 1}개`;
+    }
+    
+    filterCourses();
+}
+
+// 과목분류 필터 업데이트 함수
+function updateSubjectTypeFilter() {
+    const selectedSubjectTypes = [];
+    document.querySelectorAll('input[name="subjectTypeFilter"]:checked').forEach(cb => {
+        selectedSubjectTypes.push(cb.value);
+    });
+    
+    const subjectTypeFilterText = document.getElementById('subjectTypeFilterText');
+    if (selectedSubjectTypes.length === 0) {
+        subjectTypeFilterText.textContent = '전체';
+    } else if (selectedSubjectTypes.length === 1) {
+        subjectTypeFilterText.textContent = selectedSubjectTypes[0];
+    } else {
+        subjectTypeFilterText.textContent = `${selectedSubjectTypes[0]} 외 ${selectedSubjectTypes.length - 1}개`;
+    }
+    
+    filterCourses();
+}
+
+// 드롭다운 외부 클릭 시 닫기
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('.checkbox-filter-dropdown')) {
+        document.querySelectorAll('.filter-dropdown-content').forEach(dropdown => {
+            dropdown.classList.remove('show');
+        });
+    }
+});
+
+// 파일 끝에서 init 함수를 전역으로 노출
+if (typeof init === 'function') {
+    window.init = init;
+    console.log('✓ app.js 로드 완료, window.init 함수 사용 가능');
+} else {
+    console.error('❌ init 함수가 정의되지 않았습니다.');
+    console.log('사용 가능한 함수들:', Object.keys(window).filter(k => k.includes('init')));
 }
 

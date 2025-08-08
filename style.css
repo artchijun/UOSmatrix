@@ -579,7 +579,7 @@ select:focus, input:focus {
 table, .matrix-table, #coursesTable {
     width: 100%;
     border-collapse: collapse;
-    min-width: 800px;
+    min-width: 600px;
     background: var(--table-bg-color);
     font-family: var(--font-family);
     font-size: var(--font-size);
@@ -1088,7 +1088,7 @@ th.resizable:hover .column-resizer {
     margin-right: 2px;
     vertical-align: middle;
 }
-.badge-category-liberal { background: #adb5bd; }
+.badge-category-liberal { background: #6c757d; }
 .badge-category-thinking { background: #1976d2; }
 .badge-category-design { background: #d32f2f; }
 .badge-category-tech { background: #28a745; }
@@ -2083,7 +2083,7 @@ th, td, .matrix-table th, .matrix-table td {
 
 /* 카테고리(구분)별 색상 */
 .course-block-category-liberal {
-    background: #e9ecef;
+    background: #e1e5e8;
 }
 .course-block-category-thinking {
     background: #e3f2fd;
@@ -3332,6 +3332,159 @@ th, td, .matrix-table th, .matrix-table td {
     font-weight: bold;
 }
 
+/* 삭제된 교과목 행 스타일 */
+.matrix-table .deleted-course-row,
+#coursesTable .deleted-course-row {
+    opacity: 0.7;
+}
+
+/* 교과목 관리 탭 - 교과목 제목 스타일 */
+#coursesTable td.course-title-cell {
+    font-weight: bold;
+}
+
+/* 추가된 교과목 제목 (녹색) */
+#coursesTable tr.added-course td.course-title-cell {
+    color: #27ae60 !important;
+    font-weight: bold;
+}
+
+/* 수정된 교과목 제목 (파란색) */
+#coursesTable tr.modified-course td.course-title-cell {
+    color: #1976d2 !important;
+    font-weight: bold;
+}
+
+/* 삭제된 교과목 제목 (빨간색 + 취소선) */
+#coursesTable tr.deleted-course td.course-title-cell {
+    color: #f44336 !important;
+    text-decoration: line-through !important;
+    font-style: italic !important;
+    opacity: 0.8;
+}
+
+/* 삭제된 교과목의 매트릭스 마크 (빨간색) */
+.matrix-mark-deleted {
+    color: #dc3545 !important;
+}
+
+/* 삭제된 교과목의 필수 마크 (빨간색) */
+.deleted-course-dot {
+    color: #dc3545 !important;
+}
+
+/* 추가된 교과목의 매트릭스 마크 (녹색) */
+.matrix-mark-added {
+    color: #28a745 !important;
+}
+
+/* 컬러 인디케이터 스타일 */
+.color-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    margin-right: 5px;
+    vertical-align: baseline;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* 인라인 체크박스 스타일 (교과목 관리 탭) */
+.change-status-filter {
+    margin-top: 10px;
+}
+
+.change-status-checkboxes {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.inline-checkbox {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.inline-checkbox input[type="checkbox"] {
+    margin-right: 5px;
+}
+
+.inline-checkbox span {
+    line-height: 1;
+}
+
+/* 수행평가 매트릭스 필터 내 컬러 인디케이터 */
+.label-text .color-indicator {
+    margin-left: 5px;
+}
+
+/* 체크박스 필터 드롭다운 스타일 */
+.checkbox-filter-dropdown {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.filter-dropdown-btn {
+    width: 100%;
+    padding: 8px 12px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+}
+
+.filter-dropdown-btn:hover {
+    background: #f8f9fa;
+}
+
+.dropdown-arrow {
+    font-size: 10px;
+    color: #666;
+}
+
+.filter-dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: white;
+    min-width: 100%;
+    box-shadow: 0px 8px 16px rgba(0,0,0,0.1);
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    z-index: 1000;
+    margin-top: 2px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.filter-dropdown-content.show {
+    display: block;
+}
+
+.filter-checkbox-item {
+    display: block;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.filter-checkbox-item:hover {
+    background-color: #f1f1f1;
+}
+
+.filter-checkbox-item input[type="checkbox"] {
+    margin-right: 8px;
+    cursor: pointer;
+}
+
 /* 추가 모바일 최적화 스타일 */
 @media (max-width: 768px) {
     /* 터치 스크롤 최적화 */
@@ -3770,5 +3923,107 @@ th, td, .matrix-table th, .matrix-table td {
 .vis-network .vis-node.box.selected {
     box-shadow: 0 4px 12px rgba(25, 118, 210, 0.4) !important;
     border: 2px solid #1976d2 !important;
+}
+
+/* 체크박스 필터 드롭다운 스타일 */
+.checkbox-filter-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.filter-dropdown-btn {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 120px;
+    transition: all 0.2s;
+}
+
+.filter-dropdown-btn:hover {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+}
+
+.dropdown-arrow {
+    margin-left: auto;
+    font-size: 10px;
+    transition: transform 0.2s;
+}
+
+.filter-dropdown-content {
+    display: none;
+    position: absolute;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    min-width: 150px;
+    max-height: 300px;
+    overflow-y: auto;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+}
+
+.filter-dropdown-content.show {
+    display: block;
+}
+
+.filter-checkbox-item {
+    display: block;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.filter-checkbox-item:hover {
+    background: #f8f9fa;
+}
+
+.filter-checkbox-item input[type="checkbox"] {
+    margin-right: 8px;
+    cursor: pointer;
+}
+
+.filter-checkbox-item span {
+    cursor: pointer;
+    user-select: none;
+}
+
+/* 변경 상태 필터 스타일 */
+.change-status-filter {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.change-status-checkboxes {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.inline-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+
+.inline-checkbox input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.color-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    display: inline-block;
 }
 
