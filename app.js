@@ -7960,7 +7960,13 @@ function renderCommonValuesNetworkGraph() {
                     // 2. 그룹 내 노드들 간의 상호 인력 (스프링 연결)
                     groupNodeIds.forEach(otherNodeId => {
                         if (otherNodeId !== nodeId) {
-                            const otherPos = network.getPosition(otherNodeId);
+                            let otherPos;
+                            try {
+                                otherPos = network.getPosition(otherNodeId);
+                            } catch (e) {
+                                // 노드가 존재하지 않는 경우 무시
+                                return;
+                            }
                             if (otherPos) {
                                 const dx = otherPos.x - position.x;
                                 const dy = otherPos.y - position.y;
@@ -8359,7 +8365,13 @@ function renderCommonValuesNetworkGraph() {
                 if (!nodeInThisGroup && !nodeInsideOriginalBoundary && !nodeInsideExpandedBoundary) {
                     if (detectedIntruders.includes(nodeId)) {
                         setTimeout(() => {
-                            const currentNodePosition = network.getPosition(nodeId);
+                            let currentNodePosition;
+                            try {
+                                currentNodePosition = network.getPosition(nodeId);
+                            } catch (e) {
+                                // 노드가 존재하지 않는 경우 무시
+                                return;
+                            }
                             if (currentNodePosition && 
                                 !isPointInPolygon(currentNodePosition, groupBoundary) &&
                                 !isPointInPolygon(currentNodePosition, expandedBoundary)) {
@@ -8727,7 +8739,13 @@ function renderCommonValuesNetworkGraph() {
     // 노드 외곽점 샘플링 함수 (더 부드러운 스플라인을 위해 더 많은 점 생성)
     // 그룹별로 겹침을 최소화하기 위해 offset을 더 크게 적용
     function getNodeOutlinePoints(network, nodeId, offset = 48) {
-        const pos = network.getPosition(nodeId);
+        let pos;
+        try {
+            pos = network.getPosition(nodeId);
+        } catch (e) {
+            // 노드가 존재하지 않는 경우
+            return [];
+        }
         const node = network.body.nodes[nodeId];
         if (!pos || !node) return [];
         const width = (node.shapeObj && node.shapeObj.width) || 60;
@@ -8827,11 +8845,26 @@ function renderCommonValuesNetworkGraph() {
             if (ids.length > 0) {
                 // 중앙점 계산
                 let centerX = 0, centerY = 0;
+                let validNodeCount = 0;
                 ids.forEach(id => {
-                    const pos = network.getPosition(id);
-                    centerX += pos.x; centerY += pos.y;
+                    try {
+                        const pos = network.getPosition(id);
+                        if (pos) {
+                            centerX += pos.x; 
+                            centerY += pos.y;
+                            validNodeCount++;
+                        }
+                    } catch (e) {
+                        // 노드가 존재하지 않는 경우 무시
+                    }
                 });
-                centerX /= ids.length; centerY /= ids.length;
+                if (validNodeCount > 0) {
+                    centerX /= validNodeCount; 
+                    centerY /= validNodeCount;
+                } else {
+                    // 유효한 노드가 없으면 스킵
+                    return;
+                }
                 ctx.save();
                 ctx.globalAlpha = 1;
                 // 선택/호버 상태에 따른 폰트 스타일 설정
@@ -8980,9 +9013,13 @@ function renderCommonValuesNetworkGraph() {
                 
                 if (groupNodeIds && groupNodeIds.length > 0) {
                     groupNodeIds.forEach(nodeId => {
-                        const nodePosition = network.getPosition(nodeId);
-                        if (nodePosition && typeof nodePosition.x === 'number' && typeof nodePosition.y === 'number') {
-                            groupOriginalPositions[nodeId] = { x: nodePosition.x, y: nodePosition.y };
+                        try {
+                            const nodePosition = network.getPosition(nodeId);
+                            if (nodePosition && typeof nodePosition.x === 'number' && typeof nodePosition.y === 'number') {
+                                groupOriginalPositions[nodeId] = { x: nodePosition.x, y: nodePosition.y };
+                            }
+                        } catch (e) {
+                            // 노드가 존재하지 않는 경우 무시
                         }
                     });
                 }
