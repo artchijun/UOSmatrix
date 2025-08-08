@@ -9350,6 +9350,21 @@ function handleCommonValuesDrop(e) {
             commonValuesCopiedBlocks[subjectType][targetColumn].push(course.id);
         }
         
+        // 소스가 다른 value 컬럼인 경우 원래 위치에서 제거
+        if (sourceCell && sourceCell.includes('-value')) {
+            const sourceParts = sourceCell.replace('commonValues-cell-', '').split('-');
+            const sourceSubjectType = sourceParts[0];
+            const sourceColumn = sourceParts[1];
+            
+            if (commonValuesCopiedBlocks[sourceSubjectType] && 
+                commonValuesCopiedBlocks[sourceSubjectType][sourceColumn]) {
+                const index = commonValuesCopiedBlocks[sourceSubjectType][sourceColumn].indexOf(course.id);
+                if (index > -1) {
+                    commonValuesCopiedBlocks[sourceSubjectType][sourceColumn].splice(index, 1);
+                }
+            }
+        }
+        
         // 변경 기록 추가
         addChangeRecord('commonValues', `${subjectType}-${targetColumn}`, `${course.courseName} 블럭이 복사되었습니다.`);
         
@@ -9362,16 +9377,24 @@ function handleCommonValuesDrop(e) {
 
     // 기존 로직 (필수/선택 컬럼)
     if (isRequired || idParts[1] === '선택') {
-        // 소스가 value 컬럼인 경우 복사 동작, 아니면 이동 동작
+        // 소스가 value 컬럼인 경우 원래 위치에서 제거
         if (sourceCell && sourceCell.includes('-value')) {
-            // value 컬럼에서 전공필수/선택으로 드래그한 경우는 복사
-            course.subjectType = subjectType;
-            course.isRequired = isRequired ? '필수' : '선택';
-        } else {
-            // 전공필수/선택 간의 이동은 기존 동작 유지
-            course.subjectType = subjectType;
-            course.isRequired = isRequired ? '필수' : '선택';
+            const sourceParts = sourceCell.replace('commonValues-cell-', '').split('-');
+            const sourceSubjectType = sourceParts[0];
+            const sourceColumn = sourceParts[1];
+            
+            if (commonValuesCopiedBlocks[sourceSubjectType] && 
+                commonValuesCopiedBlocks[sourceSubjectType][sourceColumn]) {
+                const index = commonValuesCopiedBlocks[sourceSubjectType][sourceColumn].indexOf(course.id);
+                if (index > -1) {
+                    commonValuesCopiedBlocks[sourceSubjectType][sourceColumn].splice(index, 1);
+                }
+            }
         }
+        
+        // 과목 속성 업데이트
+        course.subjectType = subjectType;
+        course.isRequired = isRequired ? '필수' : '선택';
         
         // 변경 기록 추가
         addChangeRecord('commonValues', `${subjectType}-${isRequired ? '필수' : '선택'}`, `${course.courseName}이(가) ${subjectType} ${isRequired ? '필수' : '선택'}(으)로 분류되었습니다.`);
