@@ -6924,6 +6924,10 @@ function renderCommonValuesNetworkGraph() {
     const subjectTypes = [
         '설계', '디지털', '역사', '이론', '도시', '사회', '기술', '실무', '비교과'
     ];
+    
+    // 디버그: commonValuesCopiedBlocks 구조 확인
+    console.log('[Debug] commonValuesCopiedBlocks:', commonValuesCopiedBlocks);
+    
     // 전역 valueCourseIds 초기화
     valueCourseIds = { value1: [], value2: [], value3: [] };
     
@@ -6938,6 +6942,12 @@ function renderCommonValuesNetworkGraph() {
     valueKeys.forEach(key => {
         valueCourseIds[key] = Array.from(new Set(valueCourseIds[key]));
     });
+    
+    // 디버그: valueCourseIds 내용 확인
+    console.log('[Debug] valueCourseIds after initialization:', valueCourseIds);
+    console.log('[Debug] value1 courses:', valueCourseIds.value1.length, valueCourseIds.value1);
+    console.log('[Debug] value2 courses:', valueCourseIds.value2.length, valueCourseIds.value2);
+    console.log('[Debug] value3 courses:', valueCourseIds.value3.length, valueCourseIds.value3);
 
     // 노드: 교과목만 추가 (VALUE1,2,3 노드 제거)
     const nodes = [];
@@ -6946,6 +6956,9 @@ function renderCommonValuesNetworkGraph() {
         valueCourseIds[key].forEach((courseId, idx) => {
             if (!nodeIdSet.has(courseId)) {
                 const course = courses.find(c => c.id === courseId);
+                if (!course) {
+                    console.log(`[Debug] Course not found for ${key}: courseId=${courseId}`);
+                }
                 if (course) {
                     let nodeColor = {};
                     if (colorModeBySubjectType) {
@@ -7026,6 +7039,13 @@ function renderCommonValuesNetworkGraph() {
                 }
             }
         });
+    });
+    
+    // 디버그: 생성된 노드 수 확인
+    console.log('[Debug] Total nodes created:', nodes.length);
+    valueKeys.forEach(key => {
+        const nodesInGroup = nodes.filter(n => n.group === key).length;
+        console.log(`[Debug] Nodes created for ${key}:`, nodesInGroup);
     });
 
     // 엣지: 같은 학년-학기 내 교과목끼리만 연결
@@ -7208,12 +7228,10 @@ function renderCommonValuesNetworkGraph() {
     const stabilityThreshold = 0.5; // 안정화 임계값 (픽셀 단위)
     
     // 반발력 시스템을 즉시 시작 (네트워크 안정화와 무관하게)
-    console.log('[RepulsionSystem] Initializing immediate start');
     
     // 스플라인 데이터가 없는 경우를 대비한 테스트 데이터 생성
     setTimeout(() => {
         if (!commonValuesBlobData.value1 || commonValuesBlobData.value1.length === 0) {
-            console.log('[RepulsionSystem] Creating test spline data');
             // 각 그룹 주변에 간단한 직사각형 스플라인 생성
             valueKeys.forEach((key, index) => {
                 const centerX = 200 + (index * 300); // 그룹별로 300px씩 떨어뜨림
@@ -7227,7 +7245,7 @@ function renderCommonValuesNetworkGraph() {
                     {x: centerX + width/2, y: centerY + height/2}, // 오른쪽 아래
                     {x: centerX - width/2, y: centerY + height/2}  // 왼쪽 아래
                 ];
-                console.log(`[RepulsionSystem] Created test spline for ${key}:`, commonValuesBlobData[key]);
+                // Test spline created
             });
         }
         startRepulsionSystem();
@@ -7235,7 +7253,6 @@ function renderCommonValuesNetworkGraph() {
     
     // 네트워크 안정화 완료 후에도 다시 한번 확인
     network.on('stabilizationIterationsDone', function() {
-        console.log('[RepulsionSystem] Network stabilization done');
         if (!repulsionInterval) {
             startRepulsionSystem();
         }
@@ -7244,7 +7261,6 @@ function renderCommonValuesNetworkGraph() {
     // 최종 백업 - 2초 후 무조건 시작
     setTimeout(() => {
         if (!repulsionInterval) {
-            console.log('[RepulsionSystem] Fallback start after 2 seconds');
             startRepulsionSystem();
         }
     }, 2000);
@@ -7326,7 +7342,8 @@ function renderCommonValuesNetworkGraph() {
                 }
             });
             
-            // 2. 강화된 스플라인 경계 반발력 계산 (그룹 외부 노드들을 밖으로 밀어내기)
+            // 2. 침입 노드 감지 및 강제 추출 시스템
+            let isIntruder = false;
             valueKeys.forEach(groupKey => {
                 const groupBoundary = commonValuesBlobData[groupKey];
                 if (!groupBoundary || groupBoundary.length < 3) return;
@@ -7334,69 +7351,140 @@ function renderCommonValuesNetworkGraph() {
                 const groupNodeIds = valueCourseIds[groupKey] || [];
                 const isGroupMember = groupNodeIds.includes(nodeId);
                 
-                // 테스트: 모든 노드에 스플라인 반발력 적용 (그룹 멤버십 무시)
-                const testMode = true; // 테스트용
-                if (!isGroupMember || testMode) {
+                // 그룹에 속하지 않는 노드가 스플라인 내부에 있는지 검사
+                if (!isGroupMember) {
                     const isInsideSpline = isPointInPolygon(position, groupBoundary);
-                    const distanceToSpline = getDistanceToSpline(position, groupBoundary);
-                    const maxRepulsionDistance = 150; // 반발력 작용 범위 증가
                     
-                    // 강제적으로 더 넓은 범위에서 반발력 적용
-                    if (isInsideSpline || distanceToSpline < maxRepulsionDistance) {
-                        console.log(`[SplineForce] Node ${nodeId} vs ${groupKey}: inside=${isInsideSpline}, dist=${distanceToSpline.toFixed(1)}`);
-                        // 스플라인 내부 또는 근처에 있는 외부 노드 처리
+                    // 침입 노드 발견! 점진적 추출
+                    if (isInsideSpline) {
+                        isIntruder = true;
                         
-                        let forceMultiplier = 1.0;
-                        let baseForceStrength = 200; // 기본 반발력 강화
+                        // 가장 가까운 스플라인 경계점 찾기
+                        let closestBoundaryPoint = null;
+                        let minDistanceToBoundary = Infinity;
                         
-                        if (isInsideSpline) {
-                            // 스플라인 내부에 있는 경우 - 매우 강한 반발력
-                            forceMultiplier = 6.0; // 4.0 → 6.0 증가
-                            baseForceStrength = 500; // 300 → 500 증가
-                        } else if (distanceToSpline < 30) {
-                            // 경계 매우 근처 - 강한 반발력
-                            forceMultiplier = 4.0; // 3.0 → 4.0 증가
-                            baseForceStrength = 400; // 250 → 400 증가
-                        } else if (distanceToSpline < 60) {
-                            // 경계 근처 - 중간 반발력
-                            forceMultiplier = 3.0; // 2.0 → 3.0 증가
-                            baseForceStrength = 300; // 200 → 300 증가
-                        } else {
-                            // 멀리 있지만 영향권 내 - 약한 반발력
-                            forceMultiplier = 2.0; // 1.0 → 2.0 증가
-                            baseForceStrength = 200; // 150 → 200 증가
+                        // 스플라인의 각 선분에서 가장 가까운 점 찾기
+                        for (let i = 0; i < groupBoundary.length; i++) {
+                            const p1 = groupBoundary[i];
+                            const p2 = groupBoundary[(i + 1) % groupBoundary.length];
+                            
+                            // 선분에서 노드까지의 가장 가까운 점 계산
+                            const lineVec = { x: p2.x - p1.x, y: p2.y - p1.y };
+                            const nodeVec = { x: position.x - p1.x, y: position.y - p1.y };
+                            const lineLength = Math.sqrt(lineVec.x * lineVec.x + lineVec.y * lineVec.y);
+                            
+                            if (lineLength > 0) {
+                                const t = Math.max(0, Math.min(1, (nodeVec.x * lineVec.x + nodeVec.y * lineVec.y) / (lineLength * lineLength)));
+                                const closestPoint = {
+                                    x: p1.x + t * lineVec.x,
+                                    y: p1.y + t * lineVec.y
+                                };
+                                
+                                const distToPoint = Math.sqrt(
+                                    Math.pow(position.x - closestPoint.x, 2) + 
+                                    Math.pow(position.y - closestPoint.y, 2)
+                                );
+                                
+                                if (distToPoint < minDistanceToBoundary) {
+                                    minDistanceToBoundary = distToPoint;
+                                    closestBoundaryPoint = closestPoint;
+                                }
+                            }
                         }
                         
-                        // 거리에 따른 추가 감쇠
-                        const distanceDecay = Math.max(0.3, 1.0 - (distanceToSpline / maxRepulsionDistance));
-                        const finalForceStrength = baseForceStrength * forceMultiplier * distanceDecay;
-                        
-                        const repulsionForce = calculateSplineRepulsion(position, groupBoundary, finalForceStrength);
-                        console.log(`[SplineForce] Applied force to node ${nodeId}: (${repulsionForce.x.toFixed(2)}, ${repulsionForce.y.toFixed(2)}), strength=${finalForceStrength.toFixed(1)}`);
-                        
-                        if (!boundaryForces.has(nodeId)) {
-                            boundaryForces.set(nodeId, { x: 0, y: 0 });
+                        // 경계점 방향으로 부드러운 추출력 적용
+                        if (closestBoundaryPoint) {
+                            // 노드에서 경계점으로의 방향
+                            const dx = closestBoundaryPoint.x - position.x;
+                            const dy = closestBoundaryPoint.y - position.y;
+                            const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+                            
+                            // 정규화된 방향 벡터
+                            const dirX = dx / distance;
+                            const dirY = dy / distance;
+                            
+                            // 거리에 따라 점진적으로 증가하는 추출력
+                            // 중심에서 멀수록 약하게, 경계 가까이서는 더 강하게
+                            const baseForce = 200; // 기본 추출력 (훨씬 부드럽게)
+                            const distanceFactor = Math.min(1.0, minDistanceToBoundary / 100); // 거리에 따른 계수
+                            const expulsionForce = baseForce + (1 - distanceFactor) * 300; // 최대 500
+                            
+                            if (!boundaryForces.has(nodeId)) {
+                                boundaryForces.set(nodeId, { x: 0, y: 0 });
+                            }
+                            const currentForce = boundaryForces.get(nodeId);
+                            // 기존 힘에 추가하되, 추출력을 우선시
+                            currentForce.x = currentForce.x * 0.2 + dirX * expulsionForce * 0.8;
+                            currentForce.y = currentForce.y * 0.2 + dirY * expulsionForce * 0.8;
                         }
-                        const currentForce = boundaryForces.get(nodeId);
-                        currentForce.x += repulsionForce.x;
-                        currentForce.y += repulsionForce.y;
                         
-                        // 안정화 체크 - 스플라인 근처에 외부 노드가 있으면 불안정으로 간주
-                        if (distanceToSpline < 40 || isInsideSpline) {
-                            stabilityCheckCount = 0; // 강제로 불안정 상태 유지
+                        // 안정화 약간만 해제
+                        stabilityCheckCount = Math.max(0, stabilityCheckCount - 1);
+                    }
+                    // 침입하지 않은 외부 노드에 대한 일반 반발력
+                    else {
+                        const distanceToSpline = getDistanceToSpline(position, groupBoundary);
+                        const maxRepulsionDistance = 200;
+                        
+                        if (distanceToSpline < maxRepulsionDistance) {
+                            // 스플라인 밖에 있는 노드가 가까이 오면 조절점에서의 강한 반발력 적용
+                            
+                            let forceMultiplier = 1.0;
+                            let baseForceStrength = 1200; // 기본 반발력 증가
+                            
+                            if (distanceToSpline < 20) {
+                                forceMultiplier = 20.0; // 더 강한 반발
+                                baseForceStrength = 2000;
+                            } else if (distanceToSpline < 40) {
+                                forceMultiplier = 15.0;
+                                baseForceStrength = 1500;
+                            } else if (distanceToSpline < 60) {
+                                forceMultiplier = 10.0;
+                                baseForceStrength = 1000;
+                            } else if (distanceToSpline < 100) {
+                                forceMultiplier = 6.0;
+                                baseForceStrength = 600;
+                            } else {
+                                forceMultiplier = 3.0;
+                                baseForceStrength = 400;
+                            }
+                            
+                            const distanceDecay = Math.pow((maxRepulsionDistance - distanceToSpline) / maxRepulsionDistance, 2);
+                            const finalForceStrength = baseForceStrength * forceMultiplier * distanceDecay;
+                            
+                            const repulsionForce = calculateSplineRepulsion(position, groupBoundary, finalForceStrength);
+                            
+                            if (!boundaryForces.has(nodeId)) {
+                                boundaryForces.set(nodeId, { x: 0, y: 0 });
+                            }
+                            const currentForce = boundaryForces.get(nodeId);
+                            currentForce.x += repulsionForce.x;
+                            currentForce.y += repulsionForce.y;
+                            
+                            if (distanceToSpline < 40) {
+                                stabilityCheckCount = 0;
+                            }
                         }
                     }
                 }
             });
             
-            // 3. 그룹 내 노드들 간의 인력 (같은 그룹끼리 모이도록)
-            valueKeys.forEach(groupKey => {
-                const groupNodeIds = valueCourseIds[groupKey] || [];
-                const isGroupMember = groupNodeIds.includes(nodeId);
-                
-                if (isGroupMember && groupNodeIds.length > 1) {
+            // 3. 그룹 내 노드들 간의 인력 (같은 그룹끼리 모이도록) - 침입자는 제외
+            if (!isIntruder) {
+                valueKeys.forEach(groupKey => {
+                    const groupNodeIds = valueCourseIds[groupKey] || [];
+                    const isGroupMember = groupNodeIds.includes(nodeId);
+                    
+                    if (isGroupMember && groupNodeIds.length > 1) {
                     // 1. 그룹 중심점으로의 인력
-                    const groupPositions = groupNodeIds.map(id => network.getPosition(id)).filter(pos => pos);
+                    const groupPositions = groupNodeIds.map(id => {
+                        try {
+                            return network.getPosition(id);
+                        } catch (e) {
+                            // 노드가 존재하지 않는 경우 무시
+                            return null;
+                        }
+                    }).filter(pos => pos);
                     if (groupPositions.length > 0) {
                         const centerX = groupPositions.reduce((sum, pos) => sum + pos.x, 0) / groupPositions.length;
                         const centerY = groupPositions.reduce((sum, pos) => sum + pos.y, 0) / groupPositions.length;
@@ -7424,7 +7512,13 @@ function renderCommonValuesNetworkGraph() {
                     // 2. 그룹 내 노드들 간의 상호 인력 (스프링 연결)
                     groupNodeIds.forEach(otherNodeId => {
                         if (otherNodeId !== nodeId) {
-                            const otherPos = network.getPosition(otherNodeId);
+                            let otherPos;
+                            try {
+                                otherPos = network.getPosition(otherNodeId);
+                            } catch (e) {
+                                // 노드가 존재하지 않는 경우 무시
+                                return;
+                            }
                             if (otherPos) {
                                 const dx = otherPos.x - position.x;
                                 const dy = otherPos.y - position.y;
@@ -7444,9 +7538,10 @@ function renderCommonValuesNetworkGraph() {
                                 }
                             }
                         }
-                    });
-                }
-            });
+                        });
+                    }
+                });
+            }
             
             // 이 노드에 반발력이 적용되었는지 체크
             if (boundaryForces.has(nodeId)) {
@@ -7454,33 +7549,71 @@ function renderCommonValuesNetworkGraph() {
             }
         });
         
-        // 계산 결과 로그
-        if (totalNodesProcessed > 0) {
-            const blobDataStatus = valueKeys.map(key => `${key}: ${commonValuesBlobData[key] ? 'OK' : 'MISSING'}`).join(', ');
-            const labelStatus = valueKeys.map(key => `${key}: ${groupLabelPositions.has(key) ? 'OK' : 'MISSING'}`).join(', ');
-            console.log(`[RepulsionCalc] Processed: ${totalNodesProcessed} nodes, Forces applied: ${nodesWithForces}, Total forces: ${boundaryForces.size}`);
-            console.log(`[RepulsionCalc] BlobData: ${blobDataStatus}, Labels: ${labelStatus}`);
-        }
+        // 계산 결과 완료
     }
     
-    // 스플라인으로부터의 반발력 계산
+    // 스플라인 조절점으로부터의 반발력 계산 (외부 노드만 해당)
     function calculateSplineRepulsion(nodePosition, splineBoundary, force) {
         let totalForceX = 0;
         let totalForceY = 0;
         
-        // 스플라인 경계의 각 점에서 반발력 계산
-        splineBoundary.forEach(point => {
-            const dx = nodePosition.x - point.x;
-            const dy = nodePosition.y - point.y;
+        // 100px 간격으로 스플라인 위에 제어점 생성
+        const controlPoints = [];
+        const targetSpacing = 100; // 제어점 간격
+        
+        // 각 스플라인 선분을 따라 제어점 생성
+        for (let i = 0; i < splineBoundary.length; i++) {
+            const p1 = splineBoundary[i];
+            const p2 = splineBoundary[(i + 1) % splineBoundary.length];
+            
+            // 선분의 길이 계산
+            const segmentLength = Math.sqrt(
+                Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)
+            );
+            
+            // 이 선분에 필요한 제어점 개수
+            const numControlPoints = Math.max(1, Math.floor(segmentLength / targetSpacing));
+            
+            // 선분을 따라 균등하게 제어점 배치
+            for (let j = 0; j < numControlPoints; j++) {
+                const t = j / numControlPoints;
+                controlPoints.push({
+                    x: p1.x + t * (p2.x - p1.x),
+                    y: p1.y + t * (p2.y - p1.y)
+                });
+            }
+        }
+        
+        // 각 제어점에서 노드로의 반발력 계산
+        controlPoints.forEach(controlPoint => {
+            const dx = nodePosition.x - controlPoint.x;
+            const dy = nodePosition.y - controlPoint.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
             
-            if (distance > 0 && distance < 200) { // 영향 범위
-                const forceStrength = force / (distance + 1);
+            if (distance > 0 && distance < 200) { // 각 제어점의 영향 범위 확대
+                // 거리에 따른 강한 반발력
+                let repulsionStrength = 0;
+                
+                if (distance < 50) {
+                    // 매우 가까움 - 극도로 강한 반발력
+                    repulsionStrength = force * 3.0 / Math.pow(distance + 1, 1.5);
+                } else if (distance < 100) {
+                    // 가까움 - 강한 반발력
+                    repulsionStrength = force * 2.0 / Math.pow(distance + 5, 1.8);
+                } else if (distance < 150) {
+                    // 중간 거리 - 중간 반발력
+                    repulsionStrength = force * 1.0 / Math.pow(distance + 10, 2);
+                } else {
+                    // 멀리 - 약한 반발력
+                    repulsionStrength = force * 0.5 / Math.pow(distance + 20, 2.2);
+                }
+                
                 const normalizedX = dx / distance;
                 const normalizedY = dy / distance;
                 
-                totalForceX += normalizedX * forceStrength;
-                totalForceY += normalizedY * forceStrength;
+                // 각 제어점에서의 반발력 누적
+                totalForceX += normalizedX * repulsionStrength;
+                totalForceY += normalizedY * repulsionStrength;
             }
         });
         
@@ -7589,7 +7722,13 @@ function renderCommonValuesNetworkGraph() {
                 if (!skipNode && (Math.abs(force.x) > 0.1 || Math.abs(force.y) > 0.1)) { // 임계값 낮춤 (더 민감한 반응)
                     hasSignificantForces = true;
                     try {
-                        const currentPos = network.getPosition(nodeId);
+                        let currentPos;
+                        try {
+                            currentPos = network.getPosition(nodeId);
+                        } catch (e) {
+                            // 노드가 존재하지 않는 경우 건너뛰기
+                            return;
+                        }
                         if (currentPos) {
                             // 안정화 정도와 노드 위치에 따라 dampening 조정
                             let dampening = 0.18;
@@ -7649,7 +7788,7 @@ function renderCommonValuesNetworkGraph() {
             }
             
             // 디버깅을 위한 로그
-            console.log(`[RepulsionSystem] Forces: ${boundaryForces.size}, Updates: ${Object.keys(nodesToUpdate).length}, Stable: ${stabilityInfo.isStable}, Intruders: ${stabilityInfo.hasIntruders}, Max Movement: ${stabilityInfo.maxMovement.toFixed(2)}`);
+            // Update status
         } else if (stabilityInfo.isStable && stabilityInfo.checkCount >= 10) {
             // 완전히 안정화되었고 10번 이상 체크되었으면 주기를 늦춤 (성능 최적화)
             // 하지만 여전히 모니터링은 계속
@@ -7659,7 +7798,6 @@ function renderCommonValuesNetworkGraph() {
     // 반발력 시스템 시작
     function startRepulsionSystem() {
         if (repulsionInterval) clearInterval(repulsionInterval);
-        console.log('[RepulsionSystem] Starting repulsion system with 40ms interval (25fps)');
         repulsionInterval = setInterval(applyBoundaryRepulsion, 80); // 80ms마다 실행 (12.5fps) - 부드러운 속도
         repulsionSystemActive = true;
     }
@@ -7956,7 +8094,13 @@ function renderCommonValuesNetworkGraph() {
 
         let outlinePoints = [];
         ids.forEach(id => {
-            const position = network.getPosition(id);
+            let position;
+            try {
+                position = network.getPosition(id);
+            } catch (e) {
+                // 노드가 존재하지 않는 경우 무시
+                return;
+            }
             if (position) {
                 const points = getNodeOutlinePoints(network, id, 15);
                 outlinePoints = outlinePoints.concat(points);
