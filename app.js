@@ -7754,19 +7754,24 @@ function renderCommonValuesNetworkGraph() {
         physics: {
             enabled: true,
             barnesHut: {
-                gravitationalConstant: -2000, // 더 강한 반발력
-                centralGravity: 0, // 🔧 중앙 중력 완전 제거 (응축 현상 방지)
-                springLength: 12000, // 적당한 스프링 길이
-                springConstant: 0.0008, // 🔧 더 약한 스프링 (기존 0.0015 → 0.0008)
-                damping: 0.98, // 🔧 더 강한 감쇠로 안정적인 움직임 (기존 0.95 → 0.98)
-                avoidOverlap: 2 // 겹침 방지
+                gravitationalConstant: -1500, // 반발력 조정
+                centralGravity: 0, // 중앙 중력 완전 제거
+                springLength: 200, // 스프링 길이 설정
+                springConstant: 0.001, // 스프링 상수
+                damping: 0.85, // 시뮬레이션 지속시간 연장: 감쇠 감소 (더 오래 움직임)
+                avoidOverlap: 1 // 겹침 방지 최소화
             },
             stabilization: { 
-                iterations: 200,  // 🔧 안정화 반복 감소 (기존 1000 → 200)
+                iterations: 500,  // 시뮬레이션 지속시간 연장: 안정화 반복 증가
                 enabled: true,
-                updateInterval: 50
+                updateInterval: 25, // 시뮬레이션 지속시간 연장: 업데이트 간격 감소 (더 자주 업데이트)
+                fit: true,
+                onlyDynamicEdges: false // 모든 엣지에 대해 안정화 수행
             },
-            adaptiveTimestep: true // 적응형 시간 간격
+            adaptiveTimestep: true,
+            timestep: 0.3, // 시뮬레이션 지속시간 연장: 더 세밀한 시간 간격
+            maxVelocity: 50, // 시뮬레이션 지속시간 연장: 최대 속도 증가
+            minVelocity: 0.1 // 최소 속도 임계값 설정
         },
         interaction: {
             hover: true,
@@ -7880,8 +7885,8 @@ function renderCommonValuesNetworkGraph() {
     function applyDirectionalForces() {
         if (!directionalForceActive) return;
         
-        // 물리 엔진이 안정화되어 멈추지 않도록 유지
-        network.startSimulation();
+        // 최적화: 불필요한 시뮬레이션 호출 제거
+        // network.startSimulation();
         
         const nodeIds = nodes.map(n => n.id);
         const positions = network.getPositions(nodeIds);
@@ -7906,11 +7911,12 @@ function renderCommonValuesNetworkGraph() {
                     forceY = -directionalForceMagnitude;
                 }
                 
-                if (forceX !== 0 || forceY !== 0) {
-                    // 물리 엔진 body에 직접 힘 적용
-                    body.vx += forceX * 0.01; // 속도에 힘을 적용
-                    body.vy += forceY * 0.01;
-                }
+                // 물리 힘 적용 비활성화
+                // if (forceX !== 0 || forceY !== 0) {
+                //     // 물리 엔진 body에 직접 힘 적용
+                //     body.vx += forceX * 0.01; // 속도에 힘을 적용
+                //     body.vy += forceY * 0.01;
+                // }
             }
         });
         
@@ -7956,77 +7962,15 @@ function renderCommonValuesNetworkGraph() {
                 // 거리에 반비례하는 힘 (가까운 노드일수록 더 강한 힘)
                 const forceStrength = explosionForce / (distance * 0.01 + 1);
                 
-                // 즉시 속도 변경으로 폭발 효과
-                body.vx += normalizedX * forceStrength;
-                body.vy += normalizedY * forceStrength;
+                // 폭발 효과 비활성화
+                // body.vx += normalizedX * forceStrength;
+                // body.vy += normalizedY * forceStrength;
             }
         });
         
-        // 2. 진동 효과: 그룹 전체에 파동 효과
-        let wavePhase = 0;
-        const waveInterval = setInterval(() => {
-            groupNodeIds.forEach((nodeId, index) => {
-                const body = network.body.nodes[nodeId];
-                if (!body || !body.options.physics) return;
-                
-                // 사인파를 이용한 진동 효과
-                const waveForce = 3 * Math.sin(wavePhase + index * 0.5);
-                body.vx += waveForce * Math.cos(wavePhase);
-                body.vy += waveForce * Math.sin(wavePhase);
-            });
-            
-            wavePhase += 0.3;
-            
-            // 물리 시뮬레이션 강제 시작
-            network.startSimulation();
-            
-            // 🔧 전체 네트워크 중심점 유지
-            maintainGlobalNetworkCenter();
-        }, 50);
+        // 진동 효과 완전 제거 (성능 최적화)
         
-        // 3. 자기장 효과: 그룹 노드들을 원형으로 정렬하려는 힘
-        const magneticInterval = setInterval(() => {
-            const centerPos = calculateGroupCenter(groupNodeIds);
-            const targetRadius = 220; // 목표 반지름
-            
-            groupNodeIds.forEach((nodeId, index) => {
-                const body = network.body.nodes[nodeId];
-                if (!body || !body.options.physics) return;
-                
-                const nodePos = network.getPosition(nodeId);
-                const dx = nodePos.x - centerPos.x;
-                const dy = nodePos.y - centerPos.y;
-                const currentRadius = Math.sqrt(dx * dx + dy * dy);
-                
-                // 목표 반지름으로 이동시키는 힘
-                if (currentRadius > 0) {
-                    const targetX = centerPos.x + (dx / currentRadius) * targetRadius;
-                    const targetY = centerPos.y + (dy / currentRadius) * targetRadius;
-                    
-                    const attractX = (targetX - nodePos.x) * 0.02;
-                    const attractY = (targetY - nodePos.y) * 0.02;
-                    
-                    body.vx += attractX;
-                    body.vy += attractY;
-                }
-                
-                // 원형 궤도 움직임 추가
-                const orbitalForce = 1;
-                body.vx += -dy * orbitalForce * 0.001;
-                body.vy += dx * orbitalForce * 0.001;
-            });
-            
-            network.startSimulation();
-            
-            // 🔧 전체 네트워크 중심점 유지
-            maintainGlobalNetworkCenter();
-        }, 30);
-        
-        // 효과 정리
-        setTimeout(() => {
-            clearInterval(waveInterval);
-            clearInterval(magneticInterval);
-        }, explosionDuration);
+        // 자기장 효과 및 타이머 완전 제거 (성능 최적화)
     }
     
     // 그룹 중심점 계산 헬퍼 함수
@@ -8125,77 +8069,21 @@ function renderCommonValuesNetworkGraph() {
                 const normalizedX = dx / distance;
                 const normalizedY = dy / distance;
                 
-                const forceStrength = explosionForce / (distance * 0.01 + 1);
-                
-                body.vx += normalizedX * forceStrength;
-                body.vy += normalizedY * forceStrength;
+                // 부드러운 폭발 효과 비활성화
+                // const forceStrength = explosionForce / (distance * 0.01 + 1);
+                // 
+                // body.vx += normalizedX * forceStrength;
+                // body.vy += normalizedY * forceStrength;
             }
         });
         
-        // 2. 부드러운 진동 효과
-        let wavePhase = 0;
-        const waveInterval = setInterval(() => {
-            groupNodeIds.forEach((nodeId, index) => {
-                const body = network.body.nodes[nodeId];
-                if (!body || !body.options.physics) return;
-                
-                const waveForce = 2 * Math.sin(wavePhase + index * 0.3); // 기존 3에서 2로 감소
-                body.vx += waveForce * Math.cos(wavePhase) * 0.5;
-                body.vy += waveForce * Math.sin(wavePhase) * 0.5;
-            });
-            
-            wavePhase += 0.2; // 기존 0.3에서 0.2로 감소 (더 부드럽게)
-            network.startSimulation();
-            
-            // 🔧 전체 네트워크 중심점 유지
-            maintainGlobalNetworkCenter();
-        }, 60); // 기존 50에서 60으로 증가 (더 부드럽게)
+        // 부드러운 진동 효과 완전 제거 (성능 최적화)
         
-        // 3. 부드러운 자기장 효과
-        const magneticInterval = setInterval(() => {
-            const centerPos = calculateGroupCenter(groupNodeIds);
-            const targetRadius = 100; // 기존 120에서 100으로 감소
-            
-            groupNodeIds.forEach((nodeId, index) => {
-                const body = network.body.nodes[nodeId];
-                if (!body || !body.options.physics) return;
-                
-                const nodePos = network.getPosition(nodeId);
-                const dx = nodePos.x - centerPos.x;
-                const dy = nodePos.y - centerPos.y;
-                const currentRadius = Math.sqrt(dx * dx + dy * dy);
-                
-                if (currentRadius > 0) {
-                    const targetX = centerPos.x + (dx / currentRadius) * targetRadius;
-                    const targetY = centerPos.y + (dy / currentRadius) * targetRadius;
-                    
-                    const attractX = (targetX - nodePos.x) * 0.015; // 기존 0.02에서 0.015로 감소
-                    const attractY = (targetY - nodePos.y) * 0.015;
-                    
-                    body.vx += attractX;
-                    body.vy += attractY;
-                }
-                
-                const orbitalForce = 0.8; // 기존 1에서 0.8로 감소
-                body.vx += -dy * orbitalForce * 0.0008; // 기존 0.001에서 0.0008로 감소
-                body.vy += dx * orbitalForce * 0.0008;
-            });
-            
-            network.startSimulation();
-            
-            // 🔧 전체 네트워크 중심점 유지
-            maintainGlobalNetworkCenter();
-        }, 40); // 기존 30에서 40으로 증가 (더 부드럽게)
-        
-        // 효과 정리
-        setTimeout(() => {
-            clearInterval(waveInterval);
-            clearInterval(magneticInterval);
-        }, explosionDuration);
+        // 부드러운 자기장 효과 및 모든 타이머 완전 제거 (성능 최적화)
     }
 
-    // Start the directional force system immediately after network creation
-            startDirectionalForceSystem();
+    // 최적화: 방향성 힘 시스템 비활성화 (성능 향상)
+    // startDirectionalForceSystem();
     
     // 동적 제어점 시스템
     let dynamicControlPoints = new Map(); // groupKey -> [{x, y, vx, vy, originalX, originalY}]
@@ -8222,26 +8110,60 @@ function renderCommonValuesNetworkGraph() {
                 // Test spline created
             });
         }
-        startRepulsionSystem(); // 반발력 시스템 시작 - 노드와 그룹 제목 겹침 방지
+        // startRepulsionSystem(); // 반발력 시스템 비활성화 - 노드 이동 현상 방지
     }, 50); // 0.05초 후 즉시 시작 - 더 빠른 시작
     
     // 네트워크 안정화 완료 후에도 다시 한번 확인 - 활성화됨
     network.on('stabilizationIterationsDone', function() {
-        startRepulsionSystem(); // 항상 반발력 시스템 시작
+        // startRepulsionSystem(); // 반발력 시스템 비활성화
         
         // 🔧 네트워크 안정화 완료 후 전체 중심점 고정
         globalNetworkCenter = calculateGlobalNetworkCenter();
         networkCenterStabilized = true;
         
-        // 🌟 페이지 로딩시 자동으로 물리효과 시작 (안정화 완료 후)
-        setTimeout(() => {
-            triggerInitialPhysicsEffects();
-        }, 200);
+        // 시뮬레이션 지속시간 연장: 안정화 완료 후에도 물리 엔진 계속 활성화
+        network.setOptions({
+            physics: {
+                enabled: true, // 물리 엔진 계속 활성화
+                stabilization: {
+                    enabled: false // 추가 안정화는 비활성화
+                }
+            }
+        });
+        
+        // 물리 엔진을 주기적으로 재활성화하여 지속적인 움직임 유지
+        const keepSimulationAlive = setInterval(() => {
+            if (network && network.body && network.body.data) {
+                // 시뮬레이션 지속시간 연장: 주기적 재시작
+                network.startSimulation();
+                
+                // 약간의 랜덤 힘을 가해 자연스러운 움직임 유지
+                const allNodes = network.body.data.nodes.get();
+                if (allNodes.length > 0) {
+                    // 랜덤하게 선택된 몇 개 노드에 미세한 힘 적용
+                    const randomNodes = allNodes.slice(0, Math.min(3, allNodes.length));
+                    randomNodes.forEach(node => {
+                        const body = network.body.nodes[node.id];
+                        if (body && body.options.physics) {
+                            // 매우 작은 랜덤 힘으로 자연스러운 움직임 유지
+                            const microForce = 0.1;
+                            body.vx += (Math.random() - 0.5) * microForce;
+                            body.vy += (Math.random() - 0.5) * microForce;
+                        }
+                    });
+                }
+            }
+        }, 3000); // 3초마다 시뮬레이션 재시작 및 미세 조정
+        
+        // 페이지 언로드 시 인터벌 정리
+        window.addEventListener('beforeunload', () => {
+            clearInterval(keepSimulationAlive);
+        });
     });
     
     // 최종 백업 - 1초 후 무조건 시작 - 활성화됨
     setTimeout(() => {
-        startRepulsionSystem(); // 확실히 반발력 시스템 시작
+        // startRepulsionSystem(); // 반발력 시스템 비활성화
         
         // 🔧 백업용 중심점 고정 (안정화가 완료되지 않은 경우 대비)
         if (!networkCenterStabilized) {
@@ -8249,35 +8171,36 @@ function renderCommonValuesNetworkGraph() {
             networkCenterStabilized = true;
         }
         
-        // 🌟 백업용 물리효과 시작 (안정화가 완료되지 않은 경우 대비)
-        triggerInitialPhysicsEffects();
+        // 🌟 백업용 물리효과 시작 (비활성화)
+        // triggerInitialPhysicsEffects();
     }, 1000);
     
     // 🌟 페이지 로딩시 자동으로 스플라인 물리효과 시작 (클릭 없이)
-    setTimeout(() => {
-        
-        // 모든 그룹에 대해 순차적으로 물리효과 적용
-        valueKeys.forEach((groupKey, index) => {
-            const groupNodeIds = valueCourseIds[groupKey];
-            if (!groupNodeIds || groupNodeIds.length === 0) return;
-            
-            // 각 그룹마다 시간차를 두고 효과 적용 (1초씩 간격)
-            setTimeout(() => {
-                // 그룹 중심점을 클릭 위치로 사용
-                const centerPos = calculateGroupCenter(groupNodeIds);
-                
-                // 약간의 랜덤 오프셋 추가하여 자연스러움 연출
-                const clickPosition = {
-                    x: centerPos.x + (Math.random() - 0.5) * 80,
-                    y: centerPos.y + (Math.random() - 0.5) * 80
-                };
-                
-                // 기존 물리효과 함수 호출
-                triggerSplinePhysicsEffect(groupKey, clickPosition);
-                
-            }, index * 1000); // 각 그룹마다 1초씩 지연
-        });
-    }, 2000); // 2초 후 시작
+    // 자동 물리 효과 비활성화
+    // setTimeout(() => {
+    //     
+    //     // 모든 그룹에 대해 순차적으로 물리효과 적용
+    //     valueKeys.forEach((groupKey, index) => {
+    //         const groupNodeIds = valueCourseIds[groupKey];
+    //         if (!groupNodeIds || groupNodeIds.length === 0) return;
+    //         
+    //         // 각 그룹마다 시간차를 두고 효과 적용 (1초씩 간격)
+    //         setTimeout(() => {
+    //             // 그룹 중심점을 클릭 위치로 사용
+    //             const centerPos = calculateGroupCenter(groupNodeIds);
+    //             
+    //             // 약간의 랜덤 오프셋 추가하여 자연스러움 연출
+    //             const clickPosition = {
+    //                 x: centerPos.x + (Math.random() - 0.5) * 80,
+    //                 y: centerPos.y + (Math.random() - 0.5) * 80
+    //             };
+    //             
+    //             // 기존 물리효과 함수 호출
+    //             triggerSplinePhysicsEffect(groupKey, clickPosition);
+    //             
+    //         }, index * 1000); // 각 그룹마다 1초씩 지연
+    //     });
+    // }, 2000); // 2초 후 시작
     
     // 동적 제어점 초기화 및 업데이트 함수
     function updateDynamicControlPoints(groupKey, splineBoundary) {
@@ -8962,7 +8885,8 @@ function renderCommonValuesNetworkGraph() {
         if (repulsionInterval) {
             clearInterval(repulsionInterval);
         }
-                            repulsionInterval = setInterval(applyContinuousRepulsion, 8); // 120fps - 더 빠른 지속적 반발력
+        // 최적화: 반발력 시스템도 비활성화됨
+        // repulsionInterval = setInterval(applyContinuousRepulsion, 16); // 60fps로 최적화
         
         // 물리 시뮬레이션을 완전히 비활성화하고 직접 제어
         network.setOptions({
@@ -9913,6 +9837,9 @@ function renderCommonValuesNetworkGraph() {
     
     // blob 커브 클릭 및 드래그 이벤트 처리
     network.on('click', function(params) {
+        // 시뮬레이션 지속시간 연장: 클릭 시 시뮬레이션 재시작
+        network.startSimulation();
+        
         // 노드 클릭 시에는 스플라인 선택을 유지
         if (params.nodes.length > 0) {
             return;
@@ -9983,6 +9910,11 @@ function renderCommonValuesNetworkGraph() {
     window.hoveredBlob = null; // 전역 변수로 설정
     let hoveredLabel = null; // 호버된 라벨 추적
     network.on('hoverNode', function(params) {
+        // 시뮬레이션 지속시간 연장: 노드 호버 시 약간의 물리적 반응
+        setTimeout(() => {
+            network.startSimulation();
+        }, 50);
+        
         // 노드 호버 시에도 스플라인 호버 상태 유지
         // 스플라인 호버 해제하지 않음
     });
@@ -10304,6 +10236,11 @@ function renderCommonValuesNetworkGraph() {
 
     // 그룹 드래그 종료
     network.on('dragEnd', function(params) {
+        // 시뮬레이션 지속시간 연장: 드래그 종료 시 시뮬레이션 재시작
+        setTimeout(() => {
+            network.startSimulation();
+        }, 100);
+        
         if (isDraggingGroup) {
             const currentGroupKey = draggedGroupKey; // 현재 그룹키 저장
             
