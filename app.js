@@ -6801,10 +6801,12 @@ window.addEventListener('DOMContentLoaded', function() {
 function getMovedCoursesForGhost() {
     const movedCourses = [];
     
-    // 현재 교과목들과 초기 교과목들을 비교하여 이동된 것들을 찾기 (id 기준)
+    // 같은 학년학기 내에서만 화살표 그리기
+    // 현재 교과목들과 초기 교과목들을 비교하여 같은 학년학기 내에서 이동된 것들을 찾기 (id 기준)
     courses.forEach(currentCourse => {
         const initialCourse = initialCourses.find(ic => ic.id === currentCourse.id);
-        if (initialCourse && initialCourse.yearSemester !== currentCourse.yearSemester) {
+        // 같은 학년학기 내에서만 화살표 그리기
+        if (initialCourse && initialCourse.yearSemester === currentCourse.yearSemester) {
             movedCourses.push({
                 initialCourse: initialCourse,
                 currentCourse: currentCourse
@@ -6972,6 +6974,7 @@ function drawArrowBetweenCells(svgContainer, fromCell, toCell, index, moveInfo) 
     path.setAttribute('opacity', '0.85');
     path.setAttribute('stroke-dasharray', '5,4');
     path.style.filter = 'drop-shadow(0 2px 6px rgba(189,189,189,0.13))';
+    path.style.cursor = 'pointer';
     
     // 애니메이션(점선 이동 효과)
     const animate = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
@@ -6980,6 +6983,70 @@ function drawArrowBetweenCells(svgContainer, fromCell, toCell, index, moveInfo) 
     animate.setAttribute('dur', '1.6s');
     animate.setAttribute('repeatCount', 'indefinite');
     path.appendChild(animate);
+    
+    // 화살표 호버링 이벤트 추가
+    path.addEventListener('mouseenter', function() {
+        // 화살표 하이라이트
+        path.setAttribute('stroke', '#000000');
+        path.setAttribute('stroke-width', '2.5');
+        path.setAttribute('opacity', '1');
+        
+        // 화살표 머리 하이라이트
+        arrowHead.setAttribute('fill', '#000000');
+        arrowHead.setAttribute('opacity', '1');
+        
+        // 같은 학년학기 노드들 하이라이트 (화살표 시작점과 끝점 모두 고려)
+        const startYearSemester = moveInfo.initialCourse.yearSemester;
+        const endYearSemester = moveInfo.currentCourse.yearSemester;
+        const sameYearSemesterBlocks = document.querySelectorAll('.course-block');
+        sameYearSemesterBlocks.forEach(block => {
+            const blockCourseName = block.dataset.courseName;
+            const blockCourse = courses.find(c => c.courseName === blockCourseName);
+            if (blockCourse && (blockCourse.yearSemester === startYearSemester || blockCourse.yearSemester === endYearSemester)) {
+                // 인라인 스타일을 직접 설정하여 최우선 적용
+                block.setAttribute('style', `
+                    color: #000000 !important;
+                    border: 2px solid #000000 !important;
+                    font-weight: bold !important;
+                    border-width: 2px !important;
+                    border-style: solid !important;
+                    border-color: #000000 !important;
+                    background-color: inherit !important;
+                    outline: none !important;
+                    box-shadow: none !important;
+                `);
+                
+                // 추가로 클래스 추가
+                block.classList.add('arrow-highlight');
+            }
+        });
+    });
+    
+    path.addEventListener('mouseleave', function() {
+        // 화살표 원래 상태로 복원
+        path.setAttribute('stroke', '#bdbdbd');
+        path.setAttribute('stroke-width', '1.2');
+        path.setAttribute('opacity', '0.85');
+        
+        // 화살표 머리 원래 상태로 복원
+        arrowHead.setAttribute('fill', '#bdbdbd');
+        arrowHead.setAttribute('opacity', '0.95');
+        
+        // 노드들 원래 상태로 복원
+        const startYearSemester = moveInfo.initialCourse.yearSemester;
+        const endYearSemester = moveInfo.currentCourse.yearSemester;
+        const sameYearSemesterBlocks = document.querySelectorAll('.course-block');
+        sameYearSemesterBlocks.forEach(block => {
+            const blockCourseName = block.dataset.courseName;
+            const blockCourse = courses.find(c => c.courseName === blockCourseName);
+            if (blockCourse && (blockCourse.yearSemester === startYearSemester || blockCourse.yearSemester === endYearSemester)) {
+                // 클래스 제거
+                block.classList.remove('arrow-highlight');
+                // 인라인 스타일 완전 제거
+                block.removeAttribute('style');
+            }
+        });
+    });
     
     svgContainer.appendChild(path);
 
@@ -7001,6 +7068,71 @@ function drawArrowBetweenCells(svgContainer, fromCell, toCell, index, moveInfo) 
     arrowHead.setAttribute('fill', '#bdbdbd');
     arrowHead.setAttribute('opacity', '0.95');
     arrowHead.style.filter = 'drop-shadow(0 1px 2px #bdbdbdaa)';
+    arrowHead.style.cursor = 'pointer';
+    
+    // 화살표 머리 호버링 이벤트 추가
+    arrowHead.addEventListener('mouseenter', function() {
+        // 화살표 하이라이트
+        path.setAttribute('stroke', '#000000');
+        path.setAttribute('stroke-width', '2.5');
+        path.setAttribute('opacity', '1');
+        
+        // 화살표 머리 하이라이트
+        arrowHead.setAttribute('fill', '#000000');
+        arrowHead.setAttribute('opacity', '1');
+        
+        // 같은 학년학기 노드들 하이라이트 (화살표 시작점과 끝점 모두 고려)
+        const startYearSemester = moveInfo.initialCourse.yearSemester;
+        const endYearSemester = moveInfo.currentCourse.yearSemester;
+        const sameYearSemesterBlocks = document.querySelectorAll('.course-block');
+        sameYearSemesterBlocks.forEach(block => {
+            const blockCourseName = block.dataset.courseName;
+            const blockCourse = courses.find(c => c.courseName === blockCourseName);
+            if (blockCourse && (blockCourse.yearSemester === startYearSemester || blockCourse.yearSemester === endYearSemester)) {
+                // 인라인 스타일을 직접 설정하여 최우선 적용
+                block.setAttribute('style', `
+                    color: #000000 !important;
+                    border: 2px solid #000000 !important;
+                    font-weight: bold !important;
+                    border-width: 2px !important;
+                    border-style: solid !important;
+                    border-color: #000000 !important;
+                    background-color: inherit !important;
+                    outline: none !important;
+                    box-shadow: none !important;
+                `);
+                
+                // 추가로 클래스 추가
+                block.classList.add('arrow-highlight');
+            }
+        });
+    });
+    
+    arrowHead.addEventListener('mouseleave', function() {
+        // 화살표 원래 상태로 복원
+        path.setAttribute('stroke', '#bdbdbd');
+        path.setAttribute('stroke-width', '1.2');
+        path.setAttribute('opacity', '0.85');
+        
+        // 화살표 머리 원래 상태로 복원
+        arrowHead.setAttribute('fill', '#bdbdbd');
+        arrowHead.setAttribute('opacity', '0.95');
+        
+        // 노드들 원래 상태로 복원
+        const startYearSemester = moveInfo.initialCourse.yearSemester;
+        const endYearSemester = moveInfo.currentCourse.yearSemester;
+        const sameYearSemesterBlocks = document.querySelectorAll('.course-block');
+        sameYearSemesterBlocks.forEach(block => {
+            const blockCourseName = block.dataset.courseName;
+            const blockCourse = courses.find(c => c.courseName === blockCourseName);
+            if (blockCourse && (blockCourse.yearSemester === startYearSemester || blockCourse.yearSemester === endYearSemester)) {
+                // 클래스 제거
+                block.classList.remove('arrow-highlight');
+                // 인라인 스타일 완전 제거
+                block.removeAttribute('style');
+            }
+        });
+    });
     
     svgContainer.appendChild(arrowHead);
 }
@@ -7550,6 +7682,8 @@ function renderCommonValuesNetworkGraph() {
     
     // 생성된 노드 수 확인
 
+    // 생성된 노드 수 확인
+
     // 엣지: 같은 학년-학기 내 교과목끼리만 연결
     const edges = [];
     // 모든 노드(course) 정보를 id로 빠르게 참조
@@ -7572,34 +7706,45 @@ function renderCommonValuesNetworkGraph() {
         for (let i = 0; i < groupIds.length; i++) {
             for (let j = i + 1; j < groupIds.length; j++) {
                 // 같은 학년-학기 연결은 더 두껍게, yearSemester 텍스트 팝업
-                edges.push({ from: groupIds[i], to: groupIds[j], width: 4, title: yearSemester });
-                edges.push({ from: groupIds[j], to: groupIds[i], width: 4, title: yearSemester });
+                edges.push({ from: groupIds[i], to: groupIds[j], width: 3, title: yearSemester });
+                edges.push({ from: groupIds[j], to: groupIds[i], width: 3, title: yearSemester });
             }
         }
     });
 
-    // 추가: 같은 분야(subjectType)에 있는 노드들도 모두 연결
-    const subjectTypeGroups = {};
-    nodes.forEach(n => {
-        const course = nodeCourseMap[n.id];
-        if (course && course.subjectType) {
-            if (!subjectTypeGroups[course.subjectType]) subjectTypeGroups[course.subjectType] = [];
-            subjectTypeGroups[course.subjectType].push(n.id);
-        }
-    });
-    Object.values(subjectTypeGroups).forEach(groupIds => {
-        for (let i = 0; i < groupIds.length; i++) {
-            for (let j = i + 1; j < groupIds.length; j++) {
-                edges.push({ from: groupIds[i], to: groupIds[j] });
-                edges.push({ from: groupIds[j], to: groupIds[i] });
-            }
-        }
-    });
+    // // 추가: 같은 분야(subjectType)에 있는 노드들도 모두 연결
+    // const subjectTypeGroups = {};
+    // nodes.forEach(n => {
+    //     const course = nodeCourseMap[n.id];
+    //     if (course && course.subjectType) {
+    //         if (!subjectTypeGroups[course.subjectType]) subjectTypeGroups[course.subjectType] = [];
+    //         subjectTypeGroups[course.subjectType].push(n.id);
+    //     }
+    // });
+    // Object.values(subjectTypeGroups).forEach(groupIds => {
+    //     for (let i = 0; i < groupIds.length; i++) {
+    //         for (let j = i + 1; j < groupIds.length; j++) {
+    //             edges.push({ from: groupIds[i], to: groupIds[j] });
+    //             edges.push({ from: groupIds[j], to: groupIds[i] });
+    //         }
+    //     }
+    // });
 
     // 네트워크 옵션 (개별 노드 스타일을 덮어쓰지 않도록 최소화)
     const options = {
         nodes: {
-            chosen: true,
+            chosen: {
+                node: function(values, id, selected, hovering) {
+                    if (selected) {
+                        values.borderColor = '#000000';
+                        values.borderWidth = 3;
+                        // values.color를 변경하지 않음 - 배경색 유지
+                        if (values.font) {
+                            values.font.color = '#000000';
+                        }
+                    }
+                }
+            },
             shadow: {
                 enabled: true,
                 color: 'rgba(0,0,0,0.3)',
@@ -7608,7 +7753,7 @@ function renderCommonValuesNetworkGraph() {
                 y: 2
             },
             borderWidth: 2,
-            borderWidthSelected: 3
+            borderWidthSelected: 4
         },
         groups: {
             value1: {
@@ -7628,9 +7773,10 @@ function renderCommonValuesNetworkGraph() {
                 shape: 'box'
             }
         },
+        //노트네트워그_jun
         edges: {
             color: { color: '#bdbdbd', highlight: '#1976d2' },
-            arrows: { to: { enabled: true, scaleFactor: 0.7 } },
+            arrows: { to: { enabled: true, scaleFactor: 0.35 } },
             smooth: { type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.4 },
             length: 220 // 엣지 길이 더 길게
         },
@@ -7741,7 +7887,7 @@ function renderCommonValuesNetworkGraph() {
     
     // 그룹 경계 반발력 시스템
     let boundaryForces = new Map(); // nodeId -> {x, y} force vectors
-    let repulsionSystemActive = true;
+    let repulsionSystemActive = false; // 반발력 시스템 비활성화
     let repulsionInterval = null;
     let stabilityCheckCount = 0; // 안정화 체크 카운터
     let lastNodePositions = new Map(); // 이전 노드 위치 저장
@@ -7751,7 +7897,7 @@ function renderCommonValuesNetworkGraph() {
     let dynamicControlPoints = new Map(); // groupKey -> [{x, y, vx, vy, originalX, originalY}]
     let controlPointForces = new Map(); // controlPointId -> {x, y} force vectors
     
-    // 반발력 시스템을 즉시 시작 (네트워크 안정화와 무관하게)
+    // 반발력 시스템을 즉시 시작 (네트워크 안정화와 무관하게) - 비활성화됨
     
     // 스플라인 데이터가 없는 경우를 대비한 테스트 데이터 생성
     setTimeout(() => {
@@ -7772,21 +7918,21 @@ function renderCommonValuesNetworkGraph() {
                 // Test spline created
             });
         }
-        startRepulsionSystem();
+        // startRepulsionSystem(); // 반발력 시스템 시작 비활성화
     }, 500); // 0.5초 후 즉시 시작
     
-    // 네트워크 안정화 완료 후에도 다시 한번 확인
+    // 네트워크 안정화 완료 후에도 다시 한번 확인 - 비활성화됨
     network.on('stabilizationIterationsDone', function() {
-        if (!repulsionInterval) {
-            startRepulsionSystem();
-        }
+        // if (!repulsionInterval) {
+        //     startRepulsionSystem();
+        // }
     });
     
-    // 최종 백업 - 2초 후 무조건 시작
+    // 최종 백업 - 2초 후 무조건 시작 - 비활성화됨
     setTimeout(() => {
-        if (!repulsionInterval) {
-            startRepulsionSystem();
-        }
+        // if (!repulsionInterval) {
+        //     startRepulsionSystem();
+        // }
     }, 2000);
     
     // 동적 제어점 초기화 및 업데이트 함수
@@ -8471,11 +8617,13 @@ function renderCommonValuesNetworkGraph() {
         }
     }
     
-    // 반발력 시스템 시작
+    // 반발력 시스템 시작 - 비활성화됨
     function startRepulsionSystem() {
-        if (repulsionInterval) clearInterval(repulsionInterval);
-        repulsionInterval = setInterval(applyBoundaryRepulsion, 80); // 80ms마다 실행 (12.5fps) - 부드러운 속도
-        repulsionSystemActive = true;
+        // 반발력 시스템이 비활성화되었습니다
+        return;
+        // if (repulsionInterval) clearInterval(repulsionInterval);
+        // repulsionInterval = setInterval(applyBoundaryRepulsion, 80); // 80ms마다 실행 (12.5fps) - 부드러운 속도
+        // repulsionSystemActive = true;
     }
     
     // 반발력 시스템 중지
@@ -9469,8 +9617,8 @@ function renderCommonValuesNetworkGraph() {
                 }
             });
             
-            // 반발력 시스템 상태 확인 (이미 활성화되어 있어야 함)
-            repulsionSystemActive = true;
+            // 반발력 시스템 상태 확인 (이미 활성화되어 있어야 함) - 비활성화됨
+            repulsionSystemActive = false; // 반발력 시스템 비활성화
             
             // 커서 복원
             container.style.cursor = hoveredBlob ? 'pointer' : 'default';

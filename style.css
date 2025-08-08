@@ -4027,3 +4027,29 @@ th, td, .matrix-table th, .matrix-table td {
     display: inline-block;
 }
 
+/* 화살표 하이라이트 스타일 */
+.course-block.arrow-highlight {
+    color: #000000 !important;
+    border: 2px solid #000000 !important;
+    font-weight: bold !important;
+    border-width: 2px !important;
+    border-style: solid !important;
+    border-color: #000000 !important;
+    background-color: inherit !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* 모든 다른 스타일을 덮어쓰는 최우선 스타일 */
+.course-block[style*="color: #000000"] {
+    color: #000000 !important;
+    border: 2px solid #000000 !important;
+    font-weight: bold !important;
+    border-width: 2px !important;
+    border-style: solid !important;
+    border-color: #000000 !important;
+    background-color: inherit !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
