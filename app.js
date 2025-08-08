@@ -9371,33 +9371,8 @@ function handleCommonValuesDrop(e) {
             commonValuesCopiedBlocks[subjectType][targetColumn].push(course.id);
         }
         
-        // 소스가 다른 value 컬럼인 경우 원래 위치에서 제거
-        if (sourceCell && sourceCell.includes('-value')) {
-            const sourceParts = sourceCell.replace('commonValues-cell-', '').split('-');
-            const sourceSubjectType = sourceParts[0];
-            const sourceColumn = sourceParts[1];
-            
-            if (commonValuesCopiedBlocks[sourceSubjectType] && 
-                commonValuesCopiedBlocks[sourceSubjectType][sourceColumn]) {
-                const index = commonValuesCopiedBlocks[sourceSubjectType][sourceColumn].indexOf(course.id);
-                if (index > -1) {
-                    commonValuesCopiedBlocks[sourceSubjectType][sourceColumn].splice(index, 1);
-                    
-                    // 원래 위치의 commonValuesCellTexts도 업데이트
-                    const remainingCourseNames = commonValuesCopiedBlocks[sourceSubjectType][sourceColumn]
-                        .map(courseId => {
-                            const c = courses.find(course => course.id === courseId);
-                            return c ? c.courseName : null;
-                        })
-                        .filter(name => name);
-                    
-                    if (!commonValuesCellTexts[sourceSubjectType]) {
-                        commonValuesCellTexts[sourceSubjectType] = {};
-                    }
-                    commonValuesCellTexts[sourceSubjectType][sourceColumn] = remainingCourseNames.join(', ');
-                }
-            }
-        }
+        // VALUE 컬럼 간 이동은 복사로 처리 (원본 유지)
+        // 소스가 다른 value 컬럼인 경우에도 원본은 그대로 두고 복사만 수행
         
         // 대상 위치의 commonValuesCellTexts도 업데이트
         const targetCourseNames = commonValuesCopiedBlocks[subjectType][targetColumn]
@@ -9413,7 +9388,8 @@ function handleCommonValuesDrop(e) {
         commonValuesCellTexts[subjectType][targetColumn] = targetCourseNames.join(', ');
         
         // 변경 기록 추가
-        addChangeHistory('이동', course.courseName, [{field: '공통가치대응', before: sourceCell || '미배치', after: `${subjectType}-${targetColumn}`}]);
+        const changeType = sourceCell && sourceCell.includes('-value') ? '복사' : '이동';
+        addChangeHistory(changeType, course.courseName, [{field: '공통가치대응', before: sourceCell || '미배치', after: `${subjectType}-${targetColumn}`}]);
         
         // 드래그가 완전히 종료된 후 렌더링
         setTimeout(() => {
