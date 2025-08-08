@@ -9606,27 +9606,50 @@ function renderCommonValuesNetworkGraph() {
             if (selectedCommonValuesBlob && valueCourseIds[selectedCommonValuesBlob]) {
                 isInSelectedGroup = valueCourseIds[selectedCommonValuesBlob].includes(nodeId);
             }
-            const updatedNode = { ...node };
-            if (selectedCommonValuesBlob) {
-                if (isInSelectedGroup) {
-                    // 하이라이트되는 노드의 테두리를 그룹 색상으로
-                    const groupColor = {
-                        value1: '#1976d2',
-                        value2: '#d81b60',
-                        value3: '#388e3c'
-                    }[selectedCommonValuesBlob] || '#1d1d1dff';
-                    updatedNode.color = {
-                        ...updatedNode.color,
+            
+            // 업데이트할 노드 객체 생성 (id는 필수)
+            const updatedNode = { id: nodeId };
+            
+            if (selectedCommonValuesBlob && isInSelectedGroup) {
+                // 하이라이트되는 노드의 테두리를 그룹 색상으로
+                const groupColor = {
+                    value1: '#1976d2',
+                    value2: '#d81b60',
+                    value3: '#388e3c'
+                }[selectedCommonValuesBlob] || '#1d1d1dff';
+                
+                // 하이라이트 스타일 적용
+                updatedNode.color = {
+                    background: node.color ? node.color.background : '#f8f9fa',
+                    border: groupColor,
+                    highlight: {
+                        background: node.color ? node.color.background : '#f8f9fa',
                         border: groupColor
-                    };
-                }
+                    }
+                };
+                updatedNode.borderWidth = 3; // 선택된 노드는 테두리 두껍게
+            } else {
+                // 선택되지 않은 노드는 원래 스타일로 복원
+                updatedNode.color = {
+                    background: node.color ? node.color.background : '#f8f9fa',
+                    border: node.color ? node.color.border : '#bdbdbd',
+                    highlight: {
+                        background: node.color ? node.color.background : '#f8f9fa',
+                        border: node.color ? node.color.border : '#bdbdbd'
+                    }
+                };
+                updatedNode.borderWidth = 2; // 기본 테두리 두께
             }
+            
             nodeUpdate.push(updatedNode);
         });
+        
         // 노드 스타일만 update()로 적용 (네트워크 전체 재생성/물리효과 X)
         try {
             network.body.data.nodes.update(nodeUpdate);
+            console.log('노드 하이라이트 업데이트 완료:', selectedCommonValuesBlob);
         } catch (error) {
+            console.error('노드 업데이트 오류:', error);
         }
     }
     
