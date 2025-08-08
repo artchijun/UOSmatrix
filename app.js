@@ -9141,10 +9141,16 @@ function renderCommonValuesNetworkGraph() {
         };
         
         // vis.js 캔버스 좌표계로 직접 변환
-        
         let canvasPos;
         try {
+            // network 객체와 메서드 재확인
+            if (!network || !network.DOMtoCanvas) {
+                return;
+            }
             canvasPos = network.DOMtoCanvas(canvasPosition);
+            if (!canvasPos) {
+                return;
+            }
         } catch (e) {
             return;
         }
