@@ -7368,8 +7368,6 @@ function renderCommonValuesNetworkGraph() {
                             border: nodeColor.border
                         },
                         fixed: false,
-                        subjectType: '비교과',
-                        category: '기타',
                         isExtracurricular: true // 비교과 노드 표시
                     });
                     nodeIdSet.add(id);
@@ -7522,8 +7520,6 @@ function renderCommonValuesNetworkGraph() {
                         x: initX,
                         y: initY,
                         fixed: false,
-                        subjectType: '비교과',
-                        category: '기타',
                         isExtracurricular: true // 비교과 노드 표시
                     });
                     nodeIdSet.add(nodeId);
