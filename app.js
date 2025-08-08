@@ -1787,6 +1787,15 @@ function showTab(tabName, event) {
         updateCommonValuesFontSize(); // 폰트 크기 동기화
         updateColorLegendCommonValues(); // 색상 범례 업데이트
         
+        // 🌟 물리 효과 패널 표시 및 효과 재개
+        const physicsPanel = document.getElementById('physicsControlPanel');
+        if (physicsPanel) {
+            physicsPanel.style.display = 'block';
+        }
+        if (window.physicsEffects) {
+            window.physicsEffects.resumeEffects();
+        }
+        
         // 보기 모드 버튼 초기 상태 설정
         const button = document.getElementById('viewModeToggleCommonValues');
         const text = document.getElementById('viewModeTextCommonValues');
@@ -1798,6 +1807,17 @@ function showTab(tabName, event) {
                 text.textContent = '변경사항 적용';
                 button.style.background = '#28a745';
             }
+        }
+    } else {
+        // 다른 탭에서는 물리 효과 패널 숨김
+        const physicsPanel = document.getElementById('physicsControlPanel');
+        if (physicsPanel) {
+            physicsPanel.style.display = 'none';
+        }
+        
+        // 물리 효과 일시 정지
+        if (window.physicsEffects) {
+            window.physicsEffects.pauseEffects();
         }
     }
     
@@ -7859,6 +7879,9 @@ function renderCommonValuesNetworkGraph() {
     // vis-network 인스턴스 생성 (스타일링 적용된 노드로)
     const network = new vis.Network(container, { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) }, options);
     
+    // 🌟 물리 효과 시스템 초기화
+    initializePhysicsEffectsSystem(network, nodes, valueCourseIds);
+    
     // 그룹 경계 반발력 시스템
     let boundaryForces = new Map(); // nodeId -> {x, y} force vectors
     let repulsionSystemActive = true; // 반발력 시스템 활성화로 변경
@@ -7935,102 +7958,9 @@ function renderCommonValuesNetworkGraph() {
     
     // 🌟 스플라인 클릭 시 물리 효과 트리거 함수
     function triggerSplinePhysicsEffect(groupKey, clickPosition) {
-        
-        // 클릭된 그룹의 노드들 찾기
-        const groupNodeIds = valueCourseIds[groupKey];
-        if (!groupNodeIds || groupNodeIds.length === 0) return;
-        
-        // 1. 폭발 효과: 클릭 지점에서 노드들을 밀어냄
-        const explosionForce = 15; // 폭발력
-        const explosionDuration = 500; // 0.5초
-        
-        groupNodeIds.forEach(nodeId => {
-            const body = network.body.nodes[nodeId];
-            if (!body || !body.options.physics) return;
-            
-            const nodePos = network.getPosition(nodeId);
-            const dx = nodePos.x - clickPosition.x;
-            const dy = nodePos.y - clickPosition.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            if (distance > 0) {
-                const normalizedX = dx / distance;
-                const normalizedY = dy / distance;
-                
-                // 거리에 반비례하는 힘 (가까운 노드일수록 더 강한 힘)
-                const forceStrength = explosionForce / (distance * 0.01 + 1);
-                
-                // 폭발 효과 비활성화
-                // body.vx += normalizedX * forceStrength;
-                // body.vy += normalizedY * forceStrength;
-            }
-        });
-        
-        // 2. 진동 효과: 그룹 전체에 파동 효과
-        let wavePhase = 0;
-        const waveInterval = setInterval(() => {
-            groupNodeIds.forEach((nodeId, index) => {
-                const body = network.body.nodes[nodeId];
-                if (!body || !body.options.physics) return;
-                
-                // 사인파를 이용한 진동 효과
-                const waveForce = 3 * Math.sin(wavePhase + index * 0.5);
-                body.vx += waveForce * Math.cos(wavePhase);
-                body.vy += waveForce * Math.sin(wavePhase);
-            });
-            
-            wavePhase += 0.3;
-            
-            // 물리 시뮬레이션 강제 시작
-            network.startSimulation();
-            
-            // 🔧 전체 네트워크 중심점 유지
-            maintainGlobalNetworkCenter();
-        }, 50);
-        
-        // 3. 자기장 효과: 그룹 노드들을 원형으로 정렬하려는 힘
-        const magneticInterval = setInterval(() => {
-            const centerPos = calculateGroupCenter(groupNodeIds);
-            const targetRadius = 320; // 목표 반지름
-            
-            groupNodeIds.forEach((nodeId, index) => {
-                const body = network.body.nodes[nodeId];
-                if (!body || !body.options.physics) return;
-                
-                const nodePos = network.getPosition(nodeId);
-                const dx = nodePos.x - centerPos.x;
-                const dy = nodePos.y - centerPos.y;
-                const currentRadius = Math.sqrt(dx * dx + dy * dy);
-                
-                // 목표 반지름으로 이동시키는 힘
-                if (currentRadius > 0) {
-                    const targetX = centerPos.x + (dx / currentRadius) * targetRadius;
-                    const targetY = centerPos.y + (dy / currentRadius) * targetRadius;
-                    
-                    const attractX = (targetX - nodePos.x) * 0.02;
-                    const attractY = (targetY - nodePos.y) * 0.02;
-                    
-                    body.vx += attractX;
-                    body.vy += attractY;
-                }
-                
-                // 원형 궤도 움직임 추가
-                const orbitalForce = 1;
-                body.vx += -dy * orbitalForce * 0.001;
-                body.vy += dx * orbitalForce * 0.001;
-            });
-            
-            network.startSimulation();
-            
-            // 🔧 전체 네트워크 중심점 유지
-            maintainGlobalNetworkCenter();
-        }, 30);
-        
-        // 효과 정리
-        setTimeout(() => {
-            clearInterval(waveInterval);
-            clearInterval(magneticInterval);
-        }, explosionDuration);
+        if (window.physicsEffects) {
+            window.physicsEffects.triggerExplosion(groupKey, clickPosition);
+        }
     }
     
     // 그룹 중심점 계산 헬퍼 함수
@@ -8109,37 +8039,10 @@ function renderCommonValuesNetworkGraph() {
     
     // 🌟 부드러운 버전의 물리효과 (페이지 로딩시용)
     function triggerSplinePhysicsEffectGentle(groupKey, clickPosition) {
-        const groupNodeIds = valueCourseIds[groupKey];
-        if (!groupNodeIds || groupNodeIds.length === 0) return;
-        
-        // 1. 부드러운 폭발 효과 (강도 낮음)
-        const explosionForce = 8; // 기존 15에서 8로 감소
-        const explosionDuration = 800; // 0.8초로 증가
-        
-        groupNodeIds.forEach(nodeId => {
-            const body = network.body.nodes[nodeId];
-            if (!body || !body.options.physics) return;
-            
-            const nodePos = network.getPosition(nodeId);
-            const dx = nodePos.x - clickPosition.x;
-            const dy = nodePos.y - clickPosition.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            if (distance > 0) {
-                const normalizedX = dx / distance;
-                const normalizedY = dy / distance;
-                
-                // 부드러운 폭발 효과 비활성화
-                // const forceStrength = explosionForce / (distance * 0.01 + 1);
-                // 
-                // body.vx += normalizedX * forceStrength;
-                // body.vy += normalizedY * forceStrength;
-            }
-        });
-        
-        // 부드러운 진동 효과 완전 제거 (성능 최적화)
-        
-        // 부드러운 자기장 효과 및 모든 타이머 완전 제거 (성능 최적화)
+        if (window.physicsEffects) {
+            // 새로운 물리 시스템을 사용하여 부드러운 폭발 효과
+            window.physicsEffects.triggerExplosion(groupKey, clickPosition);
+        }
     }
 
     // 최적화: 방향성 힘 시스템 비활성화 (성능 향상)
@@ -9431,8 +9334,23 @@ function renderCommonValuesNetworkGraph() {
         let hull = convexHull(outlinePoints);
         // 스플라인 버텍스 포인트 개수 증가
         hull = increaseSplineVertices(hull);
-        for (let i = 0; i < 3; i++) hull = smoothHull(hull);
-        commonValuesBlobData[groupKey] = hull;
+        
+        // 🌟 시각적 스플라인과 클릭 감지 경계를 분리
+        // 시각적 스플라인: 더 부드럽게 처리
+        let visualHull = [...hull];
+        for (let i = 0; i < 3; i++) visualHull = smoothHull(visualHull);
+        
+        // 클릭 감지 경계: 원본 컨벡스 헐을 기반으로 적절한 확장 적용
+        let clickBoundary = expandPolygon(hull, 15); // 15픽셀 확장
+        
+        // 시각적 렌더링을 위한 데이터는 별도 저장
+        if (!window.commonValuesVisualData) {
+            window.commonValuesVisualData = {};
+        }
+        window.commonValuesVisualData[groupKey] = visualHull;
+        
+        // 클릭 감지용 경계 저장
+        commonValuesBlobData[groupKey] = clickBoundary;
         
         // requestAnimationFrame을 사용하여 부드러운 렌더링
         requestAnimationFrame(() => {
@@ -9732,9 +9650,23 @@ function renderCommonValuesNetworkGraph() {
             let hull = convexHull(outlinePoints);
             // 스플라인 버텍스 포인트 개수 증가
             hull = increaseSplineVertices(hull);
-            // 더 부드러운 스플라인을 위해 스무싱 활성화
-            for (let i = 0; i < 3; i++) hull = smoothHull(hull); // smoothing 3회
-            commonValuesBlobData[key] = hull;
+            
+            // 🌟 시각적 스플라인과 클릭 감지 경계를 분리
+            // 시각적 스플라인: 더 부드럽게 처리
+            let visualHull = [...hull];
+            for (let i = 0; i < 3; i++) visualHull = smoothHull(visualHull); // smoothing 3회
+            
+            // 클릭 감지 경계: 원본 컨벡스 헐을 기반으로 적절한 확장 적용
+            let clickBoundary = expandPolygon(hull, 15); // 15픽셀 확장
+            
+            // 시각적 렌더링을 위한 데이터는 별도 저장
+            if (!window.commonValuesVisualData) {
+                window.commonValuesVisualData = {};
+            }
+            window.commonValuesVisualData[key] = visualHull;
+            
+            // 클릭 감지용 경계 저장
+            commonValuesBlobData[key] = clickBoundary;
             
             // blob 색상 및 강조 효과 개선
             ctx.save();
@@ -9761,7 +9693,11 @@ function renderCommonValuesNetworkGraph() {
             ctx.lineWidth = lineWidth;
             // 점선 제거
             // ctx.setLineDash([6, 2]); // 점선 패턴 제거
-            drawSmoothCurve(ctx, hull);
+            // 🌟 시각적 렌더링은 부드러운 시각용 데이터 사용
+            const renderData = window.commonValuesVisualData && window.commonValuesVisualData[key] 
+                             ? window.commonValuesVisualData[key] 
+                             : hull;
+            drawSmoothCurve(ctx, renderData);
             ctx.fill();
             ctx.stroke();
             // ctx.setLineDash([]); // 점선 패턴 초기화 제거
@@ -9820,18 +9756,19 @@ function renderCommonValuesNetworkGraph() {
             }
     }
 
-    // 점이 폴리곤 내부에 있는지 확인하는 함수
+    // 점이 폴리곤 내부에 있는지 확인하는 함수 (개선된 경계 처리)
     function isPointInPolygon(point, polygon) {
         if (!point || !polygon || polygon.length < 3) {
             return false;
         }
         
-        // 🔧 좌표값 유효성 검사 추가
+        // 🔧 좌표값 유효성 검사
         if (typeof point.x !== 'number' || typeof point.y !== 'number' || 
             isNaN(point.x) || isNaN(point.y)) {
             return false;
         }
         
+        // 🌟 개선된 ray casting 알고리즘
         let inside = false;
         for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
             const pi = polygon[i];
@@ -9849,7 +9786,69 @@ function renderCommonValuesNetworkGraph() {
                 inside = !inside;
             }
         }
+        
         return inside;
+    }
+    
+    // 폴리곤을 지정한 거리만큼 확장하는 함수
+    function expandPolygon(polygon, expandDistance) {
+        if (!polygon || polygon.length < 3) return polygon;
+        
+        const expanded = [];
+        const len = polygon.length;
+        
+        for (let i = 0; i < len; i++) {
+            const current = polygon[i];
+            const prev = polygon[(i - 1 + len) % len];
+            const next = polygon[(i + 1) % len];
+            
+            // 이전 점과의 벡터
+            const v1x = current.x - prev.x;
+            const v1y = current.y - prev.y;
+            const v1len = Math.sqrt(v1x * v1x + v1y * v1y);
+            
+            // 다음 점과의 벡터
+            const v2x = next.x - current.x;
+            const v2y = next.y - current.y;
+            const v2len = Math.sqrt(v2x * v2x + v2y * v2y);
+            
+            if (v1len === 0 || v2len === 0) {
+                expanded.push({x: current.x, y: current.y});
+                continue;
+            }
+            
+            // 정규화된 벡터들
+            const n1x = v1x / v1len;
+            const n1y = v1y / v1len;
+            const n2x = v2x / v2len;
+            const n2y = v2y / v2len;
+            
+            // 각 변의 법선 벡터 (외향)
+            const norm1x = -n1y;
+            const norm1y = n1x;
+            const norm2x = -n2y;
+            const norm2y = n2x;
+            
+            // 평균 법선 벡터
+            let avgNormX = (norm1x + norm2x) / 2;
+            let avgNormY = (norm1y + norm2y) / 2;
+            const avgNormLen = Math.sqrt(avgNormX * avgNormX + avgNormY * avgNormY);
+            
+            if (avgNormLen > 0) {
+                avgNormX /= avgNormLen;
+                avgNormY /= avgNormLen;
+                
+                // 확장된 점
+                expanded.push({
+                    x: current.x + avgNormX * expandDistance,
+                    y: current.y + avgNormY * expandDistance
+                });
+            } else {
+                expanded.push({x: current.x, y: current.y});
+            }
+        }
+        
+        return expanded;
     }
 
     // 그룹 드래그 관련 변수
@@ -11100,6 +11099,9 @@ function renderCommonValuesNetworkGraph() {
     setTimeout(() => {
         setupValueColumnEvents();
     }, 200);
+    
+    // 🌟 인터랙티브 레전드 생성
+    createInteractiveLegend();
 }
 // ... existing code ...
 
@@ -14103,6 +14105,1085 @@ function initializeValueColumnEvents() {
     const commonValuesContent = document.getElementById('commonValues');
     if (commonValuesContent && commonValuesContent.classList.contains('active')) {
         // 네트워크 그래프가 생성된 후에 이벤트가 설정되므로 여기서는 추가 설정 불필요
+    }
+}
+
+// 🌟 물리 효과 시스템 초기화 함수
+function initializePhysicsEffectsSystem(network, nodes, valueCourseIds) {
+    try {
+        // 필수 매개변수 검증
+        if (!network || !nodes || !valueCourseIds) {
+            console.warn('Physics effects system: Missing required parameters');
+            return;
+        }
+        
+        // 전역 물리 효과 객체 생성
+        window.physicsEffects = new PhysicsEffectsSystem(network, nodes, valueCourseIds);
+        
+        // 물리 효과 제어 패널 생성
+        createPhysicsControlPanel();
+        
+        // 자동 진동 효과 시작
+        window.physicsEffects.startContinuousVibration();
+        
+        // 마우스 이벤트로 폭발 효과 트리거
+        if (network.body && network.body.container) {
+            const container = network.body.container;
+            container.addEventListener('dblclick', function(event) {
+                try {
+                    const rect = container.getBoundingClientRect();
+                    const canvasPos = {
+                        x: event.clientX - rect.left,
+                        y: event.clientY - rect.top
+                    };
+                    
+                    // 더블클릭 위치에서 폭발 효과 트리거
+                    if (window.physicsEffects) {
+                        window.physicsEffects.triggerExplosionAtPosition(canvasPos);
+                    }
+                } catch (e) {
+                    console.warn('Physics effects: Double-click handler error:', e);
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Physics effects system initialization failed:', error);
+    }
+}
+
+// 🌟 물리 효과 시스템 클래스
+class PhysicsEffectsSystem {
+    constructor(network, nodes, valueCourseIds) {
+        this.network = network;
+        this.nodes = nodes;
+        this.valueCourseIds = valueCourseIds;
+        this.isActive = true;
+        
+        // 효과별 상태
+        this.vibrationActive = false;
+        this.magneticFieldActive = false;
+        this.explosionInProgress = false;
+        this.pulseActive = false;
+        this.attractionActive = false;
+        
+        // 효과 매개변수
+        this.vibrationIntensity = 2.0;
+        this.magneticFieldStrength = 5.0;
+        this.explosionForce = 20.0;
+        
+        // 애니메이션 루프
+        this.animationId = null;
+        this.lastTime = 0;
+        
+        // 노드별 물리 상태
+        this.nodeStates = new Map();
+        this.initializeNodeStates();
+        
+        this.startAnimationLoop();
+    }
+    
+    initializeNodeStates() {
+        this.nodes.forEach(node => {
+            this.nodeStates.set(node.id, {
+                basePosition: null,
+                velocity: { x: 0, y: 0 },
+                force: { x: 0, y: 0 },
+                vibrationPhase: Math.random() * Math.PI * 2,
+                magneticCharge: Math.random() > 0.5 ? 1 : -1
+            });
+        });
+    }
+    
+    startAnimationLoop() {
+        const animate = (currentTime) => {
+            const deltaTime = currentTime - this.lastTime;
+            this.lastTime = currentTime;
+            
+            if (this.isActive && deltaTime > 0) {
+                this.updatePhysics(deltaTime);
+            }
+            
+            this.animationId = requestAnimationFrame(animate);
+        };
+        
+        this.animationId = requestAnimationFrame(animate);
+    }
+    
+    updatePhysics(deltaTime) {
+        const dt = Math.min(deltaTime / 16.67, 2); // 60fps 기준 정규화
+        
+        // 성능 최적화: 너무 작은 델타타임은 무시
+        if (dt < 0.1) return;
+        
+        if (this.vibrationActive) {
+            this.applyVibrationEffect(dt);
+        }
+        
+        if (this.magneticFieldActive) {
+            this.applyMagneticField(dt);
+        }
+        
+        if (this.pulseActive) {
+            this.applyPulseEffect(dt);
+        }
+        
+        if (this.attractionActive) {
+            this.applyAttractionEffect(dt);
+        }
+        
+        this.applyForces(dt);
+    }
+    
+    // 🌪️ 진동 효과
+    startContinuousVibration() {
+        this.vibrationActive = true;
+    }
+    
+    stopVibration() {
+        this.vibrationActive = false;
+    }
+    
+    applyVibrationEffect(deltaTime) {
+        const time = Date.now() * 0.001; // 초 단위
+        
+        this.nodes.forEach(node => {
+            const state = this.nodeStates.get(node.id);
+            if (!state) return;
+            
+            // 그룹별 진동 패턴
+            let frequency = 0.5;
+            let amplitude = this.vibrationIntensity;
+            
+            switch(node.group) {
+                case 'value1':
+                    frequency = 0.8;
+                    amplitude *= 1.2;
+                    break;
+                case 'value2':
+                    frequency = 0.6;
+                    amplitude *= 0.8;
+                    break;
+                case 'value3':
+                    frequency = 1.0;
+                    amplitude *= 1.5;
+                    break;
+            }
+            
+            const vibrationX = Math.sin(time * frequency + state.vibrationPhase) * amplitude;
+            const vibrationY = Math.cos(time * frequency * 0.7 + state.vibrationPhase) * amplitude * 0.6;
+            
+            state.force.x += vibrationX;
+            state.force.y += vibrationY;
+        });
+    }
+    
+    // 🧲 자기장 효과
+    toggleMagneticField() {
+        this.magneticFieldActive = !this.magneticFieldActive;
+        return this.magneticFieldActive;
+    }
+    
+    applyMagneticField(deltaTime) {
+        const positions = this.network.getPositions();
+        
+        this.nodes.forEach(nodeA => {
+            const stateA = this.nodeStates.get(nodeA.id);
+            if (!stateA || !positions[nodeA.id]) return;
+            
+            this.nodes.forEach(nodeB => {
+                if (nodeA.id === nodeB.id) return;
+                
+                const stateB = this.nodeStates.get(nodeB.id);
+                if (!stateB || !positions[nodeB.id]) return;
+                
+                const dx = positions[nodeB.id].x - positions[nodeA.id].x;
+                const dy = positions[nodeB.id].y - positions[nodeA.id].y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < 200 && distance > 10) {
+                    const magneticForce = this.magneticFieldStrength * 
+                        stateA.magneticCharge * stateB.magneticCharge / (distance * distance);
+                    
+                    const forceX = (dx / distance) * magneticForce;
+                    const forceY = (dy / distance) * magneticForce;
+                    
+                    stateA.force.x += forceX;
+                    stateA.force.y += forceY;
+                }
+            });
+        });
+    }
+    
+    // 🌊 파동 효과
+    togglePulseEffect() {
+        this.pulseActive = !this.pulseActive;
+        return this.pulseActive;
+    }
+    
+    applyPulseEffect(deltaTime) {
+        const time = Date.now() * 0.002;
+        const waveSpeed = 3.0;
+        const waveAmplitude = 8.0;
+        
+        const positions = this.network.getPositions();
+        
+        this.nodes.forEach(node => {
+            const state = this.nodeStates.get(node.id);
+            if (!state || !positions[node.id]) return;
+            
+            // 중심점에서의 거리 계산
+            const centerX = 0, centerY = 0;
+            const dx = positions[node.id].x - centerX;
+            const dy = positions[node.id].y - centerY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // 파동 효과 계산
+            const wave = Math.sin(time * waveSpeed - distance * 0.01) * waveAmplitude;
+            const angle = Math.atan2(dy, dx);
+            
+            state.force.x += Math.cos(angle) * wave;
+            state.force.y += Math.sin(angle) * wave;
+        });
+    }
+    
+    // ⚡ 인력 효과
+    toggleAttractionEffect() {
+        this.attractionActive = !this.attractionActive;
+        return this.attractionActive;
+    }
+    
+    applyAttractionEffect(deltaTime) {
+        const positions = this.network.getPositions();
+        
+        // 그룹별 중심점 계산
+        const groupCenters = { value1: {x: 0, y: 0, count: 0}, value2: {x: 0, y: 0, count: 0}, value3: {x: 0, y: 0, count: 0} };
+        
+        this.nodes.forEach(node => {
+            if (positions[node.id] && groupCenters[node.group]) {
+                groupCenters[node.group].x += positions[node.id].x;
+                groupCenters[node.group].y += positions[node.id].y;
+                groupCenters[node.group].count++;
+            }
+        });
+        
+        // 중심점 평균 계산
+        Object.keys(groupCenters).forEach(key => {
+            if (groupCenters[key].count > 0) {
+                groupCenters[key].x /= groupCenters[key].count;
+                groupCenters[key].y /= groupCenters[key].count;
+            }
+        });
+        
+        // 각 노드를 그룹 중심으로 끌어당김
+        this.nodes.forEach(node => {
+            const state = this.nodeStates.get(node.id);
+            if (!state || !positions[node.id] || !groupCenters[node.group]) return;
+            
+            const center = groupCenters[node.group];
+            if (center.count === 0) return;
+            
+            const dx = center.x - positions[node.id].x;
+            const dy = center.y - positions[node.id].y;
+            const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+            
+            if (distance > 20) { // 너무 가까우면 인력 중지
+                const attractionForce = 3.0;
+                state.force.x += (dx / distance) * attractionForce;
+                state.force.y += (dy / distance) * attractionForce;
+            }
+        });
+    }
+    
+    // 💥 폭발 효과
+    triggerExplosion(groupKey, clickPosition) {
+        if (this.explosionInProgress) return;
+        
+        const groupNodeIds = this.valueCourseIds[groupKey];
+        if (!groupNodeIds || groupNodeIds.length === 0) return;
+        
+        this.explosionInProgress = true;
+        
+        // 폭발 중심점 계산
+        let centerX = 0, centerY = 0;
+        const positions = this.network.getPositions();
+        
+        groupNodeIds.forEach(nodeId => {
+            if (positions[nodeId]) {
+                centerX += positions[nodeId].x;
+                centerY += positions[nodeId].y;
+            }
+        });
+        
+        centerX /= groupNodeIds.length;
+        centerY /= groupNodeIds.length;
+        
+        // 폭발 애니메이션
+        this.createExplosionWave(centerX, centerY);
+        
+        // 노드들에 폭발력 적용
+        groupNodeIds.forEach(nodeId => {
+            const state = this.nodeStates.get(nodeId);
+            if (!state || !positions[nodeId]) return;
+            
+            const dx = positions[nodeId].x - centerX;
+            const dy = positions[nodeId].y - centerY;
+            const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+            
+            const explosionMagnitude = this.explosionForce / distance;
+            state.force.x += (dx / distance) * explosionMagnitude * 100;
+            state.force.y += (dy / distance) * explosionMagnitude * 100;
+        });
+        
+        // 2초 후 폭발 상태 리셋
+        setTimeout(() => {
+            this.explosionInProgress = false;
+        }, 2000);
+    }
+    
+    triggerExplosionAtPosition(canvasPos) {
+        // 캔버스 좌표를 네트워크 좌표로 변환
+        let networkPos;
+        try {
+            networkPos = this.network.canvasToDOM ? 
+                this.network.canvasToDOM(canvasPos) : 
+                canvasPos; // 변환 함수가 없으면 원본 좌표 사용
+        } catch (e) {
+            networkPos = canvasPos; // 오류 발생 시 원본 좌표 사용
+        }
+        
+        this.explosionInProgress = true;
+        
+        // 폭발 애니메이션
+        this.createExplosionWave(networkPos.x, networkPos.y);
+        
+        // 모든 노드에 폭발력 적용
+        const positions = this.network.getPositions();
+        
+        this.nodes.forEach(node => {
+            const state = this.nodeStates.get(node.id);
+            if (!state || !positions[node.id]) return;
+            
+            const dx = positions[node.id].x - networkPos.x;
+            const dy = positions[node.id].y - networkPos.y;
+            const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+            
+            if (distance < 300) {
+                const explosionMagnitude = this.explosionForce * (300 - distance) / 300;
+                state.force.x += (dx / distance) * explosionMagnitude * 50;
+                state.force.y += (dy / distance) * explosionMagnitude * 50;
+            }
+        });
+        
+        setTimeout(() => {
+            this.explosionInProgress = false;
+        }, 2000);
+    }
+    
+    createExplosionWave(centerX, centerY) {
+        // 시각적 폭발 효과 생성
+        const container = this.network.body.container;
+        const rect = container.getBoundingClientRect();
+        
+        const wave = document.createElement('div');
+        wave.style.position = 'absolute';
+        wave.style.left = centerX + 'px';
+        wave.style.top = centerY + 'px';
+        wave.style.width = '10px';
+        wave.style.height = '10px';
+        wave.style.borderRadius = '50%';
+        wave.style.border = '3px solid #ff6b35';
+        wave.style.background = 'radial-gradient(circle, rgba(255,107,53,0.3) 0%, transparent 70%)';
+        wave.style.pointerEvents = 'none';
+        wave.style.zIndex = '1000';
+        wave.style.transform = 'translate(-50%, -50%)';
+        wave.style.animation = 'explosionWave 1s ease-out forwards';
+        
+        container.appendChild(wave);
+        
+        // 1초 후 제거
+        setTimeout(() => {
+            if (wave.parentNode) {
+                wave.parentNode.removeChild(wave);
+            }
+        }, 1000);
+    }
+    
+    // 힘 적용 - vis-network 호환 버전
+    applyForces(deltaTime) {
+        let needsSimulation = false;
+        
+        this.nodeStates.forEach((state, nodeId) => {
+            const body = this.network.body.nodes[nodeId];
+            if (!body || !body.options || !body.options.physics) return;
+            
+            // 속도 업데이트 (가속도 = 힘 / 질량)
+            const mass = 1.0;
+            const velocityDeltaX = (state.force.x / mass) * deltaTime * 0.01;
+            const velocityDeltaY = (state.force.y / mass) * deltaTime * 0.01;
+            
+            // 감쇠 적용
+            const damping = 0.98;
+            state.velocity.x = (state.velocity.x + velocityDeltaX) * damping;
+            state.velocity.y = (state.velocity.y + velocityDeltaY) * damping;
+            
+            // vis-network 물리 body에 직접 속도 적용 (작은 값으로)
+            if (Math.abs(state.velocity.x) > 0.01 || Math.abs(state.velocity.y) > 0.01) {
+                body.vx = (body.vx || 0) + state.velocity.x * 0.1;
+                body.vy = (body.vy || 0) + state.velocity.y * 0.1;
+                needsSimulation = true;
+            }
+            
+            // 힘 리셋
+            state.force.x = 0;
+            state.force.y = 0;
+        });
+        
+        // 물리 시뮬레이션 재시작 (필요한 경우에만)
+        if (needsSimulation) {
+            try {
+                if (this.network.physics && this.network.physics.physicsEnabled) {
+                    this.network.physics.startSimulation();
+                } else if (this.network.startSimulation) {
+                    this.network.startSimulation();
+                }
+            } catch (e) {
+                console.warn('Physics simulation restart failed:', e);
+            }
+        }
+    }
+    
+    // 효과 제어 메서드
+    setVibrationIntensity(intensity) {
+        this.vibrationIntensity = Math.max(0, Math.min(10, intensity));
+    }
+    
+    setMagneticFieldStrength(strength) {
+        this.magneticFieldStrength = Math.max(0, Math.min(20, strength));
+    }
+    
+    setExplosionForce(force) {
+        this.explosionForce = Math.max(5, Math.min(50, force));
+    }
+    
+    // 시스템 제어
+    toggleSystem() {
+        this.isActive = !this.isActive;
+        return this.isActive;
+    }
+    
+    pauseEffects() {
+        this.isActive = false;
+    }
+    
+    resumeEffects() {
+        this.isActive = true;
+    }
+    
+    resetEffects() {
+        this.vibrationActive = false;
+        this.magneticFieldActive = false;
+        this.explosionInProgress = false;
+        this.pulseActive = false;
+        this.attractionActive = false;
+        
+        // 모든 노드 상태 리셋
+        this.nodeStates.forEach(state => {
+            state.velocity = { x: 0, y: 0 };
+            state.force = { x: 0, y: 0 };
+        });
+    }
+    
+    destroy() {
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+        }
+        this.resetEffects();
+    }
+}
+
+// 🎮 물리 효과 제어 패널 생성
+function createPhysicsControlPanel() {
+    // 기존 패널이 있으면 제거
+    const existingPanel = document.getElementById('physicsControlPanel');
+    if (existingPanel) {
+        existingPanel.remove();
+    }
+    
+    const panel = document.createElement('div');
+    panel.id = 'physicsControlPanel';
+    panel.style.display = 'none'; // 처음에는 숨김
+    panel.innerHTML = `
+        <div style="
+            position: fixed;
+            top: 80px;
+            right: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            z-index: 10001;
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            min-width: 250px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        ">
+            <h4 style="margin: 0 0 12px 0; font-size: 16px; text-align: center;">🌟 물리 효과 제어</h4>
+            
+            <div style="margin-bottom: 10px;">
+                <label style="display: block; font-size: 12px; margin-bottom: 5px;">진동 강도: <span id="vibrationValue">2.0</span></label>
+                <input type="range" id="vibrationSlider" min="0" max="10" step="0.5" value="2.0" 
+                       style="width: 100%; accent-color: #ff6b35;">
+            </div>
+            
+            <div style="margin-bottom: 10px;">
+                <label style="display: block; font-size: 12px; margin-bottom: 5px;">자기장 강도: <span id="magneticValue">5.0</span></label>
+                <input type="range" id="magneticSlider" min="0" max="20" step="1" value="5.0" 
+                       style="width: 100%; accent-color: #4ecdc4;">
+            </div>
+            
+            <div style="margin-bottom: 10px;">
+                <label style="display: block; font-size: 12px; margin-bottom: 5px;">폭발 강도: <span id="explosionValue">20.0</span></label>
+                <input type="range" id="explosionSlider" min="5" max="50" step="2.5" value="20.0" 
+                       style="width: 100%; accent-color: #ff6b35;">
+            </div>
+            
+            <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                <button id="toggleVibration" style="
+                    flex: 1; 
+                    padding: 8px; 
+                    border: none; 
+                    border-radius: 6px; 
+                    background: #4ecdc4; 
+                    color: white; 
+                    cursor: pointer;
+                    font-size: 11px;
+                    transition: all 0.2s;
+                ">🌪️ 진동 ON</button>
+                <button id="toggleMagnetic" style="
+                    flex: 1; 
+                    padding: 8px; 
+                    border: none; 
+                    border-radius: 6px; 
+                    background: #95a5a6; 
+                    color: white; 
+                    cursor: pointer;
+                    font-size: 11px;
+                    transition: all 0.2s;
+                ">🧲 자기장 OFF</button>
+            </div>
+            
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <button id="randomExplosion" style="
+                    flex: 1; 
+                    padding: 8px; 
+                    border: none; 
+                    border-radius: 6px; 
+                    background: #e74c3c; 
+                    color: white; 
+                    cursor: pointer;
+                    font-size: 11px;
+                    transition: all 0.2s;
+                ">💥 랜덤 폭발</button>
+                <button id="resetEffects" style="
+                    flex: 1; 
+                    padding: 8px; 
+                    border: none; 
+                    border-radius: 6px; 
+                    background: #34495e; 
+                    color: white; 
+                    cursor: pointer;
+                    font-size: 11px;
+                    transition: all 0.2s;
+                ">🔄 리셋</button>
+            </div>
+            
+            <div style="display: flex; gap: 8px;">
+                <button id="pulseEffect" style="
+                    flex: 1; 
+                    padding: 8px; 
+                    border: none; 
+                    border-radius: 6px; 
+                    background: #9b59b6; 
+                    color: white; 
+                    cursor: pointer;
+                    font-size: 11px;
+                    transition: all 0.2s;
+                ">🌊 파동</button>
+                <button id="attractionMode" style="
+                    flex: 1; 
+                    padding: 8px; 
+                    border: none; 
+                    border-radius: 6px; 
+                    background: #f39c12; 
+                    color: white; 
+                    cursor: pointer;
+                    font-size: 11px;
+                    transition: all 0.2s;
+                ">⚡ 인력</button>
+            </div>
+            
+            <div style="margin-top: 12px; font-size: 10px; opacity: 0.8; text-align: center;">
+                💡 더블클릭으로 폭발 효과!
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(panel);
+    
+    // 이벤트 리스너 설정
+    setupPhysicsControlEvents();
+}
+
+function setupPhysicsControlEvents() {
+    // 슬라이더 이벤트
+    document.getElementById('vibrationSlider').addEventListener('input', function(e) {
+        const value = parseFloat(e.target.value);
+        document.getElementById('vibrationValue').textContent = value.toFixed(1);
+        if (window.physicsEffects) {
+            window.physicsEffects.setVibrationIntensity(value);
+        }
+    });
+    
+    document.getElementById('magneticSlider').addEventListener('input', function(e) {
+        const value = parseFloat(e.target.value);
+        document.getElementById('magneticValue').textContent = value.toFixed(1);
+        if (window.physicsEffects) {
+            window.physicsEffects.setMagneticFieldStrength(value);
+        }
+    });
+    
+    document.getElementById('explosionSlider').addEventListener('input', function(e) {
+        const value = parseFloat(e.target.value);
+        document.getElementById('explosionValue').textContent = value.toFixed(1);
+        if (window.physicsEffects) {
+            window.physicsEffects.setExplosionForce(value);
+        }
+    });
+    
+    // 버튼 이벤트
+    document.getElementById('toggleVibration').addEventListener('click', function() {
+        if (window.physicsEffects) {
+            if (window.physicsEffects.vibrationActive) {
+                window.physicsEffects.stopVibration();
+                this.innerHTML = '🌪️ 진동 OFF';
+                this.style.background = '#95a5a6';
+            } else {
+                window.physicsEffects.startContinuousVibration();
+                this.innerHTML = '🌪️ 진동 ON';
+                this.style.background = '#4ecdc4';
+            }
+        }
+    });
+    
+    document.getElementById('toggleMagnetic').addEventListener('click', function() {
+        if (window.physicsEffects) {
+            const isActive = window.physicsEffects.toggleMagneticField();
+            this.innerHTML = isActive ? '🧲 자기장 ON' : '🧲 자기장 OFF';
+            this.style.background = isActive ? '#3498db' : '#95a5a6';
+        }
+    });
+    
+    document.getElementById('randomExplosion').addEventListener('click', function() {
+        if (window.physicsEffects) {
+            const container = window.physicsEffects.network.body.container;
+            const rect = container.getBoundingClientRect();
+            const randomPos = {
+                x: Math.random() * rect.width,
+                y: Math.random() * rect.height
+            };
+            window.physicsEffects.triggerExplosionAtPosition(randomPos);
+        }
+    });
+    
+    document.getElementById('resetEffects').addEventListener('click', function() {
+        if (window.physicsEffects) {
+            window.physicsEffects.resetEffects();
+            
+            // 진동 버튼 상태 리셋
+            const vibBtn = document.getElementById('toggleVibration');
+            vibBtn.innerHTML = '🌪️ 진동 OFF';
+            vibBtn.style.background = '#95a5a6';
+            
+            // 자기장 버튼 상태 리셋  
+            const magBtn = document.getElementById('toggleMagnetic');
+            magBtn.innerHTML = '🧲 자기장 OFF';
+            magBtn.style.background = '#95a5a6';
+            
+            // 파동 버튼 상태 리셋
+            const pulseBtn = document.getElementById('pulseEffect');
+            pulseBtn.innerHTML = '🌊 파동 OFF';
+            pulseBtn.style.background = '#95a5a6';
+            
+            // 인력 버튼 상태 리셋
+            const attractBtn = document.getElementById('attractionMode');
+            attractBtn.innerHTML = '⚡ 인력 OFF';
+            attractBtn.style.background = '#95a5a6';
+        }
+    });
+    
+    // 파동 효과 버튼
+    document.getElementById('pulseEffect').addEventListener('click', function() {
+        if (window.physicsEffects) {
+            const isActive = window.physicsEffects.togglePulseEffect();
+            this.innerHTML = isActive ? '🌊 파동 ON' : '🌊 파동 OFF';
+            this.style.background = isActive ? '#8e44ad' : '#95a5a6';
+        }
+    });
+    
+    // 인력 효과 버튼
+    document.getElementById('attractionMode').addEventListener('click', function() {
+        if (window.physicsEffects) {
+            const isActive = window.physicsEffects.toggleAttractionEffect();
+            this.innerHTML = isActive ? '⚡ 인력 ON' : '⚡ 인력 OFF';
+            this.style.background = isActive ? '#e67e22' : '#95a5a6';
+        }
+    });
+}
+
+// CSS 애니메이션 추가
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+    @keyframes explosionWave {
+        0% {
+            width: 10px;
+            height: 10px;
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        100% {
+            width: 200px;
+            height: 200px;
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(1.5);
+        }
+    }
+    
+    #physicsControlPanel button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    
+    #physicsControlPanel input[type="range"]::-webkit-slider-thumb {
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: white;
+        cursor: pointer;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    
+    #physicsControlPanel {
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    #physicsControlPanel button:active {
+        transform: translateY(-1px) scale(0.98);
+    }
+    
+    .physics-particle {
+        position: absolute;
+        width: 4px;
+        height: 4px;
+        background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, transparent 70%);
+        border-radius: 50%;
+        pointer-events: none;
+        animation: particleFloat 2s ease-out forwards;
+    }
+    
+    @keyframes particleFloat {
+        0% {
+            opacity: 1;
+            transform: scale(1);
+        }
+        100% {
+            opacity: 0;
+            transform: scale(0.2) translateY(-50px);
+        }
+    }
+`;
+document.head.appendChild(styleSheet);
+
+// 🌟 인터랙티브 레전드 생성 함수
+function createInteractiveLegend() {
+    // 기존 레전드가 있으면 제거
+    const existingLegend = document.getElementById('network-legend');
+    if (existingLegend) {
+        existingLegend.remove();
+    }
+    
+    // 레전드 컨테이너 생성
+    const legend = document.createElement('div');
+    legend.id = 'network-legend';
+    legend.className = 'network-legend';
+    legend.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 16px 24px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+        display: flex;
+        gap: 24px;
+        align-items: center;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 14px;
+        transition: all 0.3s ease;
+    `;
+    
+    // 레전드 제목
+    const title = document.createElement('div');
+    title.style.cssText = `
+        font-weight: 600;
+        color: #333;
+        margin-right: 16px;
+        font-size: 15px;
+    `;
+    title.textContent = '연결 유형';
+    legend.appendChild(title);
+    
+    // 연결 유형별 레전드 아이템들
+    const legendItems = [
+        {
+            type: 'year-semester',
+            label: '학년-학기 연결',
+            lineClass: 'legend-line-solid',
+            description: '같은 학년-학기에 개설되는 교과목들'
+        },
+        {
+            type: 'subject-type',
+            label: '과목분류 연결',
+            lineClass: 'legend-line-dashed',
+            description: '같은 과목분류에 속하는 교과목들'
+        }
+    ];
+    
+    legendItems.forEach(item => {
+        const itemContainer = document.createElement('div');
+        itemContainer.className = 'legend-item';
+        itemContainer.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        `;
+        
+        // 호버 효과
+        itemContainer.addEventListener('mouseenter', function() {
+            this.style.background = '#f0f8ff';
+            this.style.transform = 'translateY(-2px)';
+            highlightEdgeType(item.type);
+        });
+        
+        itemContainer.addEventListener('mouseleave', function() {
+            this.style.background = 'transparent';
+            this.style.transform = 'translateY(0)';
+            unhighlightEdgeType();
+        });
+        
+        // 선 스타일 표시
+        const line = document.createElement('div');
+        line.className = item.lineClass;
+        line.style.cssText = `
+            width: 40px;
+            height: 3px;
+            border-radius: 2px;
+            background: ${item.type === 'year-semester' ? '#4CAF50' : '#2196F3'};
+            ${item.type === 'subject-type' ? 'background: repeating-linear-gradient(to right, #2196F3 0, #2196F3 4px, transparent 4px, transparent 8px);' : ''}
+        `;
+        
+        // 라벨
+        const label = document.createElement('span');
+        label.textContent = item.label;
+        label.style.cssText = `
+            color: #555;
+            font-weight: 500;
+            white-space: nowrap;
+        `;
+        
+        // 툴팁
+        const tooltip = document.createElement('div');
+        tooltip.className = 'legend-tooltip';
+        tooltip.textContent = item.description;
+        tooltip.style.cssText = `
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+            z-index: 1001;
+            margin-bottom: 8px;
+        `;
+        
+        // 툴팁 화살표
+        const arrow = document.createElement('div');
+        arrow.style.cssText = `
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 6px solid #333;
+        `;
+        tooltip.appendChild(arrow);
+        
+        // 툴팁 표시/숨김
+        itemContainer.addEventListener('mouseenter', function() {
+            tooltip.style.opacity = '1';
+        });
+        
+        itemContainer.addEventListener('mouseleave', function() {
+            tooltip.style.opacity = '0';
+        });
+        
+        itemContainer.appendChild(line);
+        itemContainer.appendChild(label);
+        itemContainer.appendChild(tooltip);
+        legend.appendChild(itemContainer);
+    });
+    
+    // 레전드를 body에 추가
+    document.body.appendChild(legend);
+    
+    // 애니메이션 효과
+    legend.style.opacity = '0';
+    legend.style.transform = 'translateX(-50%) translateY(20px)';
+    setTimeout(() => {
+        legend.style.opacity = '1';
+        legend.style.transform = 'translateX(-50%) translateY(0)';
+    }, 100);
+}
+
+// 🌟 엣지 타입별 하이라이트 함수
+function highlightEdgeType(edgeType) {
+    if (!window.network) return;
+    
+    const edges = window.network.body.data.edges.get();
+    const edgeUpdateArray = [];
+    
+    // 과목분류별 색상 정의
+    const subjectTypeColors = {
+        '설계': '#9e9e9e',
+        '디지털': '#a1887f',
+        '역사': '#d84315',
+        '이론': '#00897b',
+        '도시': '#c2185b',
+        '사회': '#5e35b1',
+        '기술': '#ef6c00',
+        '실무': '#43a047',
+        '비교과': '#757575'
+    };
+    
+    edges.forEach(edge => {
+        let shouldHighlight = false;
+        
+        if (edgeType === 'year-semester') {
+            // 실선 엣지 (학년-학기 연결)
+            shouldHighlight = !edge.dashes;
+        } else if (edgeType === 'subject-type') {
+            // 점선 엣지 (과목분류 연결)
+            shouldHighlight = edge.dashes === true;
+        }
+        
+        if (shouldHighlight) {
+            let highlightColor = '#4CAF50'; // 기본 녹색 (학년-학기)
+            
+            if (edgeType === 'subject-type' && edge.title) {
+                // 과목분류 연결인 경우 title에서 과목분류 추출
+                let subjectType;
+                const subjectTypeMatch = edge.title.match(/^([^\-]+)\s*-/);
+                if (subjectTypeMatch) {
+                    subjectType = subjectTypeMatch[1].trim();
+                } else {
+                    // 하이픈이 없으면 전체 title을 과목분류로 사용
+                    subjectType = edge.title.trim();
+                }
+                
+                // 해당 과목분류의 색상 사용
+                if (subjectType && subjectTypeColors[subjectType]) {
+                    highlightColor = subjectTypeColors[subjectType];
+                }
+            }
+            
+            edgeUpdateArray.push({
+                id: edge.id,
+                width: 2,
+                color: { 
+                    color: highlightColor,
+                    opacity: 0.8
+                }
+            });
+        } else {
+            edgeUpdateArray.push({
+                id: edge.id,
+                width: edge.dashes ? 1.5 : 3,
+                color: { 
+                    color: edge.dashes ? '#9e9e9e' : '#666',
+                    opacity: 0.3
+                }
+            });
+        }
+    });
+    
+    if (edgeUpdateArray.length > 0) {
+        window.network.body.data.edges.update(edgeUpdateArray);
+    }
+}
+
+// 🌟 엣지 하이라이트 해제 함수
+function unhighlightEdgeType() {
+    if (!window.network) return;
+    
+    const edges = window.network.body.data.edges.get();
+    const edgeUpdateArray = [];
+    
+    edges.forEach(edge => {
+        edgeUpdateArray.push({
+            id: edge.id,
+            width: edge.dashes ? 1.5 : 3,
+            color: { 
+                color: edge.dashes ? '#9e9e9e' : '#666',
+                opacity: edge.dashes ? 0.5 : 1
+            }
+        });
+    });
+    
+    if (edgeUpdateArray.length > 0) {
+        window.network.body.data.edges.update(edgeUpdateArray);
     }
 }
 
