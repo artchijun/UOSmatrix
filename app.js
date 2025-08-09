@@ -12039,8 +12039,8 @@ function renderCommonValuesNetworkGraph() {
                         });
                     }
                     
-                    if (e.isExtracurricular) {
-                        // 비교과 엣지 하이라이트
+                    if (e.isExtracurricular || e.id === edge.id) {
+                        // 비교과 엣지 또는 호버된 엣지 자체 하이라이트
                         edgeUpdateArray.push({
                             id: e.id,
                             color: { 
