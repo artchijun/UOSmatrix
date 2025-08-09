@@ -7651,6 +7651,11 @@ function renderCommonValuesNetworkGraph() {
                             background: nodeColor.background,
                             border: nodeColor.border
                         },
+                        font: {
+                            color: '#343a40',
+                            size: 14,
+                            face: 'arial'
+                        },
                         fixed: false,
                         isExtracurricular: true // 비교과 노드 표시
                     });
@@ -7745,6 +7750,11 @@ function renderCommonValuesNetworkGraph() {
                             background: nodeColor.background,
                             border: nodeColor.border
                         },
+                        font: {
+                            color: '#343a40',
+                            size: 14,
+                            face: 'arial'
+                        },
                         x: initX,
                         y: initY,
                         fixed: false,
@@ -7801,6 +7811,11 @@ function renderCommonValuesNetworkGraph() {
                             background: nodeColor.background,
                             border: nodeColor.border
                         },
+                        font: {
+                            color: '#343a40',
+                            size: 14,
+                            face: 'arial'
+                        },
                         x: initX,
                         y: initY,
                         fixed: false,
@@ -7845,6 +7860,11 @@ function renderCommonValuesNetworkGraph() {
                             background: nodeColor.background,
                             border: nodeColor.border
                         },
+                        font: {
+                            color: '#343a40',
+                            size: 14,
+                            face: 'arial'
+                        },
                         x: initX,
                         y: initY,
                         fixed: false,
@@ -7880,6 +7900,11 @@ function renderCommonValuesNetworkGraph() {
                     color: {
                         background: nodeColor.background,
                         border: nodeColor.border
+                    },
+                    font: {
+                        color: '#343a40',
+                        size: 14,
+                        face: 'arial'
                     },
                     fixed: false,
                     isExtracurricular: true // 비교과 노드 표시
@@ -8016,26 +8041,29 @@ function renderCommonValuesNetworkGraph() {
         nodes: {
             chosen: {
                 node: function(values, id, selected, hovering) {
+                    // font 객체가 없으면 기본값으로 초기화
+                    if (!values.font || typeof values.font !== 'object') {
+                        values.font = {
+                            color: '#343a40',
+                            size: 14,
+                            face: 'arial'
+                        };
+                    }
+                    
                     // 기본 스타일 유지 (배경색은 변경하지 않음)
                     if (selected) {
                         // values.borderColor = '#454545ff';  // 검은색으로 선택 상태 표시
                         values.borderWidth = 3;
-                        if (values.font) {
-                            values.font.color = '#020202ff';
-                        }
+                        values.font.color = '#020202ff';
                     } else if (hovering) {
-                        values.borderColor = values.color ? values.color.border : '#01579b';  // 원래 노드의 테두리 색상 유지
+                        values.borderColor = values.color && values.color.border ? values.color.border : '#01579b';  // 원래 노드의 테두리 색상 유지
                         values.borderWidth = 2;
-                        if (values.font) {
-                            values.font.color = values.color ? values.color.border : '#01579b';
-                        }
+                        values.font.color = values.color && values.color.border ? values.color.border : '#01579b';
                     } else {
                         // 기본 상태에서는 그룹별 색상 유지 (배경색은 그대로)
-                        values.borderColor = values.color ? values.color.border : '#01579b';
+                        values.borderColor = values.color && values.color.border ? values.color.border : '#01579b';
                         values.borderWidth = 1;
-                        if (values.font) {
-                            values.font.color = values.color ? values.color.border : '#01579b';
-                        }
+                        values.font.color = values.color && values.color.border ? values.color.border : '#01579b';
                     }
                     // 배경색은 절대 변경하지 않음 - 원래 그룹 색상 유지
                 }
@@ -11107,6 +11135,12 @@ function renderCommonValuesNetworkGraph() {
             // 그룹 내 모든 노드들을 같이 이동
             const groupNodeIds = valueCourseIds[draggedGroupKey];
             
+            // 디버깅: 드래그 상태 확인
+            if (!groupNodeIds) {
+                console.warn(`드래그 중인 그룹 ${draggedGroupKey}의 노드를 찾을 수 없습니다.`);
+                return;
+            }
+            
             if (groupNodeIds && groupNodeIds.length > 0) {
                 // 배치로 노드 위치 업데이트 (성능 개선)
                 const updatePositions = {};
@@ -11119,19 +11153,14 @@ function renderCommonValuesNetworkGraph() {
                     }
                 });
                 
-                // 한 번에 모든 노드 위치 업데이트
-                try {
-                    network.moveNode(Object.keys(updatePositions), Object.values(updatePositions));
-                } catch (error) {
-                    // 개별 노드 업데이트 방식으로 폴백
-                    Object.entries(updatePositions).forEach(([nodeId, pos]) => {
-                        try {
-                            network.moveNode(nodeId, pos.x, pos.y);
-                        } catch (e) {
-                            // 노드가 존재하지 않는 경우 무시
-                        }
-                    });
-                }
+                // 모든 노드 위치 업데이트 (개별 호출)
+                Object.entries(updatePositions).forEach(([nodeId, pos]) => {
+                    try {
+                        network.moveNode(nodeId, pos.x, pos.y);
+                    } catch (e) {
+                        console.warn(`노드 ${nodeId} 이동 실패:`, e);
+                    }
+                });
                 
                 // 실시간 폴리곤 업데이트 (throttle 적용)
                 if (!window.dragUpdateTimer) {
