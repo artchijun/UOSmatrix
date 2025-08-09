@@ -11983,22 +11983,22 @@ function renderCommonValuesNetworkGraph() {
                     
                     // 비교과 노드인지 확인
                     if (currentNode.id && currentNode.id.toString().startsWith('extracurricular-')) {
-                        // 비교과 노드 하이라이트 (배경색 유지)
+                        // 비교과 노드 하이라이트 (다른 분야와 동일하게 배경색 변경)
                         highlightNodeIds.push(currentNode.id);
                         nodeUpdateArray.push({
                             id: currentNode.id,
                             opacity: 1,
                             borderWidth: 4,
                             color: {
-                                background: currentNode.color ? currentNode.color.background : '#f8f9fa',
+                                background: '#8bc34a',  // 비교과 테마 컬러로 배경 변경
                                 border: '#8bc34a',  // 비교과 테두리 색
                                 highlight: {
-                                    background: currentNode.color ? currentNode.color.background : '#f8f9fa',
+                                    background: '#8bc34a',
                                     border: '#8bc34a'
                                 }
                             },
                             font: {
-                                color: '#8bc34a',  // 비교과 폰트 색
+                                color: '#ffffff',  // 흰색 폰트 (다른 분야와 동일)
                                 size: (currentNode.font && currentNode.font.size) || 14,
                                 face: (currentNode.font && currentNode.font.face) || 'arial'
                             }
