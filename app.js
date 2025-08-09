@@ -8010,46 +8010,7 @@ function renderCommonValuesNetworkGraph() {
         }
     });
     
-    // 추가: 비교과 노드들 사이의 분야연결엣지 (점선) 생성
-    const extracurricularGroups = {};
-    nodes.forEach(n => {
-        if (n.isExtracurricular && n.group) {
-            if (!extracurricularGroups[n.group]) extracurricularGroups[n.group] = [];
-            extracurricularGroups[n.group].push(n.id);
-        }
-    });
-    
-    // 비교과 노드들을 서로 다른 그룹끼리 점선으로 연결
-    const extracurricularGroupKeys = Object.keys(extracurricularGroups);
-    if (extracurricularGroupKeys.length > 1) {
-        for (let i = 0; i < extracurricularGroupKeys.length; i++) {
-            for (let j = i + 1; j < extracurricularGroupKeys.length; j++) {
-                const group1 = extracurricularGroupKeys[i];
-                const group2 = extracurricularGroupKeys[j];
-                const group1Nodes = extracurricularGroups[group1];
-                const group2Nodes = extracurricularGroups[group2];
-                
-                // 각 그룹의 노드들을 서로 연결
-                group1Nodes.forEach(nodeId1 => {
-                    group2Nodes.forEach(nodeId2 => {
-                        edges.push({
-                            from: nodeId1,
-                            to: nodeId2,
-                            dashes: true,  // 점선
-                            width: 1.5,
-                            color: { color: '#9e9e9e', opacity: 0.5 },
-                            title: `비교과 연결 (${group1} ↔ ${group2})`,
-                            arrows: { 
-                                to: { enabled: true, scaleFactor: 0.35 },
-                                from: { enabled: true, scaleFactor: 0.35 }
-                            },
-                            smooth: { type: 'curvedCW', roundness: 0.3 }
-                        });
-                    });
-                });
-            }
-        }
-    }
+    // 비교과 노드들 사이의 그룹별 연결을 생성하지 않음 (VALUE 구분 제거)
 
     // 네트워크 옵션 (vis-network 기본 스타일 완전 제어)
     const options = {
