@@ -12317,10 +12317,7 @@ function renderCommonValuesNetworkGraph() {
                 }
                 
                 const course = courses.find(c => c.id === currentNode.id);
-                // 비교과 노드도 포함 (VALUE에 속한 경우)
-                const isExtracurricular = currentNode.id && currentNode.id.toString().startsWith('extracurricular-');
-                
-                if ((course && course.yearSemester === yearSemester) || isExtracurricular) {
+                if (course && course.yearSemester === yearSemester) {
                     highlightNodeIds.push(currentNode.id);
                 } else {
                     dimNodeIds.push(currentNode.id);
@@ -12389,7 +12386,7 @@ function renderCommonValuesNetworkGraph() {
                     });
                 }
                 
-                // 엣지의 title이 같은 yearSemester인지 확인 또는 비교과 엣지인지 확인
+                // 엣지의 title이 같은 yearSemester인지 확인
                 if (e.title === yearSemester) {
                     // 같은 학년학기의 모든 엣지는 검은색으로
                     edgeUpdateArray.push({
@@ -12400,18 +12397,6 @@ function renderCommonValuesNetworkGraph() {
                             hover: '#333333ff'
                         },
                         width: 2
-                    });
-                } else if (e.isExtracurricular) {
-                    // 비교과 엣지도 하이라이트 (비교과 테마색)
-                    edgeUpdateArray.push({
-                        id: e.id,
-                        color: { 
-                            color: '#8bc34a', 
-                            highlight: '#8bc34a',
-                            hover: '#8bc34a'
-                        },
-                        width: 2,
-                        dashes: true
                     });
                 } else {
                     // 다른 엣지들은 투명도 적용
