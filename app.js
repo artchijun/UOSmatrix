@@ -944,6 +944,8 @@ function restoreSelectedVersionData() {
         if (v.commonValuesTab) {
             commonValuesCellTexts = v.commonValuesTab.commonValuesCellTexts || {};
             commonValuesCopiedBlocks = v.commonValuesTab.commonValuesCopiedBlocks || {};
+            // 비교과 병합 텍스트 복원 추가
+            extracurricularMergedTexts = v.commonValuesTab.extracurricularMergedTexts || [];
             if (v.commonValuesTab.commonValuesTitleText) {
                 localStorage.setItem('commonValuesTitleText', v.commonValuesTab.commonValuesTitleText);
             }
@@ -951,6 +953,7 @@ function restoreSelectedVersionData() {
             // 기존 구조 호환성
             commonValuesCellTexts = v.commonValuesCellTexts || {};
             commonValuesCopiedBlocks = v.commonValuesCopiedBlocks || {};
+            extracurricularMergedTexts = [];
         }
         
         // 공통 설정 복원
@@ -3229,6 +3232,9 @@ window.onclick = function(event) {
 
 // 페이지 로드 시 초기화
 window.onload = function() {
+    // init() 함수를 먼저 호출하여 데이터 로드
+    init();
+    
     // 🛡️ 전역 vis-network 오류 방지 시스템 활성화
     window.setupGlobalVisNetworkErrorPrevention();
     
@@ -3237,6 +3243,10 @@ window.onload = function() {
     if (courseForm) {
         courseForm.addEventListener('submit', handleCourseSubmit);
     }
+    
+    // 키보드 이벤트 리스너 추가
+    document.addEventListener('keydown', handleMatrixKeyboardEdit);
+    
     // 탭 버튼 이벤트 리스너
     document.querySelectorAll('.tab').forEach(tab => {
         tab.addEventListener('click', function(e) {
@@ -3244,6 +3254,7 @@ window.onload = function() {
             showTab(tabName, e);
         });
     });
+    
     // 필터 이벤트 리스너 - null 체크 추가
     const yearFilter = document.getElementById('yearFilter');
     if (yearFilter) yearFilter.addEventListener('change', filterCourses);
@@ -3259,6 +3270,16 @@ window.onload = function() {
     
     const searchInput = document.getElementById('searchInput');
     if (searchInput) searchInput.addEventListener('keyup', filterCourses);
+    
+    // 색상 범례 초기화 (페이지 로드 시)
+    setTimeout(() => {
+        if (typeof updateColorLegendCurriculum === 'function') {
+            updateColorLegendCurriculum();
+        }
+        if (typeof updateColorLegendCommonValues === 'function') {
+            updateColorLegendCommonValues();
+        }
+    }, 100);
     
     // 변경상태 필터 초기화 (모두 체크된 상태로 시작)
     const showAdded = document.getElementById('showAdded');
@@ -3864,26 +3885,7 @@ function getPerformanceCriteria(matrixValues) {
     return { shortText, fullText, detailedText };
 }
 
-// 페이지 로드 시 초기화
-document.addEventListener('DOMContentLoaded', function() {
-    init();
-    
-    // 폼 제출 이벤트 리스너 추가
-    document.getElementById('courseForm').addEventListener('submit', handleCourseSubmit);
-    
-    // 키보드 이벤트 리스너 추가
-    document.addEventListener('keydown', handleMatrixKeyboardEdit);
-    
-    // 색상 범례 초기화 (페이지 로드 시)
-    setTimeout(() => {
-        if (typeof updateColorLegendCurriculum === 'function') {
-            updateColorLegendCurriculum();
-        }
-        if (typeof updateColorLegendCommonValues === 'function') {
-            updateColorLegendCommonValues();
-        }
-    }, 100);
-});
+// 페이지 로드 시 초기화 (중복 제거 - window.onload에서 처리함)
 
 // 정렬 기능 처리
 function handleSort(column) {
@@ -6693,6 +6695,8 @@ async function saveCurrentVersion() {
                 JSON.parse(JSON.stringify(commonValuesCellTexts)) : {},
             commonValuesCopiedBlocks: typeof commonValuesCopiedBlocks === 'object' ? 
                 JSON.parse(JSON.stringify(commonValuesCopiedBlocks)) : {},
+            extracurricularMergedTexts: Array.isArray(extracurricularMergedTexts) ? 
+                JSON.parse(JSON.stringify(extracurricularMergedTexts)) : [],
             commonValuesTitleText: localStorage.getItem('commonValuesTitleText') || ''
         },
         
@@ -11737,7 +11741,7 @@ function renderCommonValuesNetworkGraph() {
             } else if (connectedNodeIds.includes(node.id)) {
                 // 🔧 연결된 노드의 과목 정보 가져오기 (비교과 노드 고려)
                 let course = null;
-                let fontColor = '#000000'; // 기본값
+                let fontColor = '#c60000ff'; // 기본값
                 let borderColor = node.color ? node.color.border : '#bdbdbd';
                 
                 // 비교과 노드인지 확인
@@ -12384,7 +12388,6 @@ function renderCommonValuesNetworkGraph() {
     // 🛡️ window.network에 안전하게 할당하여 전역에서 접근 가능하게 함
     if (network && network.body && network.body.data) {
         window.network = network;
-        console.log('네트워크 객체가 전역에 안전하게 할당되었습니다.');
         
             // 🛡️ 네트워크 상태 주기적 검증 시스템
     window.networkHealthCheck = setInterval(() => {
@@ -12470,11 +12473,8 @@ window.showTab = function(tabName, event) {
                             const block = createExtracurricularBlock(text);
                             wrap.appendChild(block);
                         });
-                    } else {
-                        tdRequired.style.textAlign = 'center';
-                        tdRequired.style.fontWeight = 'bold';
-                        tdRequired.innerHTML = '클릭하여 비교과 활동 입력';
                     }
+                    // 비어있을 때도 안내 텍스트 표시하지 않음
                     
                     if (extracurricularMergedTexts && extracurricularMergedTexts.length > 0) {
                         tdRequired.appendChild(wrap);
@@ -12543,11 +12543,8 @@ window.showTab = function(tabName, event) {
                             const block = createExtracurricularBlock(text);
                             wrap.appendChild(block);
                         });
-                    } else {
-                        tdRequired.style.textAlign = 'center';
-                        tdRequired.style.fontWeight = 'bold';
-                        wrap.innerHTML = '비교과 활동은 VALUE 칸 또는 이곳에 입력하세요';
                     }
+                    // 비어있을 때는 아무것도 표시하지 않음 (안내 텍스트 제거)
                     
                     tdRequired.appendChild(wrap);
                 }
@@ -17128,12 +17125,4 @@ window.unhighlightValueGroupInGraph = unhighlightValueGroupInGraph;
 // 파일 끝에서 init 함수를 전역으로 노출
 window.init = init;
 
-// DOM이 준비되면 자동으로 init 실행
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-        init();
-    });
-} else {
-    // DOM이 이미 로드된 경우 즉시 실행
-    init();
-}
+// init()은 window.onload에서 호출되므로 여기서는 제거
