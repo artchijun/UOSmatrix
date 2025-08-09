@@ -11700,35 +11700,8 @@ function renderCommonValuesNetworkGraph() {
         const connectedNodeIds = network.getConnectedNodes(hoveredNodeId);
         let connectedEdgeIds = network.getConnectedEdges(hoveredNodeId);
         
-        // 비교과 노드인 경우, 모든 비교과 관련 엣지를 VALUE 구분 없이 포함
-        if (hoveredNodeId && hoveredNodeId.toString().startsWith('extracurricular-')) {
-            const allNodes = network.body.data.nodes.get();
-            const allEdges = network.body.data.edges.get();
-            
-            // 모든 비교과 노드 ID 찾기
-            const allExtracurricularNodeIds = allNodes
-                .filter(node => node.id && node.id.toString().startsWith('extracurricular-'))
-                .map(node => node.id);
-            
-            // 모든 비교과 노드를 연결된 노드로 추가
-            allExtracurricularNodeIds.forEach(nodeId => {
-                if (!connectedNodeIds.includes(nodeId) && nodeId !== hoveredNodeId) {
-                    connectedNodeIds.push(nodeId);
-                }
-            });
-            
-            // 비교과 관련 모든 엣지 찾기 (VALUE 구분 없이)
-            allEdges.forEach(edge => {
-                // 비교과 엣지거나, 비교과 노드와 연결된 엣지
-                if (edge.isExtracurricular || 
-                    allExtracurricularNodeIds.includes(edge.from) || 
-                    allExtracurricularNodeIds.includes(edge.to)) {
-                    if (!connectedEdgeIds.includes(edge.id)) {
-                        connectedEdgeIds.push(edge.id);
-                    }
-                }
-            });
-        }
+        // 비교과 노드도 다른 과목 분류와 동일하게 처리
+        // 실제 연결된 노드와 엣지만 하이라이트
         
         // 모든 노드와 엣지 가져오기
         const allNodes = network.body.data.nodes.get();
@@ -11777,9 +11750,9 @@ function renderCommonValuesNetworkGraph() {
                 
                 // 비교과 노드인지 확인
                 if (node.id && node.id.startsWith('extracurricular-')) {
-                    // 비교과 노드의 경우 고정 색상 사용
-                    fontColor = '#757575'; // 비교과 노드용 폰트 색상
-                    borderColor = '#757575'; // 비교과 노드용 테두리 색상
+                    // 비교과 노드의 경우 비교과 분류 색상 사용
+                    fontColor = subjectTypeBorderColors['비교과'] || '#8bc34a';
+                    borderColor = subjectTypeBorderColors['비교과'] || '#8bc34a';
                 } else {
                     // 일반 교과목 노드의 경우
                     course = courses.find(c => c.courseName === node.label);
