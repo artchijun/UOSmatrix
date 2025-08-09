@@ -2078,7 +2078,7 @@ th, td, .matrix-table th, .matrix-table td {
     align-items: center;
     text-align: center;
     position: relative;
-    z-index: 1;
+    z-index: 10;
 }
 
 /* 카테고리(구분)별 색상 */
@@ -2130,7 +2130,7 @@ th, td, .matrix-table th, .matrix-table td {
     background: #f1f8e9;
 }
 .course-block-type-unclassified {
-    background: #f6f6f683;
+    background: #f6f6f6;
 }
 .course-block-type-default {
     background: #f5f5f5;
@@ -2248,7 +2248,7 @@ th, td, .matrix-table th, .matrix-table td {
 /* 🌟 개선된 커스텀 교과목 툴팁 스타일 */
 .custom-course-tooltip {
     position: absolute;
-    background: rgba(45, 55, 72, 0.95);
+    background: #2d3748;
     color: #ffffff;
     padding: 10px 14px;
     border-radius: 8px;
@@ -2256,14 +2256,12 @@ th, td, .matrix-table th, .matrix-table td {
     font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-weight: 500;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25), 0 2px 6px rgba(0, 0, 0, 0.15);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
     z-index: 9999;
     min-width: 140px;
     max-width: 280px;
     pointer-events: none;
     transition: opacity 0.2s ease-in-out;
-    opacity: 0.96;
+    opacity: 1;
     line-height: 1.4;
     border: 1px solid rgba(255,255,255,0.12);
     white-space: pre-line;
@@ -2490,7 +2488,7 @@ th, td, .matrix-table th, .matrix-table td {
     font-weight: 500 !important;
     line-height: 1.4 !important;
     padding: 8px 12px !important;
-    background: rgba(45, 55, 72, 0.95) !important;
+    background: #2d3748 !important;
     color: #ffffff !important;
     border: none !important;
     border-radius: 8px !important;
@@ -2533,27 +2531,27 @@ th, td, .matrix-table th, .matrix-table td {
 
 /* 🎨 다양한 테마별 엣지 툴팁 스타일 */
 .vis-tooltip[data-edge-type="yearSemester"] {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.95), rgba(37, 99, 235, 0.95)) !important;
+    background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
     border: 1px solid rgba(59, 130, 246, 0.3) !important;
 }
 
 .vis-tooltip[data-edge-type="subjectType-설계"] {
-    background: linear-gradient(135deg, rgba(158, 158, 158, 0.95), rgba(117, 117, 117, 0.95)) !important;
+    background: linear-gradient(135deg, #9e9e9e, #757575) !important;
     border: 1px solid rgba(158, 158, 158, 0.3) !important;
 }
 
 .vis-tooltip[data-edge-type="subjectType-디지털"] {
-    background: linear-gradient(135deg, rgba(161, 136, 127, 0.95), rgba(141, 110, 99, 0.95)) !important;
+    background: linear-gradient(135deg, #a1887f, #8d6e63) !important;
     border: 1px solid rgba(161, 136, 127, 0.3) !important;
 }
 
 .vis-tooltip[data-edge-type="subjectType-역사"] {
-    background: linear-gradient(135deg, rgba(216, 67, 21, 0.95), rgba(183, 28, 28, 0.95)) !important;
+    background: linear-gradient(135deg, #d84315, #b71c1c) !important;
     border: 1px solid rgba(216, 67, 21, 0.3) !important;
 }
 
 .vis-tooltip[data-edge-type="subjectType-이론"] {
-    background: linear-gradient(135deg, rgba(0, 137, 123, 0.95), rgba(0, 105, 92, 0.95)) !important;
+    background: linear-gradient(135deg, #00897b, #00695c) !important;
     border: 1px solid rgba(0, 137, 123, 0.3) !important;
 }
 
@@ -2605,16 +2603,52 @@ th, td, .matrix-table th, .matrix-table td {
     background: #e8e8e8 !important;
     position: relative;
     font-size: 11px !important;
+    transition: all 0.2s ease !important;
+}
+
+.course-block.ghost:hover {
+    opacity: 0.85 !important;
+    filter: grayscale(0.4) brightness(0.95) !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
+    border: 2px dashed #555 !important;
+    background: #d8d8d8 !important;
 }
 
 .course-block.ghost .course-block-title {
     color: #666 !important;
     font-style: italic !important;
+    transition: color 0.2s ease !important;
+}
+
+.course-block.ghost:hover .course-block-title {
+    color: #333 !important;
 }
 
 .course-block.ghost .course-block-info {
     color: #888 !important;
     font-style: italic !important;
+    transition: color 0.2s ease !important;
+}
+
+.course-block.ghost:hover .course-block-info {
+    color: #555 !important;
+}
+
+/* 화살표 호버 시 고스트 블럭 하이라이트 */
+.course-block.ghost.arrow-hover {
+    opacity: 0.85 !important;
+    filter: grayscale(0.4) brightness(0.95) !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
+    border: 2px dashed #555 !important;
+    background: #d8d8d8 !important;
+}
+
+.course-block.ghost.arrow-hover .course-block-title {
+    color: #333 !important;
+}
+
+.course-block.ghost.arrow-hover .course-block-info {
+    color: #555 !important;
 }
 
 .curriculum-block.highlighted {
