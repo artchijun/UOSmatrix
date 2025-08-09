@@ -176,7 +176,7 @@ window.validateNetworkDataIntegrity = function(network, autoRepair = true) {
             return false;
         }
         
-        console.log(`🛡️ 네트워크 데이터 무결성: 노드 ${nodeIds.size}개, 엣지 ${edges.length}개 (손상 제거: 노드 ${invalidNodes.length}개, 엣지 ${invalidEdges.length}개)`);
+        // 무결성 검사 완료
         return true;
         
     } catch (error) {
@@ -1060,11 +1060,22 @@ function initializeUI() {
     // 공통가치대응 Value 컬럼 이벤트 시스템 초기화
     initializeValueColumnEvents();
     
-    // 🔧 공통가치대응 데이터 구조 초기화
+    // 🔧 공통가치대응 데이터 구조 초기화 (기존 데이터 보존)
     const subjectTypes = ['설계', '디지털', '역사', '이론', '도시', '사회', '기술', '실무', '비교과'];
     subjectTypes.forEach(subjectType => {
         if (!commonValuesCopiedBlocks[subjectType]) {
             commonValuesCopiedBlocks[subjectType] = { value1: [], value2: [], value3: [] };
+        } else {
+            // 기존 데이터가 있는 경우, value1/2/3 속성만 확인하고 없으면 빈 배열로 초기화
+            if (!commonValuesCopiedBlocks[subjectType].value1) {
+                commonValuesCopiedBlocks[subjectType].value1 = [];
+            }
+            if (!commonValuesCopiedBlocks[subjectType].value2) {
+                commonValuesCopiedBlocks[subjectType].value2 = [];
+            }
+            if (!commonValuesCopiedBlocks[subjectType].value3) {
+                commonValuesCopiedBlocks[subjectType].value3 = [];
+            }
         }
     });
     
@@ -8356,7 +8367,7 @@ function renderCommonValuesNetworkGraph() {
         return true;
     });
     
-    console.log(`🛡️ 데이터 검증 완료: 유효한 노드 ${validNodes.length}개, 유효한 엣지 ${validEdges.length}개`);
+    // 데이터 검증 완료
     
     // 🛡️ 안전한 vis-network 인스턴스 생성 (폰트 속성 자동 검증)
     const safeNodeDataSet = window.createSafeVisNetworkDataSet(validNodes);
@@ -8371,12 +8382,12 @@ function renderCommonValuesNetworkGraph() {
             if (network && network.body && network.body.data && network.body.data.nodes) {
                 const nodeCount = network.body.data.nodes.length;
                 const edgeCount = network.body.data.edges.length;
-                console.log(`🛡️ 네트워크 안정화: 노드 ${nodeCount}개, 엣지 ${edgeCount}개`);
+                // 네트워크 안정화 완료
                 
                 // 🛡️ 네트워크 내부 상태 추가 검증
                 if (network.body && network.body.nodes) {
                     const nodeIds = Object.keys(network.body.nodes);
-                    console.log(`🛡️ 네트워크 내부 노드 상태: ${nodeIds.length}개 노드 초기화됨`);
+                    // 네트워크 내부 노드 초기화 완료
                 }
             }
             
@@ -8407,9 +8418,6 @@ function renderCommonValuesNetworkGraph() {
     
     // 🚨 오류 복구 시스템 활성화
     window.setupNetworkErrorRecovery(network);
-    
-    // 🌟 물리 효과 시스템 초기화
-    initializePhysicsEffectsSystem(network, nodes, valueCourseIds);
     
     // 그룹 경계 반발력 시스템
     let boundaryForces = new Map(); // nodeId -> {x, y} force vectors
@@ -11334,8 +11342,6 @@ function renderCommonValuesNetworkGraph() {
                     
                     return true;
                 });
-                
-                console.log(`🛡️ 노드 데이터 검증 완료: ${currentNodes.length}개 유효한 노드`);
             }
         } catch (error) {
             console.warn('노드 데이터 가져오기 실패:', error);
@@ -15432,50 +15438,9 @@ function initializeValueColumnEvents() {
     }
 }
 
-// 🌟 물리 효과 시스템 초기화 함수
-function initializePhysicsEffectsSystem(network, nodes, valueCourseIds) {
-    try {
-        // 필수 매개변수 검증
-        if (!network || !nodes || !valueCourseIds) {
-            console.warn('Physics effects system: Missing required parameters');
-            return;
-        }
-        
-        // 전역 물리 효과 객체 생성
-        window.physicsEffects = new PhysicsEffectsSystem(network, nodes, valueCourseIds);
-        
-        // 물리 효과 제어 패널 생성
-        createPhysicsControlPanel();
-        
-        // 자동 진동 효과 시작
-        window.physicsEffects.startContinuousVibration();
-        
-        // 마우스 이벤트로 폭발 효과 트리거
-        if (network.body && network.body.container) {
-            const container = network.body.container;
-            container.addEventListener('dblclick', function(event) {
-                try {
-                    const rect = container.getBoundingClientRect();
-                    const canvasPos = {
-                        x: event.clientX - rect.left,
-                        y: event.clientY - rect.top
-                    };
-                    
-                    // 더블클릭 위치에서 폭발 효과 트리거
-                    if (window.physicsEffects) {
-                        window.physicsEffects.triggerExplosionAtPosition(canvasPos);
-                    }
-                } catch (e) {
-                    console.warn('Physics effects: Double-click handler error:', e);
-                }
-            });
-        }
-    } catch (error) {
-        console.error('Physics effects system initialization failed:', error);
-    }
-}
 
-// 🌟 물리 효과 시스템 클래스
+// 물리 효과 시스템 제거됨
+/*
 class PhysicsEffectsSystem {
     constructor(network, nodes, valueCourseIds) {
         this.network = network;
@@ -16407,8 +16372,10 @@ class PhysicsEffectsSystem {
         }
     }
 }
+*/
 
-// 🎮 물리 효과 제어 패널 생성
+// 물리 효과 제어 패널 제거됨
+/*
 function createPhysicsControlPanel() {
     // 기존 패널이 있으면 제거
     const existingPanel = document.getElementById('physicsControlPanel');
@@ -16647,8 +16614,10 @@ function setupPhysicsControlEvents() {
         }
     });
 }
+*/
 
-// CSS 애니메이션 추가
+// CSS 애니메이션 제거됨
+/*
 const styleSheet = document.createElement('style');
 styleSheet.textContent = `
     @keyframes explosionWave {
@@ -16724,6 +16693,7 @@ styleSheet.textContent = `
     }
 `;
 document.head.appendChild(styleSheet);
+*/
 
 // 🌟 인터랙티브 레전드 생성 함수
 function createInteractiveLegend() {
