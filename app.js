@@ -11994,65 +11994,8 @@ function renderCommonValuesNetworkGraph() {
             // 현재 네트워크의 모든 노드 가져오기
             const allCurrentNodes = network.body.data.nodes.get();
             
-            // 비교과 엣지인 경우 특별 처리
-            if (edge.isExtracurricular) {
-                // 비교과 엣지: 모든 비교과 노드 하이라이트
-                allCurrentNodes.forEach(currentNode => {
-                    // 원래 스타일 저장 (처음 호버 시에만)
-                    if (!edgeHoverOriginalNodeStyles.has(currentNode.id)) {
-                        edgeHoverOriginalNodeStyles.set(currentNode.id, {
-                            opacity: currentNode.opacity || 1,
-                            font: currentNode.font ? { ...currentNode.font } : { color: '#495057', size: 14 },
-                            color: currentNode.color ? { ...currentNode.color } : undefined,
-                            borderWidth: currentNode.borderWidth || 2
-                        });
-                    }
-                    
-                    // 비교과 노드인지 확인
-                    if (currentNode.id && currentNode.id.toString().startsWith('extracurricular-')) {
-                        // 비교과 노드 하이라이트
-                        highlightNodeIds.push(currentNode.id);
-                        nodeUpdateArray.push({
-                            id: currentNode.id,
-                            opacity: 1,
-                            borderWidth: 4,
-                            color: {
-                                background: currentNode.color ? currentNode.color.background : '#f8f9fa',
-                                border: '#28a745',
-                                highlight: {
-                                    background: currentNode.color ? currentNode.color.background : '#f8f9fa',
-                                    border: '#28a745'
-                                }
-                            },
-                            font: {
-                                color: '#28a745',
-                                size: (currentNode.font && currentNode.font.size) || 14,
-                                face: (currentNode.font && currentNode.font.face) || 'arial'
-                            }
-                        });
-                    } else {
-                        // 비교과가 아닌 노드는 희미하게
-                        dimNodeIds.push(currentNode.id);
-                        nodeUpdateArray.push({
-                            id: currentNode.id,
-                            opacity: 0.3,
-                            font: {
-                                color: 'rgba(73, 80, 87, 0.3)',
-                                size: (currentNode.font && currentNode.font.size) || 14,
-                                face: (currentNode.font && currentNode.font.face) || 'arial'
-                            },
-                            color: {
-                                background: currentNode.color ? currentNode.color.background : '#f8f9fa',
-                                border: currentNode.color ? currentNode.color.border : '#bdbdbd',
-                                highlight: {
-                                    background: currentNode.color ? currentNode.color.background : '#f8f9fa',
-                                    border: currentNode.color ? currentNode.color.border : '#bdbdbd'
-                                }
-                            }
-                        });
-                    }
-                });
-            } else if (edge.dashes === true) {
+            // 점선 엣지인지 확인 (같은 과목분류 연결)
+            if (edge.dashes === true) {
                 // 점선 엣지: 과목분류 기반 하이라이트
                 // title에서 과목분류 추출 (예: "설계 - VALUE1 to VALUE2" 또는 단순히 "설계")
                 let subjectType;
