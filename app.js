@@ -11697,7 +11697,24 @@ function renderCommonValuesNetworkGraph() {
         
         // 연결된 노드와 엣지 찾기
         const connectedNodeIds = network.getConnectedNodes(hoveredNodeId);
-        const connectedEdgeIds = network.getConnectedEdges(hoveredNodeId);
+        let connectedEdgeIds = network.getConnectedEdges(hoveredNodeId);
+        
+        // 비교과 노드인 경우, 연결된 모든 비교과 노드들 사이의 엣지도 포함
+        if (hoveredNodeId && hoveredNodeId.toString().startsWith('extracurricular-')) {
+            const allEdges = network.body.data.edges.get();
+            const extracurricularNodeIds = connectedNodeIds.filter(nodeId => 
+                nodeId && nodeId.toString().startsWith('extracurricular-')
+            );
+            
+            // 비교과 노드들 사이의 모든 엣지 찾기
+            allEdges.forEach(edge => {
+                if (extracurricularNodeIds.includes(edge.from) && extracurricularNodeIds.includes(edge.to)) {
+                    if (!connectedEdgeIds.includes(edge.id)) {
+                        connectedEdgeIds.push(edge.id);
+                    }
+                }
+            });
+        }
         
         // 모든 노드와 엣지 가져오기
         const allNodes = network.body.data.nodes.get();
