@@ -8010,7 +8010,47 @@ function renderCommonValuesNetworkGraph() {
         }
     });
     
-    // 비교과 노드들 사이의 그룹별 연결을 생성하지 않음 (VALUE 구분 제거)
+    // 추가: 비교과 노드들 사이의 분야연결엣지 (점선) 생성
+    const extracurricularGroups = {};
+    nodes.forEach(n => {
+        if (n.isExtracurricular && n.group) {
+            if (!extracurricularGroups[n.group]) extracurricularGroups[n.group] = [];
+            extracurricularGroups[n.group].push(n.id);
+        }
+    });
+    
+    // 비교과 노드들을 서로 다른 그룹끼리 점선으로 연결
+    const extracurricularGroupKeys = Object.keys(extracurricularGroups);
+    if (extracurricularGroupKeys.length > 1) {
+        for (let i = 0; i < extracurricularGroupKeys.length; i++) {
+            for (let j = i + 1; j < extracurricularGroupKeys.length; j++) {
+                const group1 = extracurricularGroupKeys[i];
+                const group2 = extracurricularGroupKeys[j];
+                const group1Nodes = extracurricularGroups[group1];
+                const group2Nodes = extracurricularGroups[group2];
+                
+                // 각 그룹의 노드들을 서로 연결
+                group1Nodes.forEach(nodeId1 => {
+                    group2Nodes.forEach(nodeId2 => {
+                        edges.push({
+                            from: nodeId1,
+                            to: nodeId2,
+                            dashes: true,  // 점선
+                            width: 1.5,
+                            color: { color: '#9e9e9e', opacity: 0.5 },
+                            title: `비교과 연결`,  // VALUE 구분 제거
+                            isExtracurricular: true,  // 비교과 엣지 표시
+                            arrows: { 
+                                to: { enabled: true, scaleFactor: 0.35 },
+                                from: { enabled: true, scaleFactor: 0.35 }
+                            },
+                            smooth: { type: 'curvedCW', roundness: 0.3 }
+                        });
+                    });
+                });
+            }
+        }
+    }
 
     // 네트워크 옵션 (vis-network 기본 스타일 완전 제어)
     const options = {
@@ -11660,16 +11700,29 @@ function renderCommonValuesNetworkGraph() {
         const connectedNodeIds = network.getConnectedNodes(hoveredNodeId);
         let connectedEdgeIds = network.getConnectedEdges(hoveredNodeId);
         
-        // 비교과 노드인 경우, 연결된 모든 비교과 노드들 사이의 엣지도 포함
+        // 비교과 노드인 경우, 모든 비교과 관련 엣지를 VALUE 구분 없이 포함
         if (hoveredNodeId && hoveredNodeId.toString().startsWith('extracurricular-')) {
+            const allNodes = network.body.data.nodes.get();
             const allEdges = network.body.data.edges.get();
-            const extracurricularNodeIds = connectedNodeIds.filter(nodeId => 
-                nodeId && nodeId.toString().startsWith('extracurricular-')
-            );
             
-            // 비교과 노드들 사이의 모든 엣지 찾기
+            // 모든 비교과 노드 ID 찾기
+            const allExtracurricularNodeIds = allNodes
+                .filter(node => node.id && node.id.toString().startsWith('extracurricular-'))
+                .map(node => node.id);
+            
+            // 모든 비교과 노드를 연결된 노드로 추가
+            allExtracurricularNodeIds.forEach(nodeId => {
+                if (!connectedNodeIds.includes(nodeId) && nodeId !== hoveredNodeId) {
+                    connectedNodeIds.push(nodeId);
+                }
+            });
+            
+            // 비교과 관련 모든 엣지 찾기 (VALUE 구분 없이)
             allEdges.forEach(edge => {
-                if (extracurricularNodeIds.includes(edge.from) && extracurricularNodeIds.includes(edge.to)) {
+                // 비교과 엣지거나, 비교과 노드와 연결된 엣지
+                if (edge.isExtracurricular || 
+                    allExtracurricularNodeIds.includes(edge.from) || 
+                    allExtracurricularNodeIds.includes(edge.to)) {
                     if (!connectedEdgeIds.includes(edge.id)) {
                         connectedEdgeIds.push(edge.id);
                     }
