@@ -8109,7 +8109,10 @@ function renderCommonValuesNetworkGraph() {
                     const isDashedEdge = edge && edge.dashes === true;
                     
                     if (selected) {
-                        if (isDashedEdge && edge.title) {
+                        if (edge.isExtracurricular) {
+                            // 비교과 엣지: 비교과 테마색 사용
+                            values.color = '#8bc34a';
+                        } else if (isDashedEdge && edge.title) {
                             // 🔧 점선 엣지: 과목분류색 사용
                             const subjectType = edge.title.trim();
                             const subjectTypeBorderColors = {
@@ -8121,7 +8124,7 @@ function renderCommonValuesNetworkGraph() {
                                 '사회': '#5e35b1',
                                 '기술': '#ef6c00',
                                 '실무': '#43a047',
-                                '비교과': '#757575'
+                                '비교과': '#8bc34a'
                             };
                             values.color = subjectTypeBorderColors[subjectType] || '#4caf50';
                         } else {
@@ -8129,7 +8132,10 @@ function renderCommonValuesNetworkGraph() {
                         }
                         values.width = 3;
                     } else if (hovering) {
-                        if (isDashedEdge && edge.title) {
+                        if (edge.isExtracurricular) {
+                            // 비교과 엣지 호버: 비교과 테마색 사용
+                            values.color = '#8bc34a';
+                        } else if (isDashedEdge && edge.title) {
                             // 🔧 점선 엣지 호버: 과목분류색 사용 (약간 밝게)
                             const subjectType = edge.title.trim();
                             const subjectTypeLightColors = {
@@ -8141,7 +8147,7 @@ function renderCommonValuesNetworkGraph() {
                                 '사회': '#5e35b1',
                                 '기술': '#ef6c00',
                                 '실무': '#43a047',
-                                '비교과': '#757575'
+                                '비교과': '#8bc34a'
                             };
                             values.color = subjectTypeLightColors[subjectType] || '#282828ff';
                         } else {
