@@ -578,6 +578,23 @@ function getCurrentDiffSummary() {
             }
         }
     }
+    
+    // 정렬: 수정 → 추가 → 삭제 순서로 표시
+    summary.sort((a, b) => {
+        const typeOrder = { '수정': 1, '추가': 2, '삭제': 3 };
+        const orderA = typeOrder[a.type] || 999;
+        const orderB = typeOrder[b.type] || 999;
+        
+        if (orderA !== orderB) {
+            return orderA - orderB;
+        }
+        
+        // 같은 타입 내에서는 교과목명 알파벳 순
+        const nameA = a.course.courseName || '';
+        const nameB = b.course.courseName || '';
+        return nameA.localeCompare(nameB, 'ko-KR');
+    });
+    
     return summary;
 }
 
@@ -668,8 +685,8 @@ function renderChangeHistoryPanel() {
         return `<li data-idx='${idx}'>
             <span class=\"change-history-type ${entry.type}\">${entry.type}</span>
             <span class=\"change-history-summary\">${summary}</span>
-            <button class='change-history-apply-btn' title='이 변경 적용'>&#10003;</button>
             <button class='change-history-delete-btn' title='이 변경 되돌리기'>&times;</button>
+            <button class='change-history-apply-btn' title='이 변경 적용'>&#10003;</button>
         </li>`;
     }).join('');
     
@@ -1080,9 +1097,9 @@ function initializeUI() {
     // 🔧 공통가치대응 탭 초기 렌더링 추가
     renderCommonValuesTable();
     
-    // 공통가치대응 탭을 기본으로 시작
-    // localStorage.setItem('uosLastTab', 'commonValues');
-    showTab('commonValues');
+    // 이수모형 탭을 기본으로 시작
+    // localStorage.setItem('uosLastTab', 'curriculum');
+    showTab('curriculum');
     updateCurrentVersionDisplay();
     updateAllVersionLabels();
     updateVersionNavigationButtons();
@@ -6940,12 +6957,9 @@ function restoreVersion(versionName) {
         
         showToast(restoreMessage);
         
-        // 복원된 버전을 현재 탭으로 이동
-        const lastTab = localStorage.getItem('uosLastTab') || 'courses';
-        showTab(lastTab);
-        
-        // 복원된 탭에 시각적 피드백 추가
-        const activeTab = document.querySelector('.tab-button.active');
+        // 현재 활성화된 탭 유지 (탭 전환 제거)
+        // 현재 탭에 시각적 피드백만 추가
+        const activeTab = document.querySelector('.tab.active');
         if (activeTab) {
             // 하이라이트 효과 추가
             activeTab.style.animation = 'restoreHighlight 2s ease-in-out';
@@ -7599,9 +7613,12 @@ function initResizeObserver() {
     }
     
     // 기존 observer가 있으면 안전하게 해제
-    if (resizeObserver && typeof resizeObserver.disconnect === 'function') {
+    if (resizeObserver) {
         try {
-            resizeObserver.disconnect();
+            // ResizeObserver 인스턴스인지 확인
+            if (resizeObserver instanceof ResizeObserver && typeof resizeObserver.disconnect === 'function') {
+                resizeObserver.disconnect();
+            }
         } catch (e) {
             console.warn('Error disconnecting ResizeObserver:', e);
         }
@@ -7643,14 +7660,24 @@ function initResizeObserver() {
 
 // DOM 로드 완료 시 ResizeObserver 초기화
 document.addEventListener('DOMContentLoaded', function() {
-    initResizeObserver();
+    // 약간의 지연을 두고 초기화 (다른 확장 프로그램과의 충돌 방지)
+    setTimeout(() => {
+        try {
+            initResizeObserver();
+        } catch (e) {
+            console.warn('ResizeObserver initialization deferred:', e);
+        }
+    }, 100);
 });
 
 // 페이지 언로드 시 ResizeObserver 정리
 window.addEventListener('beforeunload', function() {
-    if (resizeObserver && typeof resizeObserver.disconnect === 'function') {
+    if (resizeObserver) {
         try {
-            resizeObserver.disconnect();
+            // ResizeObserver 인스턴스인지 확인
+            if (resizeObserver instanceof ResizeObserver && typeof resizeObserver.disconnect === 'function') {
+                resizeObserver.disconnect();
+            }
             resizeObserver = null;
         } catch (e) {
             console.warn('Error cleaning up ResizeObserver:', e);
