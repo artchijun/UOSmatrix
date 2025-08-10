@@ -353,7 +353,7 @@ async function loadDataFromFirebase(path) {
     }
 }
 
-// 로컬 데이터를 Firebase와 동기화
+// 메모리 데이터를 Firebase와 동기화
 async function syncLocalDataToFirebase() {
     if (!firebaseInitialized || !isOnline) {
         return;
@@ -365,45 +365,40 @@ async function syncLocalDataToFirebase() {
 
     
     try {
-        // 버전 데이터 동기화 (버전별 개별 저장)
-        const localVersions = localStorage.getItem('uosVersions');
-        if (localVersions) {
-            const versionsData = JSON.parse(localVersions);
-            
+        // 메모리에 있는 버전 데이터 동기화
+        if (versions && Object.keys(versions).length > 0) {
             // 각 버전을 개별적으로 저장
-            for (const [versionName, versionData] of Object.entries(versionsData)) {
+            for (const [versionName, versionData] of Object.entries(versions)) {
                 await saveDataToFirebase(`versions/${versionName}`, versionData);
             }
             
             // 버전 목록 저장
-            const versionList = Object.keys(versionsData);
+            const versionList = Object.keys(versions);
             await saveDataToFirebase('versionList', versionList);
         }
         
         // 현재 버전 동기화
-        const currentVer = localStorage.getItem('uosCurrentVersion');
-        if (currentVer) {
-            await saveDataToFirebase('currentVersion', currentVer);
+        if (currentVersion) {
+            await saveDataToFirebase('currentVersion', currentVersion);
         }
         
-        // 설정 데이터 동기화
-        const designSettings = localStorage.getItem('designSettings');
-        if (designSettings) {
-            await saveDataToFirebase('settings/design', JSON.parse(designSettings));
+        // 설정 데이터 동기화 (메모리에서)
+        if (window.designSettings) {
+            await saveDataToFirebase('settings/design', window.designSettings);
         }
         
-        // 제목들 동기화
-        const matrixTitle = localStorage.getItem('matrixTitleText');
+        // 제목들 동기화 (DOM에서 직접)
+        const matrixTitle = document.getElementById('matrixTitleText')?.textContent;
         if (matrixTitle) {
             await saveDataToFirebase('settings/matrixTitle', matrixTitle);
         }
         
-        const curriculumTitle = localStorage.getItem('curriculumTitleText');
+        const curriculumTitle = document.getElementById('curriculumTitleText')?.textContent;
         if (curriculumTitle) {
             await saveDataToFirebase('settings/curriculumTitle', curriculumTitle);
         }
         
-        const commonValuesTitle = localStorage.getItem('commonValuesTitleText');
+        const commonValuesTitle = document.getElementById('commonValuesTitleText')?.textContent;
         if (commonValuesTitle) {
             await saveDataToFirebase('settings/commonValuesTitle', commonValuesTitle);
         }
@@ -439,14 +434,14 @@ async function loadAllDataFromFirebase() {
                 }
             }
             
-            // 로컬 스토리지에도 저장
-            localStorage.setItem('uosVersions', JSON.stringify(versions));
+            // 로컬 스토리지 사용 안 함
+            // localStorage.setItem('uosVersions', JSON.stringify(versions));
         } else {
             // 기존 방식으로 전체 버전 데이터 로드 시도
             const firebaseVersions = await loadDataFromFirebase('versions');
             if (firebaseVersions) {
                 versions = firebaseVersions;
-                localStorage.setItem('uosVersions', JSON.stringify(firebaseVersions));
+                // localStorage.setItem('uosVersions', JSON.stringify(firebaseVersions));
             }
         }
         
@@ -454,30 +449,30 @@ async function loadAllDataFromFirebase() {
         const firebaseCurrentVersion = await loadDataFromFirebase('currentVersion');
         if (firebaseCurrentVersion) {
             currentVersion = firebaseCurrentVersion;
-            localStorage.setItem('uosCurrentVersion', firebaseCurrentVersion);
+            // localStorage.setItem('uosCurrentVersion', firebaseCurrentVersion);
         }
         
         // 설정 데이터 로드
         const firebaseDesignSettings = await loadDataFromFirebase('settings/design');
         if (firebaseDesignSettings) {
             designSettings = firebaseDesignSettings;
-            localStorage.setItem('designSettings', JSON.stringify(firebaseDesignSettings));
+            // localStorage.setItem('designSettings', JSON.stringify(firebaseDesignSettings));
         }
         
         // 제목들 로드
         const firebaseMatrixTitle = await loadDataFromFirebase('settings/matrixTitle');
         if (firebaseMatrixTitle) {
-            localStorage.setItem('matrixTitleText', firebaseMatrixTitle);
+            // localStorage.setItem('matrixTitleText', firebaseMatrixTitle);
         }
         
         const firebaseCurriculumTitle = await loadDataFromFirebase('settings/curriculumTitle');
         if (firebaseCurriculumTitle) {
-            localStorage.setItem('curriculumTitleText', firebaseCurriculumTitle);
+            // localStorage.setItem('curriculumTitleText', firebaseCurriculumTitle);
         }
         
         const firebaseCommonValuesTitle = await loadDataFromFirebase('settings/commonValuesTitle');
         if (firebaseCommonValuesTitle) {
-            localStorage.setItem('commonValuesTitleText', firebaseCommonValuesTitle);
+            // localStorage.setItem('commonValuesTitleText', firebaseCommonValuesTitle);
         }
         
         showToast('클라우드에서 데이터를 불러왔습니다.');
@@ -591,7 +586,7 @@ function loadChangeHistory() {
     if (saved) changeHistory = JSON.parse(saved);
 }
 function saveChangeHistory() {
-    localStorage.setItem('changeHistory', JSON.stringify(changeHistory));
+    // localStorage.setItem('changeHistory', JSON.stringify(changeHistory));
 }
 
 function addChangeHistory(type, courseName, changes) {
@@ -884,7 +879,7 @@ function selectLatestVersion() {
     }
     
     // localStorage 업데이트
-    localStorage.setItem('uosCurrentVersion', currentVersion);
+    // localStorage.setItem('uosCurrentVersion', currentVersion);
 }
 
 // 선택된 버전의 데이터를 메모리에 복원
@@ -908,7 +903,7 @@ function restoreSelectedVersionData() {
                 JSON.parse(JSON.stringify(v.matrixTab.matrixData)) : {};
             
             if (v.matrixTab.matrixTitleText) {
-                localStorage.setItem('matrixTitleText', v.matrixTab.matrixTitleText);
+                // localStorage.setItem('matrixTitleText', v.matrixTab.matrixTitleText);
             }
             
             // matrixExtraTableData 복원 (깊은 복사 적용)
@@ -933,7 +928,7 @@ function restoreSelectedVersionData() {
         if (v.curriculumTab) {
             curriculumCellTexts = v.curriculumTab.curriculumCellTexts || {};
             if (v.curriculumTab.curriculumTitleText) {
-                localStorage.setItem('curriculumTitleText', v.curriculumTab.curriculumTitleText);
+                // localStorage.setItem('curriculumTitleText', v.curriculumTab.curriculumTitleText);
             }
         } else {
             // 기존 구조 호환성
@@ -947,7 +942,7 @@ function restoreSelectedVersionData() {
             // 비교과 병합 텍스트 복원 추가
             extracurricularMergedTexts = v.commonValuesTab.extracurricularMergedTexts || [];
             if (v.commonValuesTab.commonValuesTitleText) {
-                localStorage.setItem('commonValuesTitleText', v.commonValuesTab.commonValuesTitleText);
+                // localStorage.setItem('commonValuesTitleText', v.commonValuesTab.commonValuesTitleText);
             }
         } else {
             // 기존 구조 호환성
@@ -1086,7 +1081,7 @@ function initializeUI() {
     renderCommonValuesTable();
     
     // 공통가치대응 탭을 기본으로 시작
-    localStorage.setItem('uosLastTab', 'commonValues');
+    // localStorage.setItem('uosLastTab', 'commonValues');
     showTab('commonValues');
     updateCurrentVersionDisplay();
     updateAllVersionLabels();
@@ -1939,7 +1934,7 @@ function applyHoverEffect(effect) {
 
 // 디자인 설정 저장
 function saveDesignSettings() {
-    localStorage.setItem('designSettings', JSON.stringify(designSettings));
+    // localStorage.setItem('designSettings', JSON.stringify(designSettings));
     
     // Firebase에 저장
     saveDataToFirebase('settings/design', designSettings);
@@ -2144,7 +2139,7 @@ function showTab(tabName, event) {
     }
     
     // 마지막 탭 정보 저장
-    localStorage.setItem('uosLastTab', tabName);
+    // localStorage.setItem('uosLastTab', tabName);
 }
 
 // 교과목 테이블 렌더링
@@ -2981,30 +2976,9 @@ function closeModal() {
     editingIndex = -1;
 }
 
-// X 버튼 클릭 시 확인 후 닫기
+// X 버튼 클릭 시 확인 없이 닫기
 function confirmCloseModal() {
-    const form = document.getElementById('courseForm');
-    let hasChanges = false;
-    
-    // 폼의 모든 입력 필드 확인
-    const inputs = form.querySelectorAll('input, select, textarea');
-    inputs.forEach(input => {
-        if (input.value && input.value.trim() !== '') {
-            // ID 필드는 제외 (자동 생성되는 값)
-            if (input.id !== 'courseId') {
-                hasChanges = true;
-            }
-        }
-    });
-    
-    // 편집 중인 내용이 있으면 확인 메시지 표시
-    if (hasChanges || editingIndex !== -1) {
-        if (confirm('편집 중인 내용이 있습니다. 정말로 닫으시겠습니까?\n저장하지 않은 변경사항은 사라집니다.')) {
-            closeModal();
-        }
-    } else {
-        closeModal();
-    }
+    closeModal();
 }
 
 // 교과목 추가/수정 처리
@@ -3203,33 +3177,13 @@ function initCoursesTableResize() {
     });
 }
 
-// 모달 외부 클릭 시 닫기
+// 모달 외부 클릭 시 닫기 - 외부 클릭 시 아무 반응 없음
 window.onclick = function(event) {
     const modal = document.getElementById('courseModal');
     if (event.target === modal) {
-        // 편집 중인 내용이 있는지 확인
-        const form = document.getElementById('courseForm');
-        let hasChanges = false;
-        
-        // 폼의 모든 입력 필드 확인
-        const inputs = form.querySelectorAll('input, select, textarea');
-        inputs.forEach(input => {
-            if (input.value && input.value.trim() !== '') {
-                // ID 필드는 제외 (자동 생성되는 값)
-                if (input.id !== 'courseId') {
-                    hasChanges = true;
-                }
-            }
-        });
-        
-        // 편집 중인 내용이 있으면 확인 메시지 표시
-        if (hasChanges || editingIndex !== -1) {
-            if (confirm('편집 중인 내용이 있습니다. 정말로 닫으시겠습니까?\n저장하지 않은 변경사항은 사라집니다.')) {
-                closeModal();
-            }
-        } else {
-            closeModal();
-        }
+        // 외부 클릭 시 아무 작업도 하지 않음
+        // 모달을 닫지 않고 유지
+        return;
     }
 }
 
@@ -3723,7 +3677,7 @@ function handleCurriculumTitleInput() {
         }
         
         // localStorage에 즉시 저장
-        localStorage.setItem('curriculumTitleText', newTitle);
+        // localStorage.setItem('curriculumTitleText', newTitle);
         
         showToast('제목이 임시 저장되었습니다. 버전 저장 버튼을 눌러주세요.');
     }
@@ -4270,7 +4224,7 @@ function handleMatrixTitleInput() {
     
     if (newTitle !== oldTitle) {
         // localStorage에 저장
-        localStorage.setItem('matrixTitleText', newTitle);
+        // localStorage.setItem('matrixTitleText', newTitle);
         
         // 임시 저장소에 변경사항 기록
         if (!tempMatrixData._titleChanged) {
@@ -4959,8 +4913,20 @@ function createCourseBlock(course, isDeleted = false, isGhost = false) {
     
     // 커스텀 툴팁 이벤트 추가 (ghost 블록 제외)
     if (!isGhost) {
-        block.addEventListener('mouseenter', (e) => showCourseTooltip(e, course));
-        block.addEventListener('mouseleave', hideCourseTooltip);
+        block.addEventListener('mouseenter', (e) => {
+            showCourseTooltip(e, course);
+            
+            // 변경된 블럭인 경우 변경이력 팝업의 해당 항목 하이라이트
+            if (block.classList.contains('modified') || block.classList.contains('highlighted') || block.classList.contains('deleted')) {
+                highlightChangeHistoryItem(course.id);
+            }
+        });
+        block.addEventListener('mouseleave', () => {
+            hideCourseTooltip();
+            
+            // 하이라이트 제거
+            removeChangeHistoryHighlight();
+        });
         block.addEventListener('mousemove', moveCourseTooltip);
     }
 
@@ -5093,6 +5059,56 @@ function getCourseTooltipHTML(course) {
         ${course.description ? `<div class="tooltip-row"><b>상세내용</b>: ${course.description}</div>` : ''}
         <div class="tooltip-row"><b>수행평가기준</b>:<br>${performanceCriteria.fullText.replace(/, /g, '<br>')}</div>
     `;
+}
+
+// --- 변경이력 팝업 하이라이트 함수들 ---
+function highlightChangeHistoryItem(courseId) {
+    // 변경이력 패널이 열려있는지 확인
+    const changeHistoryPanel = document.getElementById('changeHistoryPanel');
+    if (!changeHistoryPanel || changeHistoryPanel.style.display === 'none') {
+        return;
+    }
+    
+    // 변경이력 리스트 가져오기
+    const panelList = document.getElementById('changeHistoryPanelList');
+    if (!panelList) return;
+    
+    // 현재 diff summary 가져오기
+    const diffSummary = getCurrentDiffSummary();
+    if (!diffSummary || diffSummary.length === 0) return;
+    
+    // 해당 courseId와 일치하는 항목 찾기
+    const historyItems = panelList.querySelectorAll('li');
+    historyItems.forEach((item, index) => {
+        const entry = diffSummary[index];
+        if (entry && entry.course && entry.course.id === courseId) {
+            // 하이라이트 적용
+            item.classList.add('highlighted-history-item');
+            item.style.backgroundColor = '#fff3cd';
+            item.style.border = '2px solid #ffc107';
+            item.style.borderRadius = '4px';
+            item.style.padding = '8px';
+            item.style.transition = 'all 0.3s ease';
+            
+            // 스크롤하여 해당 항목이 보이도록
+            item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    });
+}
+
+function removeChangeHistoryHighlight() {
+    // 변경이력 패널의 모든 하이라이트 제거
+    const panelList = document.getElementById('changeHistoryPanelList');
+    if (!panelList) return;
+    
+    const highlightedItems = panelList.querySelectorAll('.highlighted-history-item');
+    highlightedItems.forEach(item => {
+        item.classList.remove('highlighted-history-item');
+        item.style.backgroundColor = '';
+        item.style.border = '';
+        item.style.borderRadius = '';
+        item.style.padding = '';
+    });
 }
 
 // --- 기존 코드(createCourseBlock 등) 아래에 유지 ---
@@ -5801,7 +5817,7 @@ function updateCurriculumFontSize() {
     }
     
     // localStorage에 저장
-    localStorage.setItem('currentCurriculumFontSize', currentCurriculumFontSize.toString());
+    // localStorage.setItem('currentCurriculumFontSize', currentCurriculumFontSize.toString());
     
     // 화살표 즉시 업데이트
     setTimeout(() => {
@@ -6110,36 +6126,8 @@ function exportCurriculumToPDF() {
 // 모든 버전 데이터 로드
 function loadAllVersions() {
     try {
-        // 먼저 일반 방식으로 저장된 버전 데이터 로드 시도
-        const savedVersions = localStorage.getItem('uosVersions');
-        if (savedVersions) {
-            versions = JSON.parse(savedVersions);
-        } else {
-            // 분할 저장된 버전 데이터 로드 시도
-            const versionsList = localStorage.getItem('uosVersionsList');
-            if (versionsList) {
-                const versionNames = JSON.parse(versionsList);
-                versions = {};
-                
-                // 각 버전 데이터 로드
-                versionNames.forEach(vName => {
-                    const versionData = localStorage.getItem(`uosVersion_${vName}`);
-                    if (versionData) {
-                        const parsedData = JSON.parse(versionData);
-                        Object.assign(versions, parsedData);
-                    }
-                });
-                
-            }
-        }
-        
-        // 현재 버전 로드 (Firebase에서 로드되지 않은 경우에만)
-        if (!currentVersion) {
-            const savedCurrentVersion = localStorage.getItem('uosCurrentVersion');
-            if (savedCurrentVersion) {
-                currentVersion = savedCurrentVersion;
-            }
-        }
+        // 로컬 스토리지 사용 안 함 - 메모리에 있는 데이터만 사용
+        // versions 객체는 이미 Firebase에서 로드되었거나 메모리에 있음
         
         // Firebase에서 로드되지 않은 경우 최근 버전 자동 선택
         if (!currentVersion || currentVersion === '기본') {
@@ -6252,8 +6240,8 @@ function saveCurrentVersion() {
     };
     
     versions[currentVersion] = versionData;
-    localStorage.setItem('uosVersions', JSON.stringify(versions));
-    localStorage.setItem('uosCurrentVersion', currentVersion);
+    // localStorage.setItem('uosVersions', JSON.stringify(versions));
+    // localStorage.setItem('uosCurrentVersion', currentVersion);
     
     // Firebase에 저장
     saveDataToFirebase('versions', versions);
@@ -6495,7 +6483,7 @@ async function saveVersionData(event) {
         
         // 로컬 스토리지에 저장 (용량 문제 방지를 위해 분할 저장)
         try {
-    localStorage.setItem('uosVersions', JSON.stringify(versions));
+    // localStorage.setItem('uosVersions', JSON.stringify(versions));
         } catch (storageError) {
             
             // 용량이 너무 크면 분할 저장 시도
@@ -6503,11 +6491,11 @@ async function saveVersionData(event) {
                 // 현재 버전만 따로 저장
                 const singleVersionData = {};
                 singleVersionData[versionName] = versions[versionName];
-                localStorage.setItem(`uosVersion_${versionName}`, JSON.stringify(singleVersionData));
+                // localStorage.setItem(`uosVersion_${versionName}`, JSON.stringify(singleVersionData));
                 
                 // 버전 목록만 저장
                 const versionsList = Object.keys(versions);
-                localStorage.setItem('uosVersionsList', JSON.stringify(versionsList));
+                // localStorage.setItem('uosVersionsList', JSON.stringify(versionsList));
                 
                 alert('버전 데이터가 커서 분할 저장되었습니다.');
             } catch (splitError) {
@@ -6517,7 +6505,7 @@ async function saveVersionData(event) {
         }
     
     currentVersion = versionName;
-    localStorage.setItem('uosCurrentVersion', currentVersion);
+    // localStorage.setItem('uosCurrentVersion', currentVersion);
     
     // Firebase에 버전별로 개별 저장
     if (firebaseInitialized && isOnline) {
@@ -6723,7 +6711,7 @@ async function saveCurrentVersion() {
     
     // 로컬 스토리지에 저장 (용량 문제 방지를 위해 분할 저장)
     try {
-        localStorage.setItem('uosVersions', JSON.stringify(versions));
+        // localStorage.setItem('uosVersions', JSON.stringify(versions));
     } catch (storageError) {
         
         // 용량이 너무 크면 분할 저장 시도
@@ -6744,7 +6732,7 @@ async function saveCurrentVersion() {
         }
     }
     
-    localStorage.setItem('uosCurrentVersion', currentVersion);
+    // localStorage.setItem('uosCurrentVersion', currentVersion);
     
     // Firebase에 버전별로 개별 저장
     if (firebaseInitialized && isOnline) {
@@ -6909,7 +6897,7 @@ function restoreVersion(versionName) {
         
         // 현재 버전 업데이트
         currentVersion = versionName;
-        localStorage.setItem('uosCurrentVersion', currentVersion);
+        // localStorage.setItem('uosCurrentVersion', currentVersion);
         
         // 모든 탭 렌더링
         renderCourses();
@@ -6988,7 +6976,7 @@ async function deleteVersion(versionName) {
     }
     
     delete versions[versionName];
-    localStorage.setItem('uosVersions', JSON.stringify(versions));
+    // localStorage.setItem('uosVersions', JSON.stringify(versions));
     
     // Firebase에서 개별 버전 삭제
     if (firebaseInitialized && isOnline) {
@@ -7008,7 +6996,7 @@ async function deleteVersion(versionName) {
     // 현재 버전이 삭제된 경우 기본 버전으로 변경
     if (currentVersion === versionName) {
         currentVersion = '기본';
-        localStorage.setItem('uosCurrentVersion', currentVersion);
+        // localStorage.setItem('uosCurrentVersion', currentVersion);
         
         // Firebase에서도 현재 버전 업데이트
         if (firebaseInitialized && isOnline) {
@@ -8760,7 +8748,7 @@ function renderCommonValuesNetworkGraph() {
         const sizeMultiplier = 1 + (valueGroupCount * 0.1); // 10%씩 증가
         n.widthConstraint = { 
             minimum: Math.round(80 * sizeMultiplier), 
-            maximum: Math.round(180 * sizeMultiplier) 
+            maximum: Math.round(180 * sizeMultiplier)
         };
         n.heightConstraint = { 
             minimum: Math.round(30 * sizeMultiplier), 
@@ -15123,8 +15111,8 @@ function importVersionsFromFile() {
                 }
                 
                 // localStorage에 저장
-                localStorage.setItem('uosVersions', JSON.stringify(versions));
-                localStorage.setItem('uosCurrentVersion', currentVersion);
+                // localStorage.setItem('uosVersions', JSON.stringify(versions));
+                // localStorage.setItem('uosCurrentVersion', currentVersion);
                 
                 // 버전 관리 모달이 열려있다면 버전 목록 새로고침
                 const versionManagerModal = document.getElementById('versionManagerModal');
@@ -15712,7 +15700,7 @@ function handleCommonValuesTitleInput() {
         }
         
         // localStorage에 즉시 저장
-        localStorage.setItem('commonValuesTitleText', newTitle);
+        // localStorage.setItem('commonValuesTitleText', newTitle);
         
         showToast('제목이 임시 저장되었습니다. 버전 저장 버튼을 눌러주세요.');
     }
