@@ -7119,13 +7119,24 @@ function getMovedCoursesForGhost() {
 
 // 화살표 초기화 함수
 function clearMoveArrows() {
-    const svgContainer = document.getElementById('moveArrowsSvg');
-    if (svgContainer) {
-        svgContainer.innerHTML = '';
+    const canvasContainer = document.getElementById('moveArrowsCanvas');
+    if (canvasContainer) {
+        canvasContainer.remove();
+    }
+    
+    const hoverCanvas = document.getElementById('moveArrowsHoverCanvas');
+    if (hoverCanvas) {
+        hoverCanvas.remove();
+    }
+    
+    // 애니메이션 중지
+    if (window.arrowAnimationFrame) {
+        cancelAnimationFrame(window.arrowAnimationFrame);
+        window.arrowAnimationFrame = null;
     }
 }
 
-// 이동된 교과목 화살표 그리기 함수 (최적화된 버전)
+// 이동된 교과목 화살표 그리기 함수 (Canvas 기반)
 function drawMoveArrows(movedCoursesForGhost) {
     const curriculumTable = document.querySelector('.curriculum-table');
     
@@ -7133,60 +7144,20 @@ function drawMoveArrows(movedCoursesForGhost) {
     window.movedCoursesForGhost = movedCoursesForGhost;
     
     if (!curriculumTable || movedCoursesForGhost.length === 0) {
+        clearMoveArrows();
         return;
     }
     
-    // SVG 컨테이너 생성 또는 가져오기
-    let svgContainer = document.getElementById('moveArrowsSvg');
-    if (!svgContainer) {
-        svgContainer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svgContainer.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-        svgContainer.setAttribute('version', '1.1');
-        svgContainer.id = 'moveArrowsSvg';
-        svgContainer.style.position = 'absolute';
-        svgContainer.style.top = '0';
-        svgContainer.style.left = '0';
-        svgContainer.style.width = '100%';
-        svgContainer.style.height = '100%';
-        svgContainer.style.pointerEvents = 'none';
-        svgContainer.style.zIndex = '1';
-        
-        // 화살표 머리 정의를 위한 defs 요소 추가
-        const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-        
-        // 기본 화살표 머리 (회색)
-        const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
-        marker.id = 'arrowhead';
-        marker.setAttribute('markerWidth', '12');
-        marker.setAttribute('markerHeight', '10');
-        marker.setAttribute('refX', '10');
-        marker.setAttribute('refY', '5');
-        marker.setAttribute('orient', 'auto');
-        marker.setAttribute('markerUnits', 'strokeWidth');
-        
-        const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-        polygon.setAttribute('points', '0 0, 10 5, 0 10');
-        polygon.setAttribute('fill', '#bdbdbd');
-        marker.appendChild(polygon);
-        defs.appendChild(marker);
-        
-        // 호버 시 화살표 머리 (진한 회색)
-        const markerHover = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
-        markerHover.id = 'arrowhead-hover';
-        markerHover.setAttribute('markerWidth', '12');
-        markerHover.setAttribute('markerHeight', '10');
-        markerHover.setAttribute('refX', '10');
-        markerHover.setAttribute('refY', '5');
-        markerHover.setAttribute('orient', 'auto');
-        markerHover.setAttribute('markerUnits', 'strokeWidth');
-        
-        const polygonHover = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-        polygonHover.setAttribute('points', '0 0, 10 5, 0 10');
-        polygonHover.setAttribute('fill', '#888');
-        markerHover.appendChild(polygonHover);
-        defs.appendChild(markerHover);
-        
-        svgContainer.appendChild(defs);
+    // 기본 Canvas 컨테이너 생성 (일반 화살표용)
+    let canvasContainer = document.getElementById('moveArrowsCanvas');
+    if (!canvasContainer) {
+        canvasContainer = document.createElement('canvas');
+        canvasContainer.id = 'moveArrowsCanvas';
+        canvasContainer.style.position = 'absolute';
+        canvasContainer.style.top = '0';
+        canvasContainer.style.left = '0';
+        canvasContainer.style.pointerEvents = 'none';
+        canvasContainer.style.zIndex = '1';
         
         // 이수모형 컨테이너에 상대 위치 설정
         const curriculumContent = document.getElementById('curriculum');
@@ -7194,14 +7165,48 @@ function drawMoveArrows(movedCoursesForGhost) {
             const tableContainer = curriculumContent.querySelector('.table-container');
             if (tableContainer) {
                 tableContainer.style.position = 'relative';
-                tableContainer.appendChild(svgContainer);
+                tableContainer.appendChild(canvasContainer);
             }
         }
-    } else {
-        // 기존 화살표 제거 (defs는 유지)
-        const existingPaths = svgContainer.querySelectorAll('path');
-        existingPaths.forEach(path => path.remove());
     }
+    
+    // 호버용 Canvas 컨테이너 생성 (하이라이트된 화살표용 - 상위 레이어)
+    let hoverCanvas = document.getElementById('moveArrowsHoverCanvas');
+    if (!hoverCanvas) {
+        hoverCanvas = document.createElement('canvas');
+        hoverCanvas.id = 'moveArrowsHoverCanvas';
+        hoverCanvas.style.position = 'absolute';
+        hoverCanvas.style.top = '0';
+        hoverCanvas.style.left = '0';
+        hoverCanvas.style.pointerEvents = 'none';
+        hoverCanvas.style.zIndex = '1000'; // 다른 요소들보다 위에 표시
+        
+        const curriculumContent = document.getElementById('curriculum');
+        if (curriculumContent) {
+            const tableContainer = curriculumContent.querySelector('.table-container');
+            if (tableContainer) {
+                tableContainer.appendChild(hoverCanvas);
+            }
+        }
+    }
+    
+    // Canvas 크기 설정
+    const tableContainer = document.querySelector('.curriculum-table').closest('.table-container');
+    if (!tableContainer) return;
+    
+    const containerRect = tableContainer.getBoundingClientRect();
+    canvasContainer.width = containerRect.width;
+    canvasContainer.height = containerRect.height;
+    hoverCanvas.width = containerRect.width;
+    hoverCanvas.height = containerRect.height;
+    
+    const ctx = canvasContainer.getContext('2d');
+    const hoverCtx = hoverCanvas.getContext('2d');
+    ctx.clearRect(0, 0, canvasContainer.width, canvasContainer.height);
+    hoverCtx.clearRect(0, 0, hoverCanvas.width, hoverCanvas.height);
+    
+    // 화살표 데이터 저장 (호버 효과용)
+    window.arrowData = [];
     
     movedCoursesForGhost.forEach((moveInfo, index) => {
         // 고스트 블럭 위치는 순전히 초기 상태로만 계산
@@ -7214,16 +7219,178 @@ function drawMoveArrows(movedCoursesForGhost) {
             const newCell = document.getElementById(newCellId);
             
             if (originalCell && newCell) {
-                drawArrowBetweenCells(svgContainer, originalCell, newCell, index, moveInfo);
+                drawArrowBetweenCells(ctx, containerRect, originalCell, newCell, index, moveInfo);
             }
+        }
+    });
+    
+    // 애니메이션 시작
+    startArrowAnimation();
+}
+
+// Canvas 기반 화살표 호버 이벤트 설정
+function setupArrowHoverEvents(fromGhostBlock, toCurrentBlock) {
+    // 고스트 블럭 호버 시
+    fromGhostBlock.addEventListener('mouseenter', function() {
+        window.hoveredArrow = window.arrowData.find(arrow => 
+            arrow.fromGhostBlock === fromGhostBlock
+        );
+        fromGhostBlock.classList.add('arrow-hover');
+    });
+    
+    fromGhostBlock.addEventListener('mouseleave', function() {
+        window.hoveredArrow = null;
+        fromGhostBlock.classList.remove('arrow-hover');
+    });
+    
+    // 현재 블럭 호버 시
+    toCurrentBlock.addEventListener('mouseenter', function() {
+        window.hoveredArrow = window.arrowData.find(arrow => 
+            arrow.toCurrentBlock === toCurrentBlock
+        );
+        const arrow = window.arrowData.find(arrow => 
+            arrow.toCurrentBlock === toCurrentBlock
+        );
+        if (arrow && arrow.fromGhostBlock) {
+            arrow.fromGhostBlock.classList.add('arrow-hover');
+        }
+    });
+    
+    toCurrentBlock.addEventListener('mouseleave', function() {
+        window.hoveredArrow = null;
+        const arrow = window.arrowData.find(arrow => 
+            arrow.toCurrentBlock === toCurrentBlock
+        );
+        if (arrow && arrow.fromGhostBlock) {
+            arrow.fromGhostBlock.classList.remove('arrow-hover');
         }
     });
 }
 
-// 두 교과목 블럭 사이에 화살표 그리기 (최적화된 버전)
-function drawArrowBetweenCells(svgContainer, fromCell, toCell, index, moveInfo) {
-    const tableContainer = document.querySelector('.curriculum-table').closest('.table-container');
-    if (!tableContainer) {
+// 화살표 애니메이션
+function startArrowAnimation() {
+    let offset = 0;
+    
+    function animate() {
+        const canvas = document.getElementById('moveArrowsCanvas');
+        const hoverCanvas = document.getElementById('moveArrowsHoverCanvas');
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        const hoverCtx = hoverCanvas ? hoverCanvas.getContext('2d') : null;
+        
+        // 두 Canvas 모두 클리어
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (hoverCtx) {
+            hoverCtx.clearRect(0, 0, hoverCanvas.width, hoverCanvas.height);
+        }
+        
+        // 모든 화살표 그리기
+        if (window.arrowData) {
+            // 일반 화살표와 호버된 화살표 분리
+            const normalArrows = [];
+            const hoveredArrows = [];
+            
+            window.arrowData.forEach(arrow => {
+                if (window.hoveredArrow === arrow) {
+                    hoveredArrows.push(arrow);
+                } else {
+                    normalArrows.push(arrow);
+                }
+            });
+            
+            // 일반 화살표 그리기 (하위 Canvas)
+            normalArrows.forEach(arrow => {
+                drawArrow(ctx, arrow, offset, false);
+            });
+            
+            // 호버된 화살표 그리기 (상위 Canvas)
+            if (hoverCtx && hoveredArrows.length > 0) {
+                hoveredArrows.forEach(arrow => {
+                    drawArrow(hoverCtx, arrow, offset, true);
+                });
+            }
+        }
+        
+        // 애니메이션 오프셋 업데이트
+        offset += 0.2;
+        if (offset >= 9) offset = 0;
+        
+        window.arrowAnimationFrame = requestAnimationFrame(animate);
+    }
+    
+    // 화살표 그리기 헬퍼 함수
+    function drawArrow(ctx, arrow, offset, isHovered) {
+        // 베지어 곡선 그리기
+        ctx.beginPath();
+        ctx.moveTo(arrow.fromX, arrow.fromY);
+        ctx.bezierCurveTo(arrow.cp1X, arrow.cp1Y, arrow.cp2X, arrow.cp2Y, arrow.toX, arrow.toY);
+        
+        // 호버 상태에 따른 스타일
+        if (isHovered) {
+            ctx.strokeStyle = 'rgba(100, 100, 100, 1)'; // 적당히 진한 회색
+            ctx.lineWidth = 1.2; // 살짝 두꺼운 선
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+            ctx.shadowBlur = 6;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 2;
+        } else {
+            ctx.strokeStyle = 'rgba(189, 189, 189, 0.85)';
+            ctx.lineWidth = 1.2;
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+        }
+        
+        // 점선 패턴 설정 (애니메이션 효과)
+        ctx.setLineDash([4, 5]);
+        ctx.lineDashOffset = -offset;
+        ctx.stroke();
+        
+        // 화살표 머리 그리기
+        const angle = Math.atan2(arrow.toY - arrow.cp2Y, arrow.toX - arrow.cp2X);
+        const arrowLength = isHovered ? 10 : 10;
+        const arrowAngle = Math.PI / 6;
+        
+        // 그림자 설정 (화살표 머리용)
+        if (isHovered) {
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+            ctx.shadowBlur = 6;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 2;
+        }
+        
+        ctx.beginPath();
+        ctx.moveTo(arrow.toX, arrow.toY);
+        ctx.lineTo(
+            arrow.toX - arrowLength * Math.cos(angle - arrowAngle),
+            arrow.toY - arrowLength * Math.sin(angle - arrowAngle)
+        );
+        ctx.lineTo(
+            arrow.toX - arrowLength * Math.cos(angle + arrowAngle),
+            arrow.toY - arrowLength * Math.sin(angle + arrowAngle)
+        );
+        ctx.closePath();
+        
+        if (isHovered) {
+            ctx.fillStyle = 'rgba(100, 100, 100, 1)'; // 적당히 진한 회색
+        } else {
+            ctx.fillStyle = 'rgba(189, 189, 189, 0.85)';
+        }
+        ctx.fill();
+        
+        // 그림자 제거
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+    }
+    
+    animate();
+}
+
+// 두 교과목 블럭 사이에 화살표 그리기 (Canvas 버전)
+function drawArrowBetweenCells(ctx, containerRect, fromCell, toCell, index, moveInfo) {
+    if (!ctx || !containerRect) {
         return;
     }
     
@@ -7265,7 +7432,6 @@ function drawArrowBetweenCells(svgContainer, fromCell, toCell, index, moveInfo) 
         return;
     }
     
-    const containerRect = tableContainer.getBoundingClientRect();
     const fromRect = fromGhostBlock.getBoundingClientRect();
     const toRect = toCurrentBlock.getBoundingClientRect();
     
@@ -7279,11 +7445,11 @@ function drawArrowBetweenCells(svgContainer, fromCell, toCell, index, moveInfo) 
     const fromEdge = getRectEdgePoint(fromRect, toCenterX, toCenterY);
     const toEdge = getRectEdgePoint(toRect, fromCenterX, fromCenterY);
     
-    // 항상 테두리에서 테두리로 연결
-    let fromX = fromEdge.x - containerRect.left;
-    let fromY = fromEdge.y - containerRect.top;
-    let toX = toEdge.x - containerRect.left;
-    let toY = toEdge.y - containerRect.top;
+    // Canvas 좌표로 변환
+    const fromX = fromEdge.x - containerRect.left;
+    const fromY = fromEdge.y - containerRect.top;
+    const toX = toEdge.x - containerRect.left;
+    const toY = toEdge.y - containerRect.top;
     
     // 연결점이 유효한지 확인
     if (isNaN(fromX) || isNaN(fromY) || isNaN(toX) || isNaN(toY)) {
@@ -7330,340 +7496,75 @@ function drawArrowBetweenCells(svgContainer, fromCell, toCell, index, moveInfo) 
         cp2X = toX;
         cp2Y = toY - (deltaY > 0 ? controlPointOffset : -controlPointOffset);
     }
-
-    // 끝점을 약간 짧게 조정하여 화살표 머리가 보이도록 함
-    const adjustDistance = 2; // 화살표 머리를 위한 최소 공간
-    const totalDistance = Math.sqrt((toX - fromX) ** 2 + (toY - fromY) ** 2);
     
-    // 거리가 너무 짧거나 유효하지 않으면 리턴
-    if (totalDistance < adjustDistance || isNaN(totalDistance) || totalDistance === 0) {
-        return;
-    }
+    // Canvas로 베지어 곡선 그리기
+    ctx.beginPath();
+    ctx.moveTo(fromX, fromY);
+    ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, toX, toY);
     
-    const ratio = (totalDistance - adjustDistance) / totalDistance;
+    // 화살표 스타일 설정
+    ctx.strokeStyle = 'rgba(189, 189, 189, 0.85)';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([4, 5]); // 점선 패턴
+    ctx.stroke();
     
-    // 조정된 끝점 계산
-    const adjustedToX = fromX + (toX - fromX) * ratio;
-    const adjustedToY = fromY + (toY - fromY) * ratio;
+    // 화살표 머리 그리기
+    const angle = Math.atan2(toY - cp2Y, toX - cp2X);
+    const arrowLength = 10;
+    const arrowAngle = Math.PI / 6;
     
-    // 조정된 컨트롤 포인트
-    const adjustedCp2X = cp2X - (toX - adjustedToX) * 0.8;
-    const adjustedCp2Y = cp2Y - (toY - adjustedToY) * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(toX, toY);
+    ctx.lineTo(
+        toX - arrowLength * Math.cos(angle - arrowAngle),
+        toY - arrowLength * Math.sin(angle - arrowAngle)
+    );
+    ctx.lineTo(
+        toX - arrowLength * Math.cos(angle + arrowAngle),
+        toY - arrowLength * Math.sin(angle + arrowAngle)
+    );
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(189, 189, 189, 0.85)';
+    ctx.fill();
     
-    // 모든 값이 유효한지 확인
-    if (isNaN(fromX) || isNaN(fromY) || isNaN(cp1X) || isNaN(cp1Y) || 
-        isNaN(adjustedCp2X) || isNaN(adjustedCp2Y) || isNaN(adjustedToX) || isNaN(adjustedToY)) {
-        console.warn('Invalid arrow coordinates detected');
-        return;
-    }
-    
-    // 패스(곡선) 생성 - Cubic Bezier Curve 사용
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    const pathData = `M ${fromX} ${fromY} C ${cp1X} ${cp1Y}, ${adjustedCp2X} ${adjustedCp2Y}, ${adjustedToX} ${adjustedToY}`;
-    path.setAttribute('d', pathData);
-    path.setAttribute('stroke', '#bdbdbd');
-    path.setAttribute('stroke-width', '1.2');
-    path.setAttribute('stroke-linecap', 'butt');  // round 대신 butt 사용
-    path.setAttribute('stroke-linejoin', 'round');
-    path.setAttribute('fill', 'none');
-    path.setAttribute('opacity', '0.85');
-    path.setAttribute('stroke-dasharray', '5,4');
-    path.style.filter = 'drop-shadow(0 2px 6px rgba(189,189,189,0.13))';
-    path.style.cursor = 'pointer';
-    path.style.pointerEvents = 'stroke';
-    
-    // 화살표 머리를 직접 그리기
-    const arrowSize = 8;
-    const angle = Math.atan2(adjustedToY - adjustedCp2Y, adjustedToX - adjustedCp2X);
-    
-    let arrowPath = null;
-    // angle이 유효한지 확인
-    if (!isNaN(angle)) {
-        arrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        const x1 = adjustedToX - arrowSize * Math.cos(angle - Math.PI / 6);
-        const y1 = adjustedToY - arrowSize * Math.sin(angle - Math.PI / 6);
-        const x2 = adjustedToX - arrowSize * Math.cos(angle + Math.PI / 6);
-        const y2 = adjustedToY - arrowSize * Math.sin(angle + Math.PI / 6);
-        
-        // 화살표 머리 좌표가 유효한지 확인
-        if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
-            const arrowData = `M ${x1} ${y1} L ${adjustedToX} ${adjustedToY} L ${x2} ${y2}`;
-            arrowPath.setAttribute('d', arrowData);
-            arrowPath.setAttribute('stroke', '#bdbdbd');
-            arrowPath.setAttribute('stroke-width', '1.2');
-            arrowPath.setAttribute('stroke-linecap', 'round');
-            arrowPath.setAttribute('stroke-linejoin', 'round');
-            arrowPath.setAttribute('fill', 'none');
-            arrowPath.setAttribute('opacity', '0.85');
-            arrowPath.style.cursor = 'pointer';
-            arrowPath.classList.add('curriculum-arrow-head');
-        } else {
-            arrowPath = null; // 유효하지 않은 좌표면 null로 설정
-        }
-    }
-    
-    // 화살표에 고유 클래스와 데이터 속성 추가
-    path.classList.add('curriculum-arrow');
-    path.setAttribute('data-course-name', targetCourseName);
-    path.setAttribute('data-from-cell', fromCell.id);
-    path.setAttribute('data-to-cell', toCell.id);
-    
-    // 고스트 블럭에 호버 이벤트 리스너 추가
-    fromGhostBlock.addEventListener('mouseenter', function() {
-        // 해당 화살표 하이라이트 - 색만 진하게
-        path.setAttribute('stroke', '#888');
-        path.setAttribute('stroke-width', '1.5');
-        path.setAttribute('opacity', '1');
-        path.style.filter = 'drop-shadow(0 2px 6px rgba(0,0,0,0.2))';
-        path.style.zIndex = '1000';  // 화살표를 앞으로
-        
-        // 화살표 머리도 하이라이트
-        if (arrowPath) {
-            arrowPath.setAttribute('stroke', '#888');
-            arrowPath.setAttribute('stroke-width', '1.5');
-            arrowPath.setAttribute('opacity', '1');
-        }
-        
-        // SVG 컨테이너도 앞으로
-        const svgContainer = path.parentElement;
-        if (svgContainer) {
-            svgContainer.style.zIndex = '1000';
-        }
+    // 화살표 데이터 저장 (호버 효과용)
+    window.arrowData.push({
+        fromX, fromY, toX, toY,
+        cp1X, cp1Y, cp2X, cp2Y,
+        fromGhostBlock, toCurrentBlock,
+        moveInfo
     });
     
-    fromGhostBlock.addEventListener('mouseleave', function() {
-        // 화살표 원래 스타일로 복원
-        path.setAttribute('stroke', '#bdbdbd');
-        path.setAttribute('stroke-width', '1.2');
-        path.setAttribute('opacity', '0.85');
-        path.style.filter = 'drop-shadow(0 2px 6px rgba(189,189,189,0.13))';
-        path.style.zIndex = '';  // 기본 z-index로
-        
-        // 화살표 머리도 원래 스타일로
-        if (arrowPath) {
-            arrowPath.setAttribute('stroke', '#bdbdbd');
-            arrowPath.setAttribute('stroke-width', '1.2');
-            arrowPath.setAttribute('opacity', '0.85');
-        }
-        
-        // SVG 컨테이너도 뒤로
-        const svgContainer = path.parentElement;
-        if (svgContainer) {
-            svgContainer.style.zIndex = '1';
-        }
-    });
-    
-    // 화살표 자체에도 호버 효과 추가
-    path.addEventListener('mouseenter', function() {
-        this.setAttribute('stroke', '#888');
-        this.setAttribute('stroke-width', '1.5');
-        this.setAttribute('opacity', '1');
-        this.style.filter = 'drop-shadow(0 2px 6px rgba(0,0,0,0.2))';
-        this.style.zIndex = '1000';  // 화살표를 앞으로
-        
-        // 화살표 머리도 하이라이트
-        if (arrowPath) {
-            arrowPath.setAttribute('stroke', '#888');
-            arrowPath.setAttribute('stroke-width', '1.5');
-            arrowPath.setAttribute('opacity', '1');
-        }
-        
-        // SVG 컨테이너도 앞으로
-        const svgContainer = this.parentElement;
-        if (svgContainer) {
-            svgContainer.style.zIndex = '1000';
-        }
-        
-        // 연결된 고스트 블럭도 하이라이트 - hover 클래스 추가
-        fromGhostBlock.classList.add('arrow-hover');
-    });
-    
-    path.addEventListener('mouseleave', function() {
-        this.setAttribute('stroke', '#bdbdbd');
-        this.setAttribute('stroke-width', '1.2');
-        this.setAttribute('opacity', '0.85');
-        this.style.filter = 'drop-shadow(0 2px 6px rgba(189,189,189,0.13))';
-        this.style.zIndex = '';  // 기본 z-index로
-        
-        // 화살표 머리도 원래 스타일로
-        if (arrowPath) {
-            arrowPath.setAttribute('stroke', '#bdbdbd');
-            arrowPath.setAttribute('stroke-width', '1.2');
-            arrowPath.setAttribute('opacity', '0.85');
-        }
-        
-        // SVG 컨테이너도 뒤로
-        const svgContainer = this.parentElement;
-        if (svgContainer) {
-            svgContainer.style.zIndex = '1';
-        }
-        
-        // 고스트 블럭 hover 클래스 제거
-        fromGhostBlock.classList.remove('arrow-hover');
-    });
-    
-    // 화살표 머리에도 같은 호버 효과 추가
-    if (arrowPath) {
-        arrowPath.addEventListener('mouseenter', function() {
-            path.setAttribute('stroke', '#888');
-            path.setAttribute('stroke-width', '1.5');
-            path.setAttribute('opacity', '1');
-            this.setAttribute('stroke', '#888');
-            this.setAttribute('stroke-width', '1.5');
-            this.setAttribute('opacity', '1');
-            fromGhostBlock.classList.add('arrow-hover');
-        });
-        
-        arrowPath.addEventListener('mouseleave', function() {
-            path.setAttribute('stroke', '#bdbdbd');
-            path.setAttribute('stroke-width', '1.2');
-            path.setAttribute('opacity', '0.85');
-            this.setAttribute('stroke', '#bdbdbd');
-            this.setAttribute('stroke-width', '1.2');
-            this.setAttribute('opacity', '0.85');
-            fromGhostBlock.classList.remove('arrow-hover');
-        });
-    }
-    
-    // 현재 위치의 교과목 블럭에도 호버 효과 추가
-    toCurrentBlock.addEventListener('mouseenter', function() {
-        // 화살표 하이라이트
-        path.setAttribute('stroke', '#888');
-        path.setAttribute('stroke-width', '1.5');
-        path.setAttribute('opacity', '1');
-        path.style.filter = 'drop-shadow(0 2px 6px rgba(0,0,0,0.2))';
-        path.style.zIndex = '1000';  // 화살표를 앞으로
-        
-        // 화살표 머리도 하이라이트
-        if (arrowPath) {
-            arrowPath.setAttribute('stroke', '#888');
-            arrowPath.setAttribute('stroke-width', '1.5');
-            arrowPath.setAttribute('opacity', '1');
-        }
-        
-        // SVG 컨테이너도 앞으로
-        const svgContainer = path.parentElement;
-        if (svgContainer) {
-            svgContainer.style.zIndex = '1000';
-        }
-        
-        // 고스트 블럭 하이라이트
-        fromGhostBlock.classList.add('arrow-hover');
-    });
-    
-    toCurrentBlock.addEventListener('mouseleave', function() {
-        // 화살표 원래 스타일로 복원
-        path.setAttribute('stroke', '#bdbdbd');
-        path.setAttribute('stroke-width', '1.2');
-        path.setAttribute('opacity', '0.85');
-        path.style.filter = 'drop-shadow(0 2px 6px rgba(189,189,189,0.13))';
-        path.style.zIndex = '';  // 기본 z-index로
-        
-        // 화살표 머리도 원래 스타일로
-        if (arrowPath) {
-            arrowPath.setAttribute('stroke', '#bdbdbd');
-            arrowPath.setAttribute('stroke-width', '1.2');
-            arrowPath.setAttribute('opacity', '0.85');
-        }
-        
-        // SVG 컨테이너도 뒤로
-        const svgContainer = path.parentElement;
-        if (svgContainer) {
-            svgContainer.style.zIndex = '1';
-        }
-        
-        // 고스트 블럭 스타일 복원
-        fromGhostBlock.classList.remove('arrow-hover');
-    });
-    
-    // 애니메이션(점선 이동 효과)
-    const animate = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
-    animate.setAttribute('attributeName', 'stroke-dashoffset');
-    animate.setAttribute('values', '0;-9');
-    animate.setAttribute('dur', '1.6s');
-    animate.setAttribute('repeatCount', 'indefinite');
-    path.appendChild(animate);
-    
-    // SVG 컨테이너에 패스와 화살표 머리 추가
-    svgContainer.appendChild(path);
-    if (arrowPath) {
-        svgContainer.appendChild(arrowPath);
-    }
+    // 고스트 블럭과 현재 블럭에 호버 이벤트 추가
+    setupArrowHoverEvents(fromGhostBlock, toCurrentBlock);
 }
 
 // 리사이즈 디바운스를 위한 타이머
 let resizeTimer;
 
-// 화살표만 다시 그리는 함수
+// 화살표만 다시 그리는 함수 (Canvas 버전)
 function updateArrowsOnly() {
     const curriculumTab = document.getElementById('curriculum');
     if (!curriculumTab || curriculumTab.style.display === 'none') {
         return;
     }
     
-    // 기존 SVG 컨테이너만 업데이트
-    const svgContainer = document.getElementById('moveArrowsSvg');
-    if (svgContainer) {
-        // 기존 화살표들만 제거 (defs는 유지하거나 재생성)
-        const existingPaths = svgContainer.querySelectorAll('path');
-        existingPaths.forEach(path => path.remove());
-        
-        // defs가 없으면 다시 생성
-        let defs = svgContainer.querySelector('defs');
-        if (!defs) {
-            defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-            
-            // 기본 화살표 머리 (회색)
-            const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
-            marker.id = 'arrowhead';
-            marker.setAttribute('markerWidth', '12');
-            marker.setAttribute('markerHeight', '10');
-            marker.setAttribute('refX', '10');
-            marker.setAttribute('refY', '5');
-            marker.setAttribute('orient', 'auto');
-            marker.setAttribute('markerUnits', 'strokeWidth');
-            
-            const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            polygon.setAttribute('points', '0 0, 10 5, 0 10');
-            polygon.setAttribute('fill', '#bdbdbd');
-            marker.appendChild(polygon);
-            defs.appendChild(marker);
-            
-            // 호버 시 화살표 머리 (진한 회색)
-            const markerHover = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
-            markerHover.id = 'arrowhead-hover';
-            markerHover.setAttribute('markerWidth', '12');
-            markerHover.setAttribute('markerHeight', '10');
-            markerHover.setAttribute('refX', '10');
-            markerHover.setAttribute('refY', '5');
-            markerHover.setAttribute('orient', 'auto');
-            markerHover.setAttribute('markerUnits', 'strokeWidth');
-            
-            const polygonHover = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            polygonHover.setAttribute('points', '0 0, 10 5, 0 10');
-            polygonHover.setAttribute('fill', '#888');
-            markerHover.appendChild(polygonHover);
-            defs.appendChild(markerHover);
-            
-            svgContainer.appendChild(defs);
-        }
-        
-        // 화살표만 다시 그리기
-        if (window.movedCoursesForGhost && window.movedCoursesForGhost.length > 0) {
-            window.movedCoursesForGhost.forEach((moveInfo, index) => {
-                const originalCellId = getCurriculumCellId(moveInfo.initialCourse);
-                const newCellId = getCurriculumCellId(moveInfo.currentCourse);
-                
-                if (originalCellId !== newCellId) {
-                    const originalCell = document.getElementById(originalCellId);
-                    const newCell = document.getElementById(newCellId);
-                    
-                    if (originalCell && newCell) {
-                        drawArrowBetweenCells(svgContainer, originalCell, newCell, index, moveInfo);
-                    }
-                }
-            });
-        }
+    // 저장된 화살표 데이터로 다시 그리기
+    if (window.movedCoursesForGhost && window.movedCoursesForGhost.length > 0) {
+        drawMoveArrows(window.movedCoursesForGhost);
+    }
+}
+
+// 화살표만 다시 그리는 함수 (Canvas 버전)
+function updateArrowsOnly() {
+    const curriculumTab = document.getElementById('curriculum');
+    if (!curriculumTab || curriculumTab.style.display === 'none') {
+        return;
+    }
+    
+    // 저장된 화살표 데이터로 다시 그리기
+    if (window.movedCoursesForGhost && window.movedCoursesForGhost.length > 0) {
+        drawMoveArrows(window.movedCoursesForGhost);
     }
 }
 
@@ -7679,31 +7580,10 @@ window.addEventListener('resize', function() {
         // 이전 타이머 취소
         clearTimeout(resizeTimer);
         
-        // 테이블과 화살표 임시 숨기기 (깜빡임 방지)
-        const svgContainer = document.getElementById('moveArrowsSvg');
-        const curriculumTable = document.querySelector('.curriculum-table');
-        
-        if (svgContainer) {
-            svgContainer.style.opacity = '0';
-            svgContainer.style.transition = 'opacity 0.1s ease';
-        }
-        
-        if (curriculumTable) {
-            curriculumTable.style.opacity = '0.7';
-            curriculumTable.style.transition = 'opacity 0.1s ease';
-        }
-        
         // 디바운스로 리사이즈 완료 후 전체 재렌더링
         resizeTimer = setTimeout(() => {
             // 이수모형표 전체 재렌더링
             renderCurriculumTable();
-            
-            // 테이블 다시 표시
-            const curriculumTableAfter = document.querySelector('.curriculum-table');
-            if (curriculumTableAfter) {
-                curriculumTableAfter.style.opacity = '1';
-                curriculumTableAfter.style.transition = 'opacity 0.2s ease';
-            }
         }, 250);
     }
 });
@@ -7719,7 +7599,7 @@ function initResizeObserver() {
     }
     
     // 기존 observer가 있으면 안전하게 해제
-    if (resizeObserver) {
+    if (resizeObserver && typeof resizeObserver.disconnect === 'function') {
         try {
             resizeObserver.disconnect();
         } catch (e) {
@@ -7728,27 +7608,37 @@ function initResizeObserver() {
         resizeObserver = null;
     }
     
-    // 새로운 ResizeObserver 생성
-    resizeObserver = new ResizeObserver(entries => {
-        const curriculumTab = document.getElementById('curriculum');
-        const curriculumTabBtn = document.querySelector('.tab-btn[onclick*="curriculum"]');
-        
-        // 이수모형 탭이 활성화되어 있는지 확인
-        if ((curriculumTab && curriculumTab.style.display !== 'none') || 
-            (curriculumTabBtn && curriculumTabBtn.classList.contains('active'))) {
+    // ResizeObserver가 지원되는지 확인
+    if (typeof ResizeObserver !== 'undefined') {
+        try {
+            // 새로운 ResizeObserver 생성
+            resizeObserver = new ResizeObserver(entries => {
+                const curriculumTab = document.getElementById('curriculum');
+                const curriculumTabBtn = document.querySelector('.tab-btn[onclick*="curriculum"]');
+                
+                // 이수모형 탭이 활성화되어 있는지 확인
+                if ((curriculumTab && curriculumTab.style.display !== 'none') || 
+                    (curriculumTabBtn && curriculumTabBtn.classList.contains('active'))) {
+                    
+                    // 디바운스 처리
+                    clearTimeout(resizeTimer);
+                    
+                    resizeTimer = setTimeout(() => {
+                        // 이수모형표 재렌더링
+                        renderCurriculumTable();
+                    }, 250);
+                }
+            });
             
-            // 디바운스 처리
-            clearTimeout(resizeTimer);
-            
-            resizeTimer = setTimeout(() => {
-                // 이수모형표 재렌더링
-                renderCurriculumTable();
-            }, 250);
+            // curriculum 컨텐츠 관찰 시작
+            resizeObserver.observe(curriculumContent);
+        } catch (e) {
+            console.warn('Error creating ResizeObserver:', e);
+            resizeObserver = null;
         }
-    });
-    
-    // curriculum 컨텐츠 관찰 시작
-    resizeObserver.observe(curriculumContent);
+    } else {
+        console.info('ResizeObserver not supported, using window resize event as fallback');
+    }
 }
 
 // DOM 로드 완료 시 ResizeObserver 초기화
@@ -7758,7 +7648,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 페이지 언로드 시 ResizeObserver 정리
 window.addEventListener('beforeunload', function() {
-    if (resizeObserver) {
+    if (resizeObserver && typeof resizeObserver.disconnect === 'function') {
         try {
             resizeObserver.disconnect();
             resizeObserver = null;
