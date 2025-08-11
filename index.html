@@ -998,13 +998,34 @@
     
     <!-- 전체 버전 관리 모달 -->
     <div id="versionManagerModal" class="modal">
-        <div class="modal-content" style="max-width: 700px;">
-            <div class="modal-header">
+        <div class="modal-content" id="versionManagerContent" style="width: 700px; height: 500px; max-width: 90vw; max-height: 90vh; min-width: 400px; min-height: 300px; position: relative; resize: none;">
+            <div class="modal-header" id="versionManagerHeader" style="cursor: move;">
                 <h2>버전 관리</h2>
                 <button class="close-btn" onclick="closeVersionManager()">&times;</button>
             </div>
-            <div id="versionList" style="max-height: 400px; overflow-y: auto; margin-bottom: 20px;"></div>
-            <div style="display: flex; gap: 10px; justify-content: space-between;">
+            <div id="versionList" style="height: calc(100% - 140px); overflow-y: auto; margin-bottom: 20px;"></div>
+            
+            <!-- 왼쪽 아래 리사이저 -->
+            <div id="versionManagerResizerLeft" style="position:absolute;bottom:0;left:0;width:16px;height:16px;cursor:sw-resize;z-index:1003;">
+                <div style="position:absolute;bottom:3px;left:3px;width:2px;height:2px;background:#999;border-radius:50%;"></div>
+                <div style="position:absolute;bottom:3px;left:7px;width:2px;height:2px;background:#999;border-radius:50%;"></div>
+                <div style="position:absolute;bottom:3px;left:11px;width:2px;height:2px;background:#999;border-radius:50%;"></div>
+                <div style="position:absolute;bottom:7px;left:3px;width:2px;height:2px;background:#999;border-radius:50%;"></div>
+                <div style="position:absolute;bottom:7px;left:7px;width:2px;height:2px;background:#999;border-radius:50%;"></div>
+                <div style="position:absolute;bottom:11px;left:3px;width:2px;height:2px;background:#999;border-radius:50%;"></div>
+            </div>
+            
+            <!-- 오른쪽 아래 리사이저 -->
+            <div id="versionManagerResizerRight" style="position:absolute;bottom:0;right:0;width:16px;height:16px;cursor:se-resize;z-index:1003;">
+                <div style="position:absolute;bottom:3px;right:3px;width:2px;height:2px;background:#999;border-radius:50%;"></div>
+                <div style="position:absolute;bottom:3px;right:7px;width:2px;height:2px;background:#999;border-radius:50%;"></div>
+                <div style="position:absolute;bottom:3px;right:11px;width:2px;height:2px;background:#999;border-radius:50%;"></div>
+                <div style="position:absolute;bottom:7px;right:3px;width:2px;height:2px;background:#999;border-radius:50%;"></div>
+                <div style="position:absolute;bottom:7px;right:7px;width:2px;height:2px;background:#999;border-radius:50%;"></div>
+                <div style="position:absolute;bottom:11px;right:3px;width:2px;height:2px;background:#999;border-radius:50%;"></div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: space-between; position: absolute; bottom: 10px; left: 10px; right: 10px;">
                 <button class="btn btn-primary" onclick="importVersionsFromFile()">
                     📁 버전 파일 불러오기
                 </button>
@@ -1398,6 +1419,135 @@ function mergeMatrixExtraData() {
   <div class="spinner"></div>
   <div style="margin-top:20px; font-size:18px; color:#333;">동기화 중입니다...</div>
 </div>
+
+<script>
+// 버전 관리 모달 드래그 및 리사이즈 기능
+(function() {
+    const modal = document.getElementById('versionManagerModal');
+    const content = document.getElementById('versionManagerContent');
+    const header = document.getElementById('versionManagerHeader');
+    const leftResizer = document.getElementById('versionManagerResizerLeft');
+    const rightResizer = document.getElementById('versionManagerResizerRight');
+    
+    if (!content || !header) return;
+    
+    let isDragging = false;
+    let isResizingLeft = false;
+    let isResizingRight = false;
+    let startX = 0, startY = 0;
+    let startWidth = 0, startHeight = 0;
+    let startLeft = 0, startTop = 0;
+    
+    // 드래그 기능
+    header.addEventListener('mousedown', function(e) {
+        if (e.target.tagName === 'BUTTON') return;
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        const rect = content.getBoundingClientRect();
+        startLeft = rect.left;
+        startTop = rect.top;
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+    
+    // 왼쪽 리사이저
+    if (leftResizer) {
+        leftResizer.addEventListener('mousedown', function(e) {
+            isResizingLeft = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            const rect = content.getBoundingClientRect();
+            startWidth = rect.width;
+            startHeight = rect.height;
+            startLeft = rect.left;
+            startTop = rect.top;
+            document.body.style.userSelect = 'none';
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    }
+    
+    // 오른쪽 리사이저
+    if (rightResizer) {
+        rightResizer.addEventListener('mousedown', function(e) {
+            isResizingRight = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            const rect = content.getBoundingClientRect();
+            startWidth = rect.width;
+            startHeight = rect.height;
+            startLeft = rect.left;
+            startTop = rect.top;
+            document.body.style.userSelect = 'none';
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    }
+    
+    document.addEventListener('mousemove', function(e) {
+        if (isDragging) {
+            const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
+            
+            let newLeft = startLeft + deltaX;
+            let newTop = startTop + deltaY;
+            
+            // 화면 밖으로 나가지 않도록 제한
+            newLeft = Math.max(0, Math.min(window.innerWidth - content.offsetWidth, newLeft));
+            newTop = Math.max(0, Math.min(window.innerHeight - content.offsetHeight, newTop));
+            
+            content.style.left = newLeft + 'px';
+            content.style.top = newTop + 'px';
+            content.style.transform = 'none';
+            content.style.position = 'fixed';
+        }
+        
+        if (isResizingLeft) {
+            const deltaX = startX - e.clientX;
+            const deltaY = e.clientY - startY;
+            
+            let newWidth = startWidth + deltaX;
+            let newHeight = startHeight + deltaY;
+            let newLeft = startLeft - deltaX;
+            
+            // 최소/최대 크기 제한
+            newWidth = Math.max(400, Math.min(window.innerWidth * 0.9, newWidth));
+            newHeight = Math.max(300, Math.min(window.innerHeight * 0.9, newHeight));
+            
+            if (newWidth >= 400) {
+                content.style.width = newWidth + 'px';
+                content.style.left = newLeft + 'px';
+            }
+            if (newHeight >= 300) {
+                content.style.height = newHeight + 'px';
+            }
+        }
+        
+        if (isResizingRight) {
+            const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
+            
+            let newWidth = startWidth + deltaX;
+            let newHeight = startHeight + deltaY;
+            
+            // 최소/최대 크기 제한
+            newWidth = Math.max(400, Math.min(window.innerWidth * 0.9, newWidth));
+            newHeight = Math.max(300, Math.min(window.innerHeight * 0.9, newHeight));
+            
+            content.style.width = newWidth + 'px';
+            content.style.height = newHeight + 'px';
+        }
+    });
+    
+    document.addEventListener('mouseup', function() {
+        isDragging = false;
+        isResizingLeft = false;
+        isResizingRight = false;
+        document.body.style.userSelect = '';
+    });
+})();
+</script>
 
 </body>
 </html>

@@ -427,6 +427,12 @@ async function loadAllDataFromFirebase() {
             currentVersion = firebaseCurrentVersion;
         }
         
+        // 버전 순서 로드
+        const firebaseVersionOrder = await loadDataFromFirebase('versionOrder');
+        if (firebaseVersionOrder && Array.isArray(firebaseVersionOrder)) {
+            localStorage.setItem('versionOrder', JSON.stringify(firebaseVersionOrder));
+        }
+        
         // 설정 데이터 로드
         const firebaseDesignSettings = await loadDataFromFirebase('settings/design');
         if (firebaseDesignSettings) {
@@ -7959,14 +7965,27 @@ function getDragAfterElement(container, y) {
 }
 
 // 버전 순서 저장
-function saveVersionOrder() {
+async function saveVersionOrder() {
     const versionList = document.getElementById('versionList');
     if (!versionList) return;
     
     const versionItems = versionList.querySelectorAll('.version-item');
     const order = Array.from(versionItems).map(item => item.dataset.versionName);
     
+    // localStorage에 저장
     localStorage.setItem('versionOrder', JSON.stringify(order));
+    
+    // Firebase에도 저장
+    if (firebaseInitialized && isOnline) {
+        try {
+            await saveDataToFirebase('versionOrder', order);
+            showToast('버전 순서가 저장되었습니다.');
+        } catch (error) {
+            showToast('버전 순서가 로컬에만 저장되었습니다.');
+        }
+    } else {
+        showToast('버전 순서가 로컬에 저장되었습니다.');
+    }
 }
 
 // 버전 관리 모달 닫기
