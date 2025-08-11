@@ -170,16 +170,45 @@ h1 {
     justify-content: space-between;
     align-items: center;
     padding: 5px;
+    padding-left: 25px;
     border: 1px solid #dee2e6;
     border-radius: 8px;
     margin-bottom: 10px;
     background: white;
     transition: all 0.2s ease;
+    position: relative;
+    cursor: move;
 }
 
 .version-item:hover {
     border-color: #4a90e2;
     box-shadow: 0 2px 8px rgba(74, 144, 226, 0.1);
+}
+
+.version-item[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.version-item.dragging {
+    opacity: 0.4;
+    transform: scale(0.98);
+}
+
+.version-drag-handle {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    cursor: grab;
+}
+
+.version-drag-handle:active {
+    cursor: grabbing;
 }
 
 .version-item-info {

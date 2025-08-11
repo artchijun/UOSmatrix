@@ -7760,12 +7760,46 @@ function renderVersionList() {
     
     versionList.innerHTML = '';
     
-    // 버전을 날짜순으로 정렬 (최신순)
-    const versionEntries = Object.entries(versions).map(([name, data]) => {
-        const metadata = data.metadata || {};
-        const timestamp = metadata.timestamp || new Date(metadata.saveDate || 0).getTime();
-        return { name, data, timestamp };
-    }).sort((a, b) => b.timestamp - a.timestamp);
+    // 버전 순서가 저장되어 있으면 사용, 없으면 날짜순으로 정렬
+    let versionEntries;
+    const savedOrder = localStorage.getItem('versionOrder');
+    
+    if (savedOrder) {
+        const orderArray = JSON.parse(savedOrder);
+        
+        // 저장된 순서에 없는 새 버전들을 먼저 수집 (최신순)
+        const newVersions = [];
+        Object.entries(versions).forEach(([name, data]) => {
+            if (!orderArray.includes(name)) {
+                const metadata = data.metadata || {};
+                const timestamp = metadata.timestamp || new Date(metadata.saveDate || 0).getTime();
+                newVersions.push({ name, data, timestamp });
+            }
+        });
+        
+        // 새 버전들을 날짜순으로 정렬 (최신이 위로)
+        newVersions.sort((a, b) => b.timestamp - a.timestamp);
+        
+        // 기존 저장된 순서의 버전들
+        const existingVersions = orderArray
+            .filter(name => versions[name]) // 존재하는 버전만 필터링
+            .map(name => {
+                const data = versions[name];
+                const metadata = data.metadata || {};
+                const timestamp = metadata.timestamp || new Date(metadata.saveDate || 0).getTime();
+                return { name, data, timestamp };
+            });
+        
+        // 새 버전들을 맨 위에, 그 다음 기존 순서대로
+        versionEntries = [...newVersions, ...existingVersions];
+    } else {
+        // 기본: 날짜순으로 정렬 (최신순)
+        versionEntries = Object.entries(versions).map(([name, data]) => {
+            const metadata = data.metadata || {};
+            const timestamp = metadata.timestamp || new Date(metadata.saveDate || 0).getTime();
+            return { name, data, timestamp };
+        }).sort((a, b) => b.timestamp - a.timestamp);
+    }
     
     if (versionEntries.length === 0) {
         versionList.innerHTML = '<p style="text-align: center; color: #6c757d; padding: 20px;">저장된 버전이 없습니다.</p>';
@@ -7820,12 +7854,17 @@ function renderVersionList() {
         
         const versionItem = document.createElement('div');
         versionItem.className = 'version-item';
+        versionItem.draggable = true;
+        versionItem.dataset.versionName = name;
         if (name === currentVersion) {
             versionItem.classList.add('current-version');
         }
         
         versionItem.innerHTML = `
-            <div class="version-item-info">
+            <div class="version-drag-handle" style="cursor: move; position: absolute; left: 0; top: 0; bottom: 0; width: 20px; display: flex; align-items: center; justify-content: center; color: #999;">
+                <span style="font-size: 18px;">⋮⋮</span>
+            </div>
+            <div class="version-item-info" style="margin-left: 25px;">
                 <div class="version-item-name">
                     ${name} ${name === currentVersion ? '<span class="badge bg-success">현재</span>' : ''}
                 </div>
@@ -7850,6 +7889,84 @@ function renderVersionList() {
         
         versionList.appendChild(versionItem);
     });
+    
+    // 드래그 앤 드롭 이벤트 핸들러 추가
+    setupVersionDragAndDrop();
+}
+
+// 버전 드래그 앤 드롭 설정
+function setupVersionDragAndDrop() {
+    const versionList = document.getElementById('versionList');
+    if (!versionList) return;
+    
+    let draggedItem = null;
+    
+    const versionItems = versionList.querySelectorAll('.version-item');
+    
+    versionItems.forEach(item => {
+        item.addEventListener('dragstart', function(e) {
+            draggedItem = this;
+            this.style.opacity = '0.5';
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        
+        item.addEventListener('dragend', function(e) {
+            this.style.opacity = '';
+            draggedItem = null;
+        });
+        
+        item.addEventListener('dragover', function(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            e.dataTransfer.dropEffect = 'move';
+            
+            const afterElement = getDragAfterElement(versionList, e.clientY);
+            if (afterElement == null) {
+                versionList.appendChild(draggedItem);
+            } else {
+                versionList.insertBefore(draggedItem, afterElement);
+            }
+        });
+        
+        item.addEventListener('drop', function(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+            
+            // 새로운 순서 저장
+            saveVersionOrder();
+            
+            return false;
+        });
+    });
+}
+
+// 드래그 위치 계산 헬퍼 함수
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.version-item:not(.dragging)')];
+    
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+// 버전 순서 저장
+function saveVersionOrder() {
+    const versionList = document.getElementById('versionList');
+    if (!versionList) return;
+    
+    const versionItems = versionList.querySelectorAll('.version-item');
+    const order = Array.from(versionItems).map(item => item.dataset.versionName);
+    
+    localStorage.setItem('versionOrder', JSON.stringify(order));
 }
 
 // 버전 관리 모달 닫기
