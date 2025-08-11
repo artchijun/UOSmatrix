@@ -1040,8 +1040,6 @@ function initializeUI() {
     renderCurriculumTable();
     setupCurriculumDropZones(); // 드롭 영역 설정 추가
     updateCurriculumFontSize(); // 이수모형 폰트 크기 초기화 추가
-    // 이수모형 버전 라벨 업데이트 (현재 버전 표시)
-    updateCurriculumVersionLabel();
     renderMatrixExtraTable(); // matrix-extra-table 렌더링 추가
     
     // 공통가치대응 Value 컬럼 이벤트 시스템 초기화
@@ -3793,13 +3791,7 @@ function cancelCurriculumCellEdit(cell, originalContent) {
     cell.textContent = originalContent;
 }
 
-// 이수모형 버전 라벨 업데이트
-function updateCurriculumVersionLabel() {
-    const label = document.getElementById('curriculumVersionLabel');
-    if (label) {
-        label.textContent = `[이수모형 개정: ${currentVersion}]`;
-    }
-}
+// 이수모형 버전 라벨 업데이트 - 제거됨 (updateAllVersionLabels로 통합)
 
 // 수행평가 기준 텍스트 생성
 function getPerformanceCriteria(matrixValues) {
@@ -7692,17 +7684,45 @@ function showVersionManager() {
     }
 }
 
+// 버전 순서 가져오기 (버전 관리 모달과 동일한 순서)
+function getVersionOrder() {
+    const savedOrder = localStorage.getItem('versionOrder');
+    
+    if (savedOrder) {
+        const orderArray = JSON.parse(savedOrder);
+        
+        // 저장된 순서에 없는 새 버전들을 먼저 수집 (최신순)
+        const newVersions = [];
+        Object.entries(versions).forEach(([name, data]) => {
+            if (!orderArray.includes(name)) {
+                const metadata = data.metadata || {};
+                const timestamp = metadata.timestamp || new Date(metadata.saveDate || 0).getTime();
+                newVersions.push({ name, timestamp });
+            }
+        });
+        
+        // 새 버전들을 날짜순으로 정렬 (최신이 위로)
+        newVersions.sort((a, b) => b.timestamp - a.timestamp);
+        
+        // 새 버전들을 맨 위에, 그 다음 기존 순서대로
+        const finalOrder = [...newVersions.map(v => v.name), ...orderArray.filter(name => versions[name])];
+        return finalOrder;
+    } else {
+        // 기본: 날짜순으로 정렬 (최신순)
+        return Object.entries(versions)
+            .map(([name, data]) => {
+                const metadata = data.metadata || {};
+                const timestamp = metadata.timestamp || new Date(metadata.saveDate || 0).getTime();
+                return { name, timestamp };
+            })
+            .sort((a, b) => b.timestamp - a.timestamp)
+            .map(v => v.name);
+    }
+}
+
 // 이전 버전으로 이동
 function previousVersion() {
-    // 버전명을 저장 시각 기준 오름차순(과거→최신)으로 정렬
-    const versionNames = Object.entries(versions)
-        .map(([name, data]) => {
-            const metadata = data.metadata || {};
-            const timestamp = metadata.timestamp || new Date(metadata.saveDate || 0).getTime();
-            return { name, timestamp };
-        })
-        .sort((a, b) => a.timestamp - b.timestamp)
-        .map(v => v.name);
+    const versionNames = getVersionOrder();
     const currentIndex = versionNames.indexOf(currentVersion);
     if (currentIndex > 0) {
         const previousVersionName = versionNames[currentIndex - 1];
@@ -7714,15 +7734,7 @@ function previousVersion() {
 }
 // 다음 버전으로 이동
 function nextVersion() {
-    // 버전명을 저장 시각 기준 오름차순(과거→최신)으로 정렬
-    const versionNames = Object.entries(versions)
-        .map(([name, data]) => {
-            const metadata = data.metadata || {};
-            const timestamp = metadata.timestamp || new Date(metadata.saveDate || 0).getTime();
-            return { name, timestamp };
-        })
-        .sort((a, b) => a.timestamp - b.timestamp)
-        .map(v => v.name);
+    const versionNames = getVersionOrder();
     const currentIndex = versionNames.indexOf(currentVersion);
     if (currentIndex < versionNames.length - 1) {
         const nextVersionName = versionNames[currentIndex + 1];
@@ -7735,16 +7747,7 @@ function nextVersion() {
 
 // 버전 네비게이션 버튼 상태 업데이트
 function updateVersionNavigationButtons() {
-    // 버전명을 저장 시각 기준 오름차순(과거→최신)으로 정렬
-    const versionNames = Object.entries(versions)
-        .map(([name, data]) => {
-            const metadata = data.metadata || {};
-            const timestamp = metadata.timestamp || new Date(metadata.saveDate || 0).getTime();
-            return { name, timestamp };
-        })
-        .sort((a, b) => a.timestamp - b.timestamp)
-        .map(v => v.name);
-
+    const versionNames = getVersionOrder();
     const currentIndex = versionNames.indexOf(currentVersion);
 
     const prevBtn = document.querySelector('.version-nav-btn[onclick=\"previousVersion()\"]');
