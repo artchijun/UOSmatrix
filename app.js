@@ -2564,7 +2564,13 @@ function renderMatrix() {
     const showDeleted = document.querySelector('.matrix-filters input[value="deleted"]:checked') !== null;
     
     // 삭제된 교과목들도 필터링 적용
+    // 단, 이미 coursesToRender에 있는 과목은 제외 (중복 방지)
+    const courseIds = new Set(coursesToRender.map(c => c.id));
     const filteredDeletedCourses = showDeleted ? deletedCourses.filter(course => {
+        // 이미 렌더링 목록에 있는 과목은 제외
+        if (courseIds.has(course.id)) {
+            return false;
+        }
         const [year] = course.yearSemester.split('-');
         const yearMatch = selectedYears.length === 0 || selectedYears.includes(year);
         const requiredMatch = selectedRequired.length === 0 || selectedRequired.includes(course.isRequired);
@@ -6365,6 +6371,7 @@ async function saveVersionData(event) {
             tempCourses = [];
         }
         
+        // tempMatrixData 처리 - 비어있어도 현재 matrixData는 유지해야 함
         if (Object.keys(tempMatrixData).length > 0) {
             
             // 매트릭스 제목 변경사항 처리
@@ -6381,19 +6388,29 @@ async function saveVersionData(event) {
             delete actualMatrixData._oldTitle;
             delete actualMatrixData._newTitle;
             
+            // 기존 matrixData와 병합 (tempMatrixData가 우선)
+            matrixData = { ...matrixData, ...actualMatrixData };
+            
             // --- 필터링 추가: courses에 없는 과목은 제외 ---
             const validCourseNames = new Set(courses.map(c => c.courseName));
-            Object.keys(actualMatrixData).forEach(name => {
+            Object.keys(matrixData).forEach(name => {
                 if (!validCourseNames.has(name)) {
-                    delete actualMatrixData[name];
+                    delete matrixData[name];
                 }
             });
             
-            matrixData = JSON.parse(JSON.stringify(actualMatrixData));
             tempMatrixData = {};
         } else {
-            // tempMatrixData가 비어있으면 현재 matrixData를 그대로 유지
-            // 매트릭스 데이터는 삭제하지 않고 모두 보존
+            // tempMatrixData가 비어있어도 현재 matrixData는 그대로 유지
+            // courses에 있는 과목만 필터링
+            const validCourseNames = new Set(courses.map(c => c.courseName));
+            const filteredMatrixData = {};
+            Object.keys(matrixData).forEach(name => {
+                if (validCourseNames.has(name)) {
+                    filteredMatrixData[name] = matrixData[name];
+                }
+            });
+            matrixData = filteredMatrixData;
         }
         
         if (Object.keys(tempCurriculumCellTexts).length > 0) {
