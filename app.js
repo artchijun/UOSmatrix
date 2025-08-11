@@ -11,7 +11,6 @@ const firebaseConfig = {
     appId: "1:208876542369:web:a50a4d20468bfb4c8b13e0"
 };
 
-// 물리 엔진 재시작 카운터 제거 - vis-network 자체 처리에 맡김
 
 // 🔧 vis-network 폰트 호환성을 위한 전역 안전 함수
 window.sanitizeVisNetworkFont = function(fontObj) {
@@ -133,7 +132,6 @@ window.validateNetworkDataIntegrity = function(network, autoRepair = true) {
         for (let nodeId of nodes.getIds()) {
             const node = nodes.get(nodeId);
             if (!node || node.id === undefined) {
-                console.warn(`🛡️ 무결성 검사: 노드 ${nodeId} 데이터 불완전`);
                 invalidNodes.push(nodeId);
             } else {
                 nodeIds.add(node.id);
@@ -142,7 +140,6 @@ window.validateNetworkDataIntegrity = function(network, autoRepair = true) {
         
         // 손상된 노드 제거
         if (autoRepair && invalidNodes.length > 0) {
-            console.warn(`🛡️ 손상된 노드 ${invalidNodes.length}개 제거 중...`);
             nodes.remove(invalidNodes);
         }
         
@@ -152,21 +149,18 @@ window.validateNetworkDataIntegrity = function(network, autoRepair = true) {
         for (let edgeId of edges.getIds()) {
             const edge = edges.get(edgeId);
             if (!edge || edge.from === undefined || edge.to === undefined) {
-                console.warn(`🛡️ 무결성 검사: 엣지 ${edgeId} 데이터 불완전`);
                 invalidEdges.push(edgeId);
                 continue;
             }
             
             // 엣지가 참조하는 노드 존재 여부 확인
             if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
-                console.warn(`🛡️ 무결성 검사: 엣지 ${edgeId}가 존재하지 않는 노드 참조`);
                 invalidEdges.push(edgeId);
             }
         }
         
         // 손상된 엣지 제거
         if (autoRepair && invalidEdges.length > 0) {
-            console.warn(`🛡️ 손상된 엣지 ${invalidEdges.length}개 제거 중...`);
             edges.remove(invalidEdges);
         }
         
@@ -180,7 +174,6 @@ window.validateNetworkDataIntegrity = function(network, autoRepair = true) {
         return true;
         
     } catch (error) {
-        console.warn('🛡️ 데이터 무결성 검사 중 오류:', error);
         return false;
     }
 };
@@ -212,7 +205,6 @@ window.validateAndFixNetworkFonts = function(network) {
             network.body.data.nodes.update(nodesToUpdate);
         }
     } catch (error) {
-        console.warn('네트워크 폰트 검증 중 오류:', error);
     }
 };
 
@@ -234,49 +226,35 @@ let isOnline = navigator.onLine;
 
 // Firebase 초기화 및 데이터베이스 연결
 function initializeFirebase() {
-    console.log('🔧 Firebase 초기화 시작...');
     try {
         if (typeof firebase !== 'undefined') {
-            console.log('✅ Firebase SDK 로드됨');
             // Firebase 앱이 이미 초기화되었는지 확인
             if (!firebase.apps.length) {
-                console.log('🔧 새로운 Firebase 앱 초기화 중...');
                 firebase.initializeApp(firebaseConfig);
             } else {
-                console.log('ℹ️ 기존 Firebase 앱 재사용');
                 firebase.app(); // 이미 초기화된 앱 사용
             }
             db = firebase.database();
             firebaseInitialized = true;
-            console.log('✅ Firebase 초기화 완료');
             
             // 연결 상태 모니터링
             const connectedRef = db.ref('.info/connected');
             connectedRef.on('value', function(snap) {
                 if (snap.val() === true) {
                     isOnline = true;
-                    console.log('✅ Firebase 연결 성공');
                     showConnectionStatus('온라인', 'success');
                     // 온라인 상태가 되면 로컬 데이터를 Firebase와 동기화
                     syncLocalDataToFirebase();
                 } else {
                     isOnline = false;
-                    console.log('⚠️ Firebase 오프라인 모드');
                     showConnectionStatus('오프라인', 'warning');
                 }
             });
         } else {
-            console.error('❌ Firebase SDK가 로드되지 않았습니다.');
             firebaseInitialized = false;
             showConnectionStatus('Firebase SDK 로드 실패', 'error');
         }
     } catch (error) {
-        console.error('❌ Firebase 초기화 오류:', error);
-        console.error('오류 상세:', {
-            message: error.message,
-            code: error.code,
-            stack: error.stack
-        });
         firebaseInitialized = false;
         showConnectionStatus('Firebase 초기화 실패', 'error');
     }
@@ -435,13 +413,11 @@ async function loadAllDataFromFirebase() {
             }
             
             // 로컬 스토리지 사용 안 함
-            // localStorage.setItem('uosVersions', JSON.stringify(versions));
         } else {
             // 기존 방식으로 전체 버전 데이터 로드 시도
             const firebaseVersions = await loadDataFromFirebase('versions');
             if (firebaseVersions) {
                 versions = firebaseVersions;
-                // localStorage.setItem('uosVersions', JSON.stringify(firebaseVersions));
             }
         }
         
@@ -449,30 +425,25 @@ async function loadAllDataFromFirebase() {
         const firebaseCurrentVersion = await loadDataFromFirebase('currentVersion');
         if (firebaseCurrentVersion) {
             currentVersion = firebaseCurrentVersion;
-            // localStorage.setItem('uosCurrentVersion', firebaseCurrentVersion);
         }
         
         // 설정 데이터 로드
         const firebaseDesignSettings = await loadDataFromFirebase('settings/design');
         if (firebaseDesignSettings) {
             designSettings = firebaseDesignSettings;
-            // localStorage.setItem('designSettings', JSON.stringify(firebaseDesignSettings));
         }
         
         // 제목들 로드
         const firebaseMatrixTitle = await loadDataFromFirebase('settings/matrixTitle');
         if (firebaseMatrixTitle) {
-            // localStorage.setItem('matrixTitleText', firebaseMatrixTitle);
         }
         
         const firebaseCurriculumTitle = await loadDataFromFirebase('settings/curriculumTitle');
         if (firebaseCurriculumTitle) {
-            // localStorage.setItem('curriculumTitleText', firebaseCurriculumTitle);
         }
         
         const firebaseCommonValuesTitle = await loadDataFromFirebase('settings/commonValuesTitle');
         if (firebaseCommonValuesTitle) {
-            // localStorage.setItem('commonValuesTitleText', firebaseCommonValuesTitle);
         }
         
         showToast('클라우드에서 데이터를 불러왔습니다.');
@@ -603,7 +574,6 @@ function loadChangeHistory() {
     if (saved) changeHistory = JSON.parse(saved);
 }
 function saveChangeHistory() {
-    // localStorage.setItem('changeHistory', JSON.stringify(changeHistory));
 }
 
 function addChangeHistory(type, courseName, changes) {
@@ -685,7 +655,6 @@ function renderChangeHistoryPanel() {
         return `<li data-idx='${idx}'>
             <span class=\"change-history-type ${entry.type}\">${entry.type}</span>
             <span class=\"change-history-summary\">${summary}</span>
-            <button class='change-history-delete-btn' title='이 변경 되돌리기'>&times;</button>
             <button class='change-history-apply-btn' title='이 변경 적용'>&#10003;</button>
             <button class='change-history-delete-btn' title='이 변경 되돌리기'>&times;</button>
         </li>`;
@@ -897,7 +866,6 @@ function selectLatestVersion() {
     }
     
     // localStorage 업데이트
-    // localStorage.setItem('uosCurrentVersion', currentVersion);
 }
 
 // 선택된 버전의 데이터를 메모리에 복원
@@ -921,7 +889,6 @@ function restoreSelectedVersionData() {
                 JSON.parse(JSON.stringify(v.matrixTab.matrixData)) : {};
             
             if (v.matrixTab.matrixTitleText) {
-                // localStorage.setItem('matrixTitleText', v.matrixTab.matrixTitleText);
             }
             
             // matrixExtraTableData 복원 (깊은 복사 적용)
@@ -946,7 +913,6 @@ function restoreSelectedVersionData() {
         if (v.curriculumTab) {
             curriculumCellTexts = v.curriculumTab.curriculumCellTexts || {};
             if (v.curriculumTab.curriculumTitleText) {
-                // localStorage.setItem('curriculumTitleText', v.curriculumTab.curriculumTitleText);
             }
         } else {
             // 기존 구조 호환성
@@ -960,7 +926,6 @@ function restoreSelectedVersionData() {
             // 비교과 병합 텍스트 복원 추가
             extracurricularMergedTexts = v.commonValuesTab.extracurricularMergedTexts || [];
             if (v.commonValuesTab.commonValuesTitleText) {
-                // localStorage.setItem('commonValuesTitleText', v.commonValuesTab.commonValuesTitleText);
             }
         } else {
             // 기존 구조 호환성
@@ -1099,7 +1064,6 @@ function initializeUI() {
     renderCommonValuesTable();
     
     // 이수모형 탭을 기본으로 시작
-    // localStorage.setItem('uosLastTab', 'curriculum');
     showTab('curriculum');
     updateCurrentVersionDisplay();
     updateAllVersionLabels();
@@ -1952,7 +1916,6 @@ function applyHoverEffect(effect) {
 
 // 디자인 설정 저장
 function saveDesignSettings() {
-    // localStorage.setItem('designSettings', JSON.stringify(designSettings));
     
     // Firebase에 저장
     saveDataToFirebase('settings/design', designSettings);
@@ -2157,7 +2120,6 @@ function showTab(tabName, event) {
     }
     
     // 마지막 탭 정보 저장
-    // localStorage.setItem('uosLastTab', tabName);
 }
 
 // 교과목 테이블 렌더링
@@ -6259,7 +6221,6 @@ function saveCurrentVersion() {
     
     versions[currentVersion] = versionData;
     // localStorage.setItem('uosVersions', JSON.stringify(versions));
-    // localStorage.setItem('uosCurrentVersion', currentVersion);
     
     // Firebase에 저장
     saveDataToFirebase('versions', versions);
@@ -6523,7 +6484,6 @@ async function saveVersionData(event) {
         }
     
     currentVersion = versionName;
-    // localStorage.setItem('uosCurrentVersion', currentVersion);
     
     // Firebase에 버전별로 개별 저장
     if (firebaseInitialized && isOnline) {
@@ -6750,7 +6710,6 @@ async function saveCurrentVersion() {
         }
     }
     
-    // localStorage.setItem('uosCurrentVersion', currentVersion);
     
     // Firebase에 버전별로 개별 저장
     if (firebaseInitialized && isOnline) {
@@ -6915,8 +6874,7 @@ function restoreVersion(versionName) {
         
         // 현재 버전 업데이트
         currentVersion = versionName;
-        // localStorage.setItem('uosCurrentVersion', currentVersion);
-        
+            
         // 모든 탭 렌더링
         renderCourses();
         renderMatrix();
@@ -7011,8 +6969,7 @@ async function deleteVersion(versionName) {
     // 현재 버전이 삭제된 경우 기본 버전으로 변경
     if (currentVersion === versionName) {
         currentVersion = '기본';
-        // localStorage.setItem('uosCurrentVersion', currentVersion);
-        
+            
         // Firebase에서도 현재 버전 업데이트
         if (firebaseInitialized && isOnline) {
             try {
@@ -7439,10 +7396,8 @@ function drawArrowBetweenCells(ctx, containerRect, fromCell, toCell, index, move
     if (!fromGhostBlock || !toCurrentBlock) {
         // 디버깅: 매칭 실패 시 로그
         if (!fromGhostBlock) {
-            console.warn(`고스트 블럭을 찾을 수 없음: ${targetCourseName} (ID: ${targetCourseId})`);
         }
         if (!toCurrentBlock) {
-            console.warn(`현재 블럭을 찾을 수 없음: ${targetCourseName} (ID: ${targetCourseId})`);
         }
         return;
     }
@@ -7609,7 +7564,6 @@ let resizeObserver = null;
 function initResizeObserver() {
     const curriculumContent = document.getElementById('curriculum');
     if (!curriculumContent) {
-        console.warn('Curriculum content not found for ResizeObserver');
         return;
     }
     
@@ -7621,7 +7575,6 @@ function initResizeObserver() {
                 resizeObserver.disconnect();
             }
         } catch (e) {
-            console.warn('Error disconnecting ResizeObserver:', e);
         }
         resizeObserver = null;
     }
@@ -7651,7 +7604,6 @@ function initResizeObserver() {
             // curriculum 컨텐츠 관찰 시작
             resizeObserver.observe(curriculumContent);
         } catch (e) {
-            console.warn('Error creating ResizeObserver:', e);
             resizeObserver = null;
         }
     } else {
@@ -7666,7 +7618,6 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             initResizeObserver();
         } catch (e) {
-            console.warn('ResizeObserver initialization deferred:', e);
         }
     }, 100);
 });
@@ -7681,7 +7632,6 @@ window.addEventListener('beforeunload', function() {
             }
             resizeObserver = null;
         } catch (e) {
-            console.warn('Error cleaning up ResizeObserver:', e);
         }
     }
 });
@@ -8020,7 +7970,6 @@ function renderCommonValuesNetworkGraph() {
                     
                     // 🔍 비교과 노드 생성 검증
                     if (!name || name.trim() === '') {
-                        console.warn(`비교과 노드 ${id}의 이름이 없습니다. 스킵합니다.`);
                         return; // 이 노드 스킵
                     }
                     
@@ -8738,7 +8687,6 @@ function renderCommonValuesNetworkGraph() {
         
         // 특정 손상된 edge ID 제거
         if (edge.id === 'b32b3453-2317-430d-9775-ce82c08eaed0') {
-            console.warn('🛡️ 손상된 edge 제거:', edge.id);
             return false;
         }
         
@@ -8809,7 +8757,6 @@ function renderCommonValuesNetworkGraph() {
                 });
             }
         } catch (error) {
-            console.warn('네트워크 안정화 과정에서 오류 발생:', error);
         }
     }, 100);
     
@@ -11274,16 +11221,13 @@ function renderCommonValuesNetworkGraph() {
                         if (position && typeof position.x === 'number' && typeof position.y === 'number') {
                             return true;
                         } else {
-                            console.warn(`Node ${nodeId} exists but has invalid position in group ${key}:`, position);
                             return false;
                         }
                     } catch (e) {
                         // 노드가 네트워크에 존재하지 않는 경우
                         if (nodeId.startsWith('extracurricular-')) {
                             const name = window.extracurricularNameMap ? window.extracurricularNameMap[nodeId] : 'unknown';
-                            console.warn(`비교과 노드 누락: ${nodeId} (${name}) from group ${key}`, e.message);
                         } else {
-                            console.warn(`일반 노드 누락: ${nodeId} from group ${key}`, e.message);
                         }
                         return false;
                     }
@@ -11299,7 +11243,6 @@ function renderCommonValuesNetworkGraph() {
                             }
                         } catch (e) {
                             // 🚨 노드가 존재하지 않는 경우 무시 (데이터 불일치 상황)
-                            console.warn(`Node ${nodeId} not found in network but exists in data structure`);
                             return;
                         }
                     });
@@ -11544,7 +11487,6 @@ function renderCommonValuesNetworkGraph() {
             
             // 디버깅: 드래그 상태 확인
             if (!groupNodeIds) {
-                console.warn(`드래그 중인 그룹 ${draggedGroupKey}의 노드를 찾을 수 없습니다.`);
                 return;
             }
             
@@ -11565,7 +11507,6 @@ function renderCommonValuesNetworkGraph() {
                     try {
                         network.moveNode(nodeId, pos.x, pos.y);
                     } catch (e) {
-                        console.warn(`노드 ${nodeId} 이동 실패:`, e);
                     }
                 });
                 
@@ -11683,7 +11624,6 @@ function renderCommonValuesNetworkGraph() {
                 }
             }
         } catch (error) {
-            console.warn('unselectAll 호출 중 오류 발생:', error);
             
             // 🛡️ font 속성 관련 오류인 경우 특별 처리
             if (error.message && error.message.includes('includes') && error.message.includes('getFormattingValues')) {
@@ -12426,7 +12366,6 @@ function renderCommonValuesNetworkGraph() {
                 network.unselectAll();
             } catch (error) {
                 // unselectAll 오류 무시 - vis-network 내부 처리에 맡김
-                console.warn('unselectAll 오류:', error.message);
             }
         }
         
@@ -13040,7 +12979,6 @@ function renderCommonValuesNetworkGraph() {
                   }
                   network.unselectAll();
               } catch (error) {
-                  console.warn('🛡️ blurEdge unselectAll 오류 방지:', error);
                   // 대안: 선택된 노드만 직접 해제
                   try {
                       if (network.body && network.body.selectionHandler) {
@@ -15029,9 +14967,7 @@ function importVersionsFromFile() {
                 }
                 
                 // localStorage에 저장
-                // localStorage.setItem('uosVersions', JSON.stringify(versions));
-                // localStorage.setItem('uosCurrentVersion', currentVersion);
-                
+                                
                 // 버전 관리 모달이 열려있다면 버전 목록 새로고침
                 const versionManagerModal = document.getElementById('versionManagerModal');
                 if (versionManagerModal && versionManagerModal.style.display === 'block') {
@@ -16302,12 +16238,6 @@ class PhysicsEffectsSystem {
     }
     
     restartAnimationLoop() {
-        console.log('Restarting physics animation loop...', {
-            isActive: this.isActive,
-            loopStarted: this.loopStarted,
-            animationId: this.animationId,
-            timeSinceLastUpdate: Date.now() - this.lastPhysicsUpdateTime
-        });
         
         // 🔧 더 긴 대기 시간으로 안정성 확보
         setTimeout(() => {
@@ -16441,7 +16371,6 @@ class PhysicsEffectsSystem {
         
         // 최대 실행 시간 체크 (24시간)
         if (this.runTime > this.maxRunTime) {
-            console.log('Max runtime reached, restarting physics system...');
             this.restartSystem();
         }
         
@@ -16486,7 +16415,6 @@ class PhysicsEffectsSystem {
         this.runTime = 0;
         this.frameCount = 0;
         this.performanceStats.frameTimeHistory = [];
-        console.log('Physics system restarted');
     }
     
     disableEffect(effectName) {
@@ -16550,20 +16478,6 @@ class PhysicsEffectsSystem {
             // 자동 복구 시스템을 위한 프레임 타임 업데이트
             this.lastPhysicsUpdateTime = Date.now();
             
-            // 🔧 주기적 상태 로깅 (1분마다)
-            if (this.frameCount % 3600 === 0) { // 60fps * 60sec = 3600 frames
-                console.log('Physics system status:', {
-                    frameCount: this.frameCount,
-                    runTime: Math.round((Date.now() - this.startTime) / 1000) + 's',
-                    performanceMode: this.performanceMode,
-                    activeEffects: {
-                        vibration: this.vibrationActive,
-                        magnetic: this.magneticFieldActive,
-                        pulse: this.pulseActive,
-                        attraction: this.attractionActive
-                    }
-                });
-            }
             
         } catch (error) {
             console.warn('Physics update error:', error);
@@ -16997,7 +16911,6 @@ class PhysicsEffectsSystem {
     }
     
     destroy() {
-        console.log('Destroying physics effects system...');
         
         // 애니메이션 루프 중단
         this.stopAnimationLoop();
@@ -17054,11 +16967,9 @@ class PhysicsEffectsSystem {
                 
                 // 🔧 복구 시도 횟수 증가 (3 → 5)
                 if (this.stuckCounter >= 5) {
-                    console.log('Physics simulation recovery: Full system restart');
                     this.fullRestart();
                     this.stuckCounter = 0;
                 } else {
-                    console.log('Physics simulation recovery: Animation loop restart');
                     this.restartAnimationLoop();
                 }
                 
@@ -17071,7 +16982,6 @@ class PhysicsEffectsSystem {
     }
     
     fullRestart() {
-        console.log('Performing full physics system restart...');
         
         // 기존 시스템 정리
         this.stopAnimationLoop();
