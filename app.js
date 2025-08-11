@@ -687,6 +687,7 @@ function renderChangeHistoryPanel() {
             <span class=\"change-history-summary\">${summary}</span>
             <button class='change-history-delete-btn' title='이 변경 되돌리기'>&times;</button>
             <button class='change-history-apply-btn' title='이 변경 적용'>&#10003;</button>
+            <button class='change-history-delete-btn' title='이 변경 되돌리기'>&times;</button>
         </li>`;
     }).join('');
     
