@@ -2717,7 +2717,7 @@ th, td, .matrix-table th, .matrix-table td {
 
 .change-history-delete-btn {
     display: inline-block;
-    margin-right: 6px;
+    margin-right: 0px;
     background: none;
     border: none;
     color: #e53935;
@@ -3497,7 +3497,7 @@ th, td, .matrix-table th, .matrix-table td {
     word-break: keep-all !important;
     word-wrap: break-word !important;
     display: inline-block !important;
-    max-width: calc(100% - 70px) !important;
+    max-width: calc(100% - 50px) !important;
 }
 .change-history-delete-btn {
     font-size: 24px !important;
