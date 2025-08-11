@@ -364,27 +364,27 @@
                             <label class="modern-checkbox">
                                 <input type="checkbox" value="1" onchange="filterMatrix()">
                                 <span class="checkmark"></span>
-                                <span class="label-text">1학년</span>
+                                <span class="label-text">1</span>
                             </label>
                             <label class="modern-checkbox">
                                 <input type="checkbox" value="2" onchange="filterMatrix()">
                                 <span class="checkmark"></span>
-                                <span class="label-text">2학년</span>
+                                <span class="label-text">2</span>
                             </label>
                             <label class="modern-checkbox">
                                 <input type="checkbox" value="3" onchange="filterMatrix()">
                                 <span class="checkmark"></span>
-                                <span class="label-text">3학년</span>
+                                <span class="label-text">3</span>
                             </label>
                             <label class="modern-checkbox">
                                 <input type="checkbox" value="4" onchange="filterMatrix()">
                                 <span class="checkmark"></span>
-                                <span class="label-text">4학년</span>
+                                <span class="label-text">4</span>
                             </label>
                             <label class="modern-checkbox">
                                 <input type="checkbox" value="5" onchange="filterMatrix()">
                                 <span class="checkmark"></span>
-                                <span class="label-text">5학년</span>
+                                <span class="label-text">5</span>
                             </label>
                         </div>
                     </div>
@@ -449,6 +449,14 @@
                     <button class="btn btn-reset" onclick="resetMatrixFilters()">
                         <i class="reset-icon">🔄</i>
                         <span>필터 초기화</span>
+                    </button>
+                </div>
+                
+                <!-- 보기 모드 버튼 -->
+                <div class="view-mode-switch" style="display: inline-flex; align-items: center; gap: 8px; margin-right: 15px;">
+                    <span style="font-size: 14px; color: #666; font-weight: 500;">보기 모드:</span>
+                    <button class="btn btn-sm" id="viewModeToggleMatrix" onclick="toggleViewModeMatrix()" style="min-width: 120px; background: #6c757d; color: white;">
+                        <span id="viewModeTextMatrix">변경사항 표시</span>
                     </button>
                 </div>
                 

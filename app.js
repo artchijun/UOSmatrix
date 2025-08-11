@@ -467,6 +467,7 @@ let filteredCourses = null;
 let isEditMode = false;
 let isEditModeMatrix = false;
 let isEditModeCurriculum = false;
+let showChangesModeMatrix = true; // 매트릭스 탭 보기 모드 (true: 변경사항 표시, false: 변경사항 적용)
 let designSettings = {
     tableBgColor: '#ffffff',
     headerBgColor: '#2c3e50',
@@ -2606,11 +2607,36 @@ function renderMatrix() {
         });
     });
     
+    // 변경사항 표시 모드에서만 이동된 과목 정보 수집
+    let movedCoursesForMatrix = [];
+    if (showChangesModeMatrix) {
+        movedCoursesForMatrix = getMovedCoursesForMatrix();
+    }
+    
     Object.entries(coursesByCategory).forEach(([category, categoryCourses]) => {
         if (categoryCourses.length === 0) return;
+        
+        // 변경사항 적용 모드에서 실제 표시될 과목 수 계산
+        let visibleCoursesCount = categoryCourses.length;
+        if (!showChangesModeMatrix) {
+            visibleCoursesCount = categoryCourses.filter(course => {
+                const isDeleted = deletedCourses.some(deletedCourse => deletedCourse.id === course.id);
+                return !isDeleted;
+            }).length;
+            
+            // 표시할 과목이 없으면 카테고리 전체 건너뛰기
+            if (visibleCoursesCount === 0) return;
+        }
+        
+        let visibleIndex = 0;
         categoryCourses.forEach((course, index) => {
             // 삭제된 교과목인지 먼저 확인
             const isDeleted = deletedCourses.some(deletedCourse => deletedCourse.id === course.id);
+            
+            // 변경사항 적용 모드에서는 삭제된 과목 건너뛰기
+            if (!showChangesModeMatrix && isDeleted) {
+                return;
+            }
             
             // 추가된 교과목인지 확인
             const courseDiff = diffSummary.find(diff => diff.course.id === course.id);
@@ -2620,12 +2646,13 @@ function renderMatrix() {
             const categoryClass = getCategoryClass(course.category);
             row.classList.add(`category-${categoryClass}`);
             if (course.isRequired === '필수') row.classList.add('major-required-row');
+            row.setAttribute('data-course-id', course.id);
 
-            // 카테고리 셀: 첫 행만 실제 값, 나머지는 숨김셀
-            if (index === 0) {
+            // 카테고리 셀: 첫 번째 표시되는 행에만 실제 값
+            if (visibleIndex === 0) {
                 const categoryCell = row.insertCell();
                 categoryCell.textContent = category;
-                categoryCell.rowSpan = categoryCourses.length;
+                categoryCell.rowSpan = visibleCoursesCount;
                 categoryCell.style.fontWeight = 'bold';
                 categoryCell.style.textAlign = 'center';
                 categoryCell.style.verticalAlign = 'middle';
@@ -2634,6 +2661,8 @@ function renderMatrix() {
                 const hiddenCell = row.insertCell();
                 hiddenCell.style.display = 'none';
             }
+            
+            visibleIndex++;
 
             // 이하 기존과 동일하게 셀 추가
             const yearSemCell = row.insertCell();
@@ -2641,7 +2670,25 @@ function renderMatrix() {
             const numCell = row.insertCell();
             numCell.textContent = course.courseNumber;
             const nameCell = row.insertCell();
-            nameCell.textContent = course.courseName;
+            
+            // 변경사항 표시 모드에서 이전 과목명 표시
+            if (showChangesModeMatrix) {
+                const initialCourse = initialCourses.find(ic => ic.id === course.id);
+                if (initialCourse && initialCourse.courseName !== course.courseName) {
+                    // 과목명이 변경된 경우
+                    nameCell.innerHTML = `
+                        <div style="line-height: 1.2;">${course.courseName}</div>
+                        <div style="font-size: 10px; color: #999; margin-top: 1px; line-height: 1;">
+                            (이전: ${initialCourse.courseName})
+                        </div>
+                    `;
+                } else {
+                    nameCell.textContent = course.courseName;
+                }
+            } else {
+                nameCell.textContent = course.courseName;
+            }
+            
             nameCell.style.cursor = 'pointer';
             nameCell.title = ``;
             nameCell.addEventListener('mouseenter', (e) => showCourseTooltip(e, course));
@@ -2653,19 +2700,21 @@ function renderMatrix() {
             }
             nameCell.classList.add('no-edit');
             
-            // 교과목 변경 상태에 따른 색상 적용 (이미 위에서 courseDiff 선언됨)
-            if (courseDiff) {
-                if (courseDiff.type === '추가') {
-                    nameCell.classList.add('course-added');
-                } else if (courseDiff.type === '삭제') {
+            // 변경사항 표시 모드에서만 교과목 변경 상태에 따른 색상 적용
+            if (showChangesModeMatrix) {
+                if (courseDiff) {
+                    if (courseDiff.type === '추가') {
+                        nameCell.classList.add('course-added');
+                    } else if (courseDiff.type === '삭제') {
+                        nameCell.classList.add('course-deleted');
+                    } else if (courseDiff.type === '수정') {
+                        nameCell.classList.add('course-modified');
+                    }
+                } else if (isDeleted) {
+                    // 삭제된 교과목 스타일 적용
                     nameCell.classList.add('course-deleted');
-                } else if (courseDiff.type === '수정') {
-                    nameCell.classList.add('course-modified');
+                    row.classList.add('deleted-course-row');
                 }
-            } else if (isDeleted) {
-                // 삭제된 교과목 스타일 적용
-                nameCell.classList.add('course-deleted');
-                row.classList.add('deleted-course-row');
             }
             const creditsCell = row.insertCell();
             creditsCell.textContent = course.credits;
@@ -2686,22 +2735,16 @@ function renderMatrix() {
                     markClass = 'matrix-mark-practice';
                 }
                 if (value === 1) {
-                    // 삭제된 교과목인 경우 빨간색으로 표시
+                    // 삭제된 과목은 빨간색으로 표시
                     if (isDeleted) {
-                        cell.innerHTML = `<span class=\"matrix-mark matrix-mark-deleted\">●</span>`;
-                    } else if (isAdded) {
-                        // 추가된 교과목인 경우 녹색으로 표시
-                        cell.innerHTML = `<span class=\"matrix-mark matrix-mark-added\">●</span>`;
+                        cell.innerHTML = `<span class=\"matrix-mark\" style=\"color: #e74c3c;\">●</span>`;
                     } else {
                         cell.innerHTML = `<span class=\"matrix-mark ${markClass}\">●</span>`;
                     }
                 } else if (value === 0.5) {
-                    // 삭제된 교과목인 경우 빨간색으로 표시
+                    // 삭제된 과목은 빨간색으로 표시
                     if (isDeleted) {
-                        cell.innerHTML = `<span class=\"matrix-mark matrix-mark-deleted\">◐</span>`;
-                    } else if (isAdded) {
-                        // 추가된 교과목인 경우 녹색으로 표시
-                        cell.innerHTML = `<span class=\"matrix-mark matrix-mark-added\">◐</span>`;
+                        cell.innerHTML = `<span class=\"matrix-mark\" style=\"color: #e74c3c;\">◐</span>`;
                     } else {
                         cell.innerHTML = `<span class=\"matrix-mark ${markClass}\">◐</span>`;
                     }
@@ -2727,9 +2770,9 @@ function renderMatrix() {
             if (course.isRequired === '필수') {
                 // 삭제된 교과목인 경우 빨간색으로 표시
                 if (isDeleted) {
-                    requiredCell.innerHTML = '<span class="major-required-dot deleted-course-dot">●</span>';
-                } else if (isAdded) {
-                    // 추가된 교과목인 경우 녹색으로 표시
+                    requiredCell.innerHTML = '<span class="major-required-dot" style="color: #e74c3c;">●</span>';
+                } else if (showChangesModeMatrix && isAdded) {
+                    // 변경사항 표시 모드에서 추가된 교과목인 경우 녹색으로 표시
                     requiredCell.innerHTML = '<span class="major-required-dot matrix-mark-added">●</span>';
                 } else {
                     requiredCell.innerHTML = '<span class="major-required-dot">●</span>';
@@ -2754,6 +2797,14 @@ function renderMatrix() {
             }
         });
     });
+    
+    // 변경사항 표시 모드에서는 고스트 행과 화살표 기능 일시 비활성화
+    // (카테고리 그룹화와 충돌 문제로 인해)
+    /*
+    if (showChangesModeMatrix && movedCoursesForMatrix.length > 0) {
+        // 추후 카테고리 구조를 고려한 고스트 행 구현 필요
+    }
+    */
     
     // 호버 효과 재적용
     if (designSettings.hoverEffect) {
@@ -3018,7 +3069,8 @@ function handleCourseSubmit(e) {
         if (oldCourseName !== course.courseName) {
             if (matrixData[oldCourseName]) {
                 matrixData[course.courseName] = matrixData[oldCourseName];
-                delete matrixData[oldCourseName];
+                // 이전 과목명의 데이터도 보존 (삭제하지 않음)
+                // delete matrixData[oldCourseName];
             } else {
                 matrixData[course.courseName] = new Array(18).fill(0);
             }
@@ -6341,13 +6393,7 @@ async function saveVersionData(event) {
             tempMatrixData = {};
         } else {
             // tempMatrixData가 비어있으면 현재 matrixData를 그대로 유지
-            // --- 필터링 추가: courses에 없는 과목은 제외 ---
-            const validCourseNames = new Set(courses.map(c => c.courseName));
-            Object.keys(matrixData).forEach(name => {
-                if (!validCourseNames.has(name)) {
-                    delete matrixData[name];
-                }
-            });
+            // 매트릭스 데이터는 삭제하지 않고 모두 보존
         }
         
         if (Object.keys(tempCurriculumCellTexts).length > 0) {
@@ -6561,13 +6607,7 @@ async function saveCurrentVersion() {
         tempMatrixData = {};
     } else {
         // tempMatrixData가 비어있으면 현재 matrixData를 그대로 유지
-        // --- 필터링 추가: courses에 없는 과목은 제외 ---
-        const validCourseNames = new Set(courses.map(c => c.courseName));
-        Object.keys(matrixData).forEach(name => {
-            if (!validCourseNames.has(name)) {
-                delete matrixData[name];
-            }
-        });
+        // 매트릭스 데이터는 삭제하지 않고 모두 보존
     }
     
     if (Object.keys(tempCurriculumCellTexts).length > 0) {
@@ -6749,7 +6789,15 @@ function restoreVersion(versionName) {
     }
     
     // 원본 데이터를 수정하지 않기 위해 깊은 복사
-    const versionData = JSON.parse(JSON.stringify(versions[versionName]));
+    let versionData;
+    try {
+        versionData = JSON.parse(JSON.stringify(versions[versionName]));
+    } catch (parseError) {
+        console.error('버전 데이터 파싱 오류:', parseError);
+        alert('버전 데이터를 파싱하는 중 오류가 발생했습니다.');
+        return;
+    }
+    
     if (!versionData) {
         alert('버전 데이터를 찾을 수 없습니다.');
         return;
@@ -6936,7 +6984,8 @@ function restoreVersion(versionName) {
         
         // 복원 완료 후 콘솔에 로그 출력
     } catch (e) {
-        alert('버전 복원 중 오류가 발생했습니다.');
+        console.error('버전 복원 오류:', e);
+        alert(`버전 복원 중 오류가 발생했습니다.\n\n오류 내용: ${e.message}\n\n자세한 내용은 개발자 콘솔을 확인하세요.`);
     }
 }
 
@@ -7085,6 +7134,104 @@ function getMovedCoursesForGhost() {
     });
     
     return movedCourses;
+}
+
+// 매트릭스 탭에서 이동된 교과목 정보를 가져오는 함수
+function getMovedCoursesForMatrix() {
+    const movedCourses = [];
+    
+    // 현재 교과목들과 초기 교과목들을 비교하여 순서가 변경된 것들을 찾기
+    courses.forEach(currentCourse => {
+        const initialCourse = initialCourses.find(ic => ic.id === currentCourse.id);
+        if (initialCourse) {
+            // 현재 위치와 초기 위치의 인덱스 비교
+            const currentIndex = courses.indexOf(currentCourse);
+            const initialIndex = initialCourses.indexOf(initialCourse);
+            
+            if (currentIndex !== initialIndex) {
+                movedCourses.push({
+                    initialCourse: initialCourse,
+                    currentCourse: currentCourse,
+                    initialIndex: initialIndex,
+                    currentIndex: currentIndex
+                });
+            }
+        }
+    });
+    
+    return movedCourses;
+}
+
+// 매트릭스 탭용 화살표 그리기 함수
+function drawMatrixMoveArrows(movedCourses) {
+    // 매트릭스 테이블의 Canvas 컨테이너 생성
+    const matrixTable = document.getElementById('matrixTable');
+    if (!matrixTable || movedCourses.length === 0) return;
+    
+    // 기존 Canvas 제거
+    const existingCanvas = document.getElementById('matrixArrowsCanvas');
+    if (existingCanvas) {
+        existingCanvas.remove();
+    }
+    
+    // Canvas 생성
+    const canvas = document.createElement('canvas');
+    canvas.id = 'matrixArrowsCanvas';
+    canvas.style.position = 'absolute';
+    canvas.style.pointerEvents = 'none';
+    canvas.style.zIndex = '10';
+    
+    // 테이블 위치와 크기 가져오기
+    const tableRect = matrixTable.getBoundingClientRect();
+    canvas.width = tableRect.width;
+    canvas.height = tableRect.height;
+    canvas.style.left = '0';
+    canvas.style.top = '0';
+    
+    // Canvas를 테이블 컨테이너에 추가
+    matrixTable.parentElement.style.position = 'relative';
+    matrixTable.parentElement.appendChild(canvas);
+    
+    const ctx = canvas.getContext('2d');
+    
+    // 각 이동된 과목에 대해 화살표 그리기
+    movedCourses.forEach(moveInfo => {
+        const ghostRow = document.querySelector(`[data-ghost-for="${moveInfo.currentCourse.id}"]`);
+        const currentRow = document.querySelector(`[data-course-id="${moveInfo.currentCourse.id}"]`);
+        
+        if (ghostRow && currentRow) {
+            const ghostRect = ghostRow.getBoundingClientRect();
+            const currentRect = currentRow.getBoundingClientRect();
+            
+            // 화살표 시작점과 끝점 계산
+            const startX = ghostRect.right - tableRect.left - 50;
+            const startY = ghostRect.top + ghostRect.height / 2 - tableRect.top;
+            const endX = currentRect.right - tableRect.left - 50;
+            const endY = currentRect.top + currentRect.height / 2 - tableRect.top;
+            
+            // 화살표 그리기
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(100, 100, 100, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            
+            // 베지어 곡선으로 화살표 그리기
+            const controlX = (startX + endX) / 2 + 50;
+            ctx.moveTo(startX, startY);
+            ctx.quadraticCurveTo(controlX, (startY + endY) / 2, endX, endY);
+            ctx.stroke();
+            
+            // 화살촉 그리기
+            const angle = Math.atan2(endY - startY, endX - startX);
+            ctx.beginPath();
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(endX - 10 * Math.cos(angle - Math.PI / 6), endY - 10 * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(endX - 10 * Math.cos(angle + Math.PI / 6), endY - 10 * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(100, 100, 100, 0.5)';
+            ctx.fill();
+        }
+    });
 }
 
 // 화살표 초기화 함수
@@ -14147,6 +14294,28 @@ function toggleViewModeCommonValues() {
     if (commonValuesTab && commonValuesTab.classList.contains('active')) {
         renderCommonValuesTable();
     }
+}
+
+// 보기 모드 전환 함수 (매트릭스 탭용)
+function toggleViewModeMatrix() {
+    showChangesModeMatrix = !showChangesModeMatrix;
+    const button = document.getElementById('viewModeToggleMatrix');
+    const text = document.getElementById('viewModeTextMatrix');
+    
+    if (button && text) {
+        if (showChangesModeMatrix) {
+            // 변경사항 표시 모드
+            text.textContent = '변경사항 표시';
+            button.style.background = '#6c757d';
+        } else {
+            // 변경사항 적용 모드
+            text.textContent = '변경사항 적용';
+            button.style.background = '#28a745';
+        }
+    }
+    
+    // 매트릭스 테이블 다시 렌더링
+    renderMatrix();
 }
 
 // 색상 기준 전환 함수 (이수모형 탭용)
