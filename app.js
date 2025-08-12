@@ -631,6 +631,47 @@ function getCurrentDiffSummary() {
         }
     }
     
+    // 매트릭스 변경사항 추가
+    // 현재 courses에 있는 모든 과목의 매트릭스 데이터를 초기 데이터와 비교
+    courses.forEach(course => {
+        const courseName = course.courseName;
+        const currentMatrix = matrixData[courseName] || new Array(18).fill(0);
+        const initialMatrix = initialMatrixData[courseName] || new Array(18).fill(0);
+        
+        const matrixChanges = [];
+        for (let i = 0; i < 18; i++) {
+            if (currentMatrix[i] !== initialMatrix[i]) {
+                const criteriaName = performanceCriteria[i];
+                const oldValueText = (initialMatrix[i] === 1 || initialMatrix[i] === 2) ? '●' : 
+                                    initialMatrix[i] === 0.5 ? '◐' : '없음';
+                const newValueText = (currentMatrix[i] === 1 || currentMatrix[i] === 2) ? '●' : 
+                                    currentMatrix[i] === 0.5 ? '◐' : '없음';
+                
+                matrixChanges.push({
+                    field: criteriaName,
+                    before: oldValueText,
+                    after: newValueText,
+                    colIndex: i,
+                    oldValue: initialMatrix[i],
+                    newValue: currentMatrix[i]
+                });
+            }
+        }
+        
+        if (matrixChanges.length > 0) {
+            // 이미 수정으로 등록된 과목인지 확인
+            const existingModification = summary.find(item => 
+                item.type === '수정' && item.course.id === course.id
+            );
+            
+            if (existingModification) {
+                // 기존 수정 항목에 매트릭스 변경사항 추가
+                existingModification.matrixChanges = matrixChanges;
+            }
+            // 매트릭스만 변경된 경우는 따로 표시하지 않음 (확정 후에는 기록 불필요)
+        }
+    });
+    
     // 정렬: 수정 → 추가 → 삭제 순서로 표시
     summary.sort((a, b) => {
         const typeOrder = { '수정': 1, '추가': 2, '삭제': 3 };
@@ -655,6 +696,7 @@ function loadChangeHistory() {
     if (saved) changeHistory = JSON.parse(saved);
 }
 function saveChangeHistory() {
+    localStorage.setItem('changeHistory', JSON.stringify(changeHistory));
 }
 
 function addChangeHistory(type, courseName, changes) {
@@ -692,10 +734,36 @@ function renderChangeHistoryPanel() {
     const actionsDiv = document.getElementById('changeHistoryActions');
     if (!panelList) return;
     
-    const diffSummary = restoredVersionChangeHistory || getCurrentDiffSummary();
+    let diffSummary = restoredVersionChangeHistory || getCurrentDiffSummary() || [];
     if (restoredVersionChangeHistory) {
         restoredVersionChangeHistory = null;
     }
+    
+    // tempMatrixChangeHistory의 임시 매트릭스 수정 항목들을 diffSummary 형식으로 변환하여 추가
+    if (tempMatrixChangeHistory && tempMatrixChangeHistory.length > 0) {
+        tempMatrixChangeHistory.forEach(item => {
+            // diffSummary에 중복되지 않은 경우만 추가
+            const exists = diffSummary.some(entry => 
+                entry.course && entry.course.courseName === item.courseName &&
+                entry.type === '매트릭스 수정 (임시)'
+            );
+            if (!exists) {
+                const course = courses.find(c => c.courseName === item.courseName);
+                if (course) {
+                    diffSummary.push({
+                        type: '매트릭스 수정 (임시)',
+                        course: course,
+                        changes: item.changes,
+                        timestamp: item.timestamp,
+                        isTemp: true
+                    });
+                }
+            }
+        });
+    }
+    
+    // 확정된 매트릭스 수정은 표시하지 않음 (주석 처리)
+    // changeHistory의 매트릭스 수정 항목들은 표시하지 않음
     
     if (!diffSummary || diffSummary.length === 0) {
         panelList.innerHTML = "<li style='text-align:center; color:#888; padding:12px 0;'>변경 이력이 없습니다.</li>";
@@ -706,6 +774,7 @@ function renderChangeHistoryPanel() {
     
     // 변경사항이 있으면 확정 버튼 표시
     if (actionsDiv) actionsDiv.style.display = 'block';
+    
     
     const fieldMap = {
         yearSemester: '학년학기',
@@ -724,6 +793,14 @@ function renderChangeHistoryPanel() {
             summary = `<b>${entry.course.courseName}</b> 추가 ${entry.course.yearSemester || ''}`;
         } else if (entry.type === '삭제') {
             summary = `<b>${entry.course.courseName}</b> 삭제`;
+        } else if (entry.type === '매트릭스 수정 (임시)') {
+            summary = `<b>${entry.course.courseName}</b> `;
+            summary += entry.changes.map(c => {
+                const field = c.field || '';
+                const before = (c.before+"").length > 20 ? (c.before+"").slice(0,20)+"..." : c.before;
+                const after = (c.after+"").length > 20 ? (c.after+"").slice(0,20)+"..." : c.after;
+                return `<span style='color:#ff9800;'>${field}</span>: <span style='color:#888'>${before}</span>→<span style='color:#ff9800;'>${after}</span>`;
+            }).join(', ');
         } else if (entry.type === '수정') {
             summary = `<b>${entry.course.courseName}</b> `;
             summary += entry.changes.map(c => {
@@ -733,8 +810,9 @@ function renderChangeHistoryPanel() {
                 return `<span style='color:#1976d2;'>${field}</span>: <span style='color:#888'>${before}</span>→<span style='color:#1976d2'>${after}</span>`;
             }).join(', ');
         }
+        const displayType = entry.type === '매트릭스 수정 (임시)' ? 'SPC' : entry.type;
         return `<li data-idx='${idx}'>
-            <span class=\"change-history-type ${entry.type}\">${entry.type}</span>
+            <span class=\"change-history-type ${entry.type.replace(/[\s()]/g, '-')}\">${displayType}</span>
             <span class=\"change-history-summary\">${summary}</span>
             <button class='change-history-apply-btn' title='이 변경 적용'>&#10003;</button>
             <button class='change-history-delete-btn' title='이 변경 되돌리기'>&times;</button>
@@ -797,6 +875,21 @@ function handleChangeHistoryApply(entry) {
         // 삭제: initialCourses에서 해당 교과목 제거(확정)
         const idx = initialCourses.findIndex(c => c.id === entry.course.id);
         if (idx !== -1) initialCourses.splice(idx, 1);
+    } else if (entry.type === '매트릭스 수정 (임시)') {
+        // 매트릭스 수정 (임시): 현재 매트릭스 데이터를 초기 데이터로 확정
+        if (entry.course && entry.course.courseName) {
+            if (!initialMatrixData[entry.course.courseName]) {
+                initialMatrixData[entry.course.courseName] = new Array(18).fill(0);
+            }
+            // 현재 matrixData의 값을 initialMatrixData로 복사
+            if (matrixData[entry.course.courseName]) {
+                initialMatrixData[entry.course.courseName] = [...matrixData[entry.course.courseName]];
+            }
+        }
+        // 임시 변경이력에서 해당 항목 제거
+        tempMatrixChangeHistory = tempMatrixChangeHistory.filter(item => 
+            !(item.courseId === entry.course.id)
+        );
     }
     
     // changeHistory 배열은 사용하지 않음 (getCurrentDiffSummary()가 실시간으로 계산)
@@ -806,6 +899,7 @@ function handleChangeHistoryApply(entry) {
     renderChangeHistoryPanel();
     renderCurriculumTable();
     renderCourses();
+    renderMatrix();  // 매트릭스 테이블도 즉시 갱신
     if (document.getElementById('commonValues')?.classList.contains('active')) {
         renderCommonValuesTable();
     }
@@ -836,6 +930,30 @@ function handleChangeHistoryDelete(entry) {
         // 삭제: 초기 상태의 교과목을 복원
         const orig = initialCourses.find(c => c.id === entry.course.id);
         if (orig) courses.push(JSON.parse(JSON.stringify(orig)));
+    } else if (entry.type === '매트릭스 수정 (임시)') {
+        // 매트릭스 수정 (임시): 해당 변경사항을 초기 값으로 되돌림
+        if (entry.course && entry.course.courseName && entry.changes && entry.changes[0]) {
+            const change = entry.changes[0];
+            const colIndex = change.colIndex;
+            const oldValue = change.oldValue;
+            
+            // matrixData를 원래 값으로 되돌림
+            if (!matrixData[entry.course.courseName]) {
+                matrixData[entry.course.courseName] = new Array(18).fill(0);
+            }
+            matrixData[entry.course.courseName][colIndex] = oldValue;
+            
+            // tempMatrixData도 되돌림
+            if (tempMatrixData[entry.course.courseName]) {
+                tempMatrixData[entry.course.courseName][colIndex] = oldValue;
+            }
+        }
+        
+        // 임시 변경이력에서 해당 항목 제거
+        tempMatrixChangeHistory = tempMatrixChangeHistory.filter(item => 
+            !(item.courseId === entry.course.id && 
+              item.changes[0].colIndex === entry.changes[0].colIndex)
+        );
     }
     
     // 공통가치대응 표의 셀 데이터 복원
@@ -844,7 +962,7 @@ function handleChangeHistoryDelete(entry) {
     renderChangeHistoryPanel();
     renderCurriculumTable();
     renderCourses();
-    renderMatrix();
+    renderMatrix();  // 매트릭스 테이블 즉시 갱신
     // 공통가치대응 탭이 활성화된 경우에만 즉시 렌더링
     const commonValuesTab = document.getElementById('commonValues');
     if (commonValuesTab && commonValuesTab.classList.contains('active')) {
@@ -859,6 +977,8 @@ function confirmAllChanges() {
         return;
     }
     
+    // 매트릭스 변경사항은 changeHistory에 추가하지 않음 (확정 후에는 기록 불필요)
+    
     // 현재 상태를 초기 상태로 설정
     initialCourses = JSON.parse(JSON.stringify(courses));
     ensureCourseIds(initialCourses);
@@ -866,9 +986,17 @@ function confirmAllChanges() {
     // 매트릭스 초기 상태도 현재 상태로 업데이트 (파란점을 검은점으로 변경)
     initialMatrixData = JSON.parse(JSON.stringify(matrixData));
     
-    // 변경이력 초기화
-    changeHistory = [];
-    saveChangeHistory();
+    // 디버그: 확정 후 initialMatrixData와 matrixData가 같은지 확인
+    window.matrixDebugLogged = false;  // 디버그 플래그 리셋
+    console.log('확정 후 initialMatrixData:', initialMatrixData);
+    console.log('확정 후 matrixData:', matrixData);
+    console.log('두 데이터가 같은가?', JSON.stringify(initialMatrixData) === JSON.stringify(matrixData));
+    
+    // 임시 매트릭스 변경이력 초기화
+    tempMatrixChangeHistory = [];
+    
+    // 임시 매트릭스 데이터 초기화
+    tempMatrixData = {};
     
     // deletedCoursesData도 초기화
     deletedCoursesData = {};
@@ -877,8 +1005,48 @@ function confirmAllChanges() {
     // 모든 UI 요소 즉시 업데이트
     renderChangeHistoryPanel();
     renderCourses();
+    
+    // 매트릭스 테이블 업데이트
     renderMatrix();
     renderCurriculumTable();
+    
+    // 파란색 점들을 검은색으로 직접 변경
+    setTimeout(() => {
+        // 파란색 인라인 스타일을 가진 모든 요소 찾기
+        const allMatrixMarks = document.querySelectorAll('.matrix-mark');
+        allMatrixMarks.forEach(mark => {
+            // 파란색 스타일이 있으면 제거
+            if (mark.style.color === 'rgb(0, 123, 255)' || mark.style.color === '#007bff') {
+                mark.style.color = '';  // 인라인 스타일 제거
+                mark.classList.remove('matrix-mark-new');
+                
+                // 카테고리별 색상 클래스 확인 및 추가
+                const cell = mark.closest('td');
+                if (cell) {
+                    const cellIndex = Array.from(cell.parentElement.children).indexOf(cell);
+                    const colIndex = cellIndex - 5;  // 첫 5개 컬럼 제외
+                    
+                    let markClass = '';
+                    if (colIndex >= 0 && colIndex <= 3) {
+                        markClass = 'matrix-mark-thinking';
+                    } else if (colIndex >= 4 && colIndex <= 10) {
+                        markClass = 'matrix-mark-design';
+                    } else if (colIndex >= 11 && colIndex <= 15) {
+                        markClass = 'matrix-mark-tech';
+                    } else if (colIndex >= 16 && colIndex <= 17) {
+                        markClass = 'matrix-mark-practice';
+                    }
+                    
+                    if (markClass && !mark.classList.contains(markClass)) {
+                        mark.classList.add(markClass);
+                    }
+                }
+            }
+        });
+        
+        console.log('파란색 점 제거 완료');
+    }, 100);
+    
     // 공통가치대응 탭이 활성화된 경우에만 즉시 렌더링
     const commonValuesTab = document.getElementById('commonValues');
     if (commonValuesTab && commonValuesTab.classList.contains('active')) {
@@ -902,6 +1070,15 @@ function resetAllChanges() {
     courses = JSON.parse(JSON.stringify(initialCourses));
     ensureCourseIds(courses);
     
+    // 매트릭스 데이터도 초기 상태로 복원
+    matrixData = JSON.parse(JSON.stringify(initialMatrixData));
+    
+    // 임시 매트릭스 데이터 초기화
+    tempMatrixData = {};
+    
+    // 임시 매트릭스 변경이력 초기화
+    tempMatrixChangeHistory = [];
+    
     // 공통가치대응 표의 셀 데이터 복원
     commonValuesCellTexts = currentCommonValuesData;
     
@@ -913,7 +1090,7 @@ function resetAllChanges() {
     renderChangeHistoryPanel();
     renderCurriculumTable();
     renderCourses();
-    renderMatrix();
+    renderMatrix();  // 매트릭스 테이블 즉시 반영
     // 공통가치대응 탭이 활성화된 경우에만 즉시 렌더링
     const commonValuesTab = document.getElementById('commonValues');
     if (commonValuesTab && commonValuesTab.classList.contains('active')) {
@@ -1669,19 +1846,49 @@ function handleMatrixCellClickSimple(cell) {
     
     // 삭제된 과목인 경우 변경사항이 지속되도록 확인
     
-    // 변경이력 추가
+    // 매트릭스 변경이력 추가
     const criteriaName = performanceCriteria[colIndex];
-    const oldValueText = currentValue === 1 ? '● (주요)' : currentValue === 0.5 ? '◐ (보조)' : '없음';
-    const newValueText = newMatrixValue === 1 ? '● (주요)' : newMatrixValue === 0.5 ? '◐ (보조)' : '없음';
+    const oldValueText = (currentValue === 1 || currentValue === 2) ? '●' : currentValue === 0.5 ? '◐' : '없음';
+    const newValueText = (newMatrixValue === 1 || newMatrixValue === 2) ? '●' : newMatrixValue === 0.5 ? '◐' : '없음';
     
     if (currentValue !== newMatrixValue) {
-        addChangeHistory('매트릭스 수정', course.courseName, [{
-            field: `수행평가 - ${criteriaName}`,
-            before: oldValueText,
-            after: newValueText
-        }]);
+        // 초기값과 비교하여 실제 변경사항인지 확인
+        const initialValue = initialMatrixData[course.courseName] ? 
+            initialMatrixData[course.courseName][colIndex] : 0;
         
-        // 변경이력 패널 업데이트
+        // 초기값과 다른 경우에만 임시 변경이력에 추가
+        if (newMatrixValue !== initialValue) {
+            const tempEntry = {
+                timestamp: new Date().toLocaleString('ko-KR'),
+                type: '매트릭스 수정',
+                courseName: course.courseName,
+                courseId: course.id,
+                changes: [{
+                    field: criteriaName,
+                    before: oldValueText,
+                    after: newValueText,
+                    colIndex: colIndex,
+                    oldValue: currentValue,
+                    newValue: newMatrixValue
+                }]
+            };
+            
+            // 같은 과목의 같은 컬럼에 대한 기존 임시 변경이력이 있으면 제거
+            tempMatrixChangeHistory = tempMatrixChangeHistory.filter(item => 
+                !(item.courseId === course.id && 
+                  item.changes[0].colIndex === colIndex)
+            );
+            
+            tempMatrixChangeHistory.unshift(tempEntry);
+        } else {
+            // 초기값으로 되돌아간 경우 임시 변경이력에서 제거
+            tempMatrixChangeHistory = tempMatrixChangeHistory.filter(item => 
+                !(item.courseId === course.id && 
+                  item.changes[0].colIndex === colIndex)
+            );
+        }
+        
+        // 변경이력 패널 즉시 업데이트
         renderChangeHistoryPanel();
     }
     
@@ -1828,11 +2035,9 @@ function handleMatrixCellClick(cell) {
         return;
     }
     
-    // 순환 편집: 빈 값 → ◎ → ● → ◐ → 빈 값
+    // 순환 편집: 빈 값 → ● → ◐ → 빈 값 (2점 제거)
     let currentValue = 0;
-    if (originalContent.includes('◎')) {
-        currentValue = 2;
-    } else if (originalContent.includes('●')) {
+    if (originalContent.includes('●')) {
         currentValue = 1;
     } else if (originalContent.includes('◐')) {
         currentValue = 0.5;
@@ -1856,16 +2061,20 @@ function handleMatrixCellClick(cell) {
         markClass = 'matrix-mark-practice';
     }
     
-    // 순환 토글: 빈 값(0) → ◎(2) → ●(1) → ◐(0.5) → 빈 값(0)
+    // 순환 토글: 빈 값(0) → ●(1) → ◐(0.5) → 빈 값(0)
     if (currentValue === 0) {
-        newMatrixValue = 2;  // ◎
-        newDisplayContent = `<span class="matrix-mark ${markClass}">◎</span>`;
-    } else if (currentValue === 2) {
         newMatrixValue = 1;  // ●
         newDisplayContent = `<span class="matrix-mark ${markClass}">●</span>`;
     } else if (currentValue === 1) {
         newMatrixValue = 0.5;  // ◐
         newDisplayContent = `<span class="matrix-mark ${markClass}">◐</span>`;
+    } else if (currentValue === 0.5) {
+        newMatrixValue = 0;  // 빈 값
+        newDisplayContent = '';
+    } else if (currentValue === 2) {
+        // 기존 2점 데이터가 있으면 1점으로 변경
+        newMatrixValue = 1;  // ●
+        newDisplayContent = `<span class="matrix-mark ${markClass}">●</span>`;
     } else {
         newMatrixValue = 0;  // 빈 값
         newDisplayContent = '';
@@ -1897,19 +2106,49 @@ function handleMatrixCellClick(cell) {
         cell.style.backgroundColor = '';
     }, 300);
     
-    // 변경이력 추가
+    // 매트릭스 변경이력 추가
     const criteriaName = performanceCriteria[matrixColIndex];
-    const oldValueText = currentValue === 2 ? '◎ (중요)' : currentValue === 1 ? '● (주요)' : currentValue === 0.5 ? '◐ (보조)' : '없음';
-    const newValueText = newMatrixValue === 2 ? '◎ (중요)' : newMatrixValue === 1 ? '● (주요)' : newMatrixValue === 0.5 ? '◐ (보조)' : '없음';
+    const oldValueText = (currentValue === 2 || currentValue === 1) ? '●' : currentValue === 0.5 ? '◐' : '없음';
+    const newValueText = (newMatrixValue === 2 || newMatrixValue === 1) ? '●' : newMatrixValue === 0.5 ? '◐' : '없음';
     
     if (currentValue !== newMatrixValue) {
-        addChangeHistory('매트릭스 수정', course.courseName, [{
-            field: `수행평가 - ${criteriaName}`,
-            before: oldValueText,
-            after: newValueText
-        }]);
+        // 초기값과 비교하여 실제 변경사항인지 확인
+        const initialValue = initialMatrixData[course.courseName] ? 
+            initialMatrixData[course.courseName][matrixColIndex] : 0;
         
-        // 변경이력 패널 업데이트
+        // 초기값과 다른 경우에만 임시 변경이력에 추가
+        if (newMatrixValue !== initialValue) {
+            const tempEntry = {
+                timestamp: new Date().toLocaleString('ko-KR'),
+                type: '매트릭스 수정',
+                courseName: course.courseName,
+                courseId: course.id,
+                changes: [{
+                    field: criteriaName,
+                    before: oldValueText,
+                    after: newValueText,
+                    colIndex: matrixColIndex,
+                    oldValue: currentValue,
+                    newValue: newMatrixValue
+                }]
+            };
+            
+            // 같은 과목의 같은 컬럼에 대한 기존 임시 변경이력이 있으면 제거
+            tempMatrixChangeHistory = tempMatrixChangeHistory.filter(item => 
+                !(item.courseId === course.id && 
+                  item.changes[0].colIndex === matrixColIndex)
+            );
+            
+            tempMatrixChangeHistory.unshift(tempEntry);
+        } else {
+            // 초기값으로 되돌아간 경우 임시 변경이력에서 제거
+            tempMatrixChangeHistory = tempMatrixChangeHistory.filter(item => 
+                !(item.courseId === course.id && 
+                  item.changes[0].colIndex === matrixColIndex)
+            );
+        }
+        
+        // 변경이력 패널 즉시 업데이트
         renderChangeHistoryPanel();
     }
     
@@ -3125,33 +3364,28 @@ function renderMatrix() {
                     initialValue = initialMatrixData[course.courseName][colIndex];
                 }
                 
-                // 값이 0이고 초기값이 있었다면 회색으로 흔적 표시 (수정모드이고 변경사항 표시 모드에서만)
-                if (isEditModeMatrix && showChangesModeMatrix && value === 0 && initialValue > 0) {
-                    const removedSymbol = initialValue === 1 ? '●' : '◐';
+                // 디버그: 변경된 셀 로그 (첫 번째만)
+                if (value !== initialValue && !window.matrixDebugLogged) {
+                    console.log(`렌더링 시점 - 과목: ${course.courseName}, 컬럼: ${colIndex}`);
+                    console.log(`현재값: ${value}, 초기값: ${initialValue}`);
+                    console.log(`showChangesModeMatrix: ${showChangesModeMatrix}`);
+                    console.log(`파란색 표시 조건: ${showChangesModeMatrix && initialValue !== value}`);
+                    window.matrixDebugLogged = true;
+                }
+                
+                // 값이 0이고 초기값이 있었다면 회색으로 흔적 표시 (변경사항 표시 모드에서만)
+                if (showChangesModeMatrix && value === 0 && initialValue > 0) {
+                    const removedSymbol = (initialValue === 2 || initialValue === 1) ? '●' : '◐';
                     cell.innerHTML = `<span class="matrix-mark matrix-mark-removed" style="color: #999999; opacity: 0.4;">${removedSymbol}</span>`;
                 }
-                // 값 표시 로직 수정: 2=◎, 1=●, 0.5=◐
-                else if (value === 2) {
-                    // 삭제된 과목은 빨간색으로 표시
-                    if (isDeleted) {
-                        cell.innerHTML = `<span class=\"matrix-mark\" style=\"color: #e74c3c;\">◎</span>`;
-                    } 
-                    // 추가된 과목은 녹색으로 표시 (변경사항 표시 모드에서만)
-                    else if (showChangesModeMatrix && courseDiff && courseDiff.type === '추가') {
-                        cell.innerHTML = `<span class=\"matrix-mark\" style=\"color: #27ae60;\">◎</span>`;
-                    } else {
-                        cell.innerHTML = `<span class=\"matrix-mark ${markClass}\">◎</span>`;
-                    }
-                } else if (value === 1) {
-                    // 초기에 값이 없었는데 새로 추가된 점인지 확인
-                    const isNewPoint = initialValue === 0;
-                    
+                // 값 표시 로직 수정: 2점도 1점으로 표시, 1=●, 0.5=◐
+                else if (value === 2 || value === 1) {
                     // 삭제된 과목은 빨간색으로 표시
                     if (isDeleted) {
                         cell.innerHTML = `<span class=\"matrix-mark\" style=\"color: #e74c3c;\">●</span>`;
                     }
-                    // 새로 추가된 점은 파란색으로 표시 (수정모드이고 변경사항 표시 모드에서만)
-                    else if (isEditModeMatrix && showChangesModeMatrix && isNewPoint) {
+                    // 새로 추가된 점은 파란색으로 표시 (변경사항 표시 모드에서만)
+                    else if (showChangesModeMatrix && initialValue !== 1 && initialValue !== 2) {
                         cell.innerHTML = `<span class=\"matrix-mark matrix-mark-new\" style=\"color: #007bff;\">●</span>`;
                     }
                     // 추가된 과목은 녹색으로 표시 (변경사항 표시 모드에서만)
@@ -3161,15 +3395,12 @@ function renderMatrix() {
                         cell.innerHTML = `<span class=\"matrix-mark ${markClass}\">●</span>`;
                     }
                 } else if (value === 0.5) {
-                    // 초기에 값이 없었는데 새로 추가된 점인지 확인
-                    const isNewPoint = initialValue === 0;
-                    
                     // 삭제된 과목은 빨간색으로 표시
                     if (isDeleted) {
                         cell.innerHTML = `<span class=\"matrix-mark\" style=\"color: #e74c3c;\">◐</span>`;
                     }
-                    // 새로 추가된 점은 파란색으로 표시 (수정모드이고 변경사항 표시 모드에서만)
-                    else if (isEditModeMatrix && showChangesModeMatrix && isNewPoint) {
+                    // 새로 추가된 점은 파란색으로 표시 (변경사항 표시 모드에서만)
+                    else if (showChangesModeMatrix && initialValue !== 0.5) {
                         cell.innerHTML = `<span class=\"matrix-mark matrix-mark-new\" style=\"color: #007bff;\">◐</span>`;
                     }
                     // 추가된 과목은 녹색으로 표시 (변경사항 표시 모드에서만)
@@ -7097,8 +7328,10 @@ async function saveVersionData(event) {
             settings: {
                 designSettings: typeof designSettings === 'object' ? 
                     JSON.parse(JSON.stringify(designSettings)) : {},
-                changeHistory: Array.isArray(getCurrentDiffSummary()) ? 
-                    getCurrentDiffSummary() : []
+                changeHistory: Array.isArray(changeHistory) ? 
+                    JSON.parse(JSON.stringify(changeHistory)) : [],
+                tempMatrixChangeHistory: Array.isArray(tempMatrixChangeHistory) ? 
+                    JSON.parse(JSON.stringify(tempMatrixChangeHistory)) : []
             },
             metadata: {
         description: versionDescription,
@@ -7155,6 +7388,9 @@ async function saveVersionData(event) {
         }
     }
         
+        // 버전 저장 후 임시 변경이력 초기화
+        tempMatrixChangeHistory = [];
+        
         // UI 업데이트
         renderCourses();
         renderMatrix();
@@ -7168,6 +7404,7 @@ async function saveVersionData(event) {
     updateCurrentVersionDisplay();
         renderVersionList();
         updateVersionNavigationButtons();
+        renderChangeHistoryPanel();  // 변경이력 패널도 업데이트
     
     // 버전 저장 후 초기 매트릭스 데이터를 현재 상태로 업데이트 (파란점을 검은점으로 변경)
     initialMatrixData = JSON.parse(JSON.stringify(matrixData));
@@ -7541,6 +7778,8 @@ function restoreVersion(versionName) {
                 JSON.parse(JSON.stringify(versionData.settings.designSettings)) : {};
             // 변경이력 복원 추가
             changeHistory = versionData.settings.changeHistory || [];
+            // 임시 매트릭스 변경이력 복원
+            tempMatrixChangeHistory = versionData.settings.tempMatrixChangeHistory || [];
         } else {
             // 기존 구조 호환성
             designSettings = versionData.designSettings || designSettings;
@@ -8660,7 +8899,7 @@ function renderVersionList() {
             </div>
             <div class="version-item-info" style="margin-left: 25px;">
                 <div class="version-item-name">
-                    ${name} <span style="color: #6c757d; font-size: 0.9em; margin-left: 8px;">(${dateString})</span> ${name === currentVersion ? '<span class="badge bg-success">현재</span>' : ''}
+                    ${name} <span style="color: #999; font-size: 0.75em; margin-left: 8px;">(${dateString})</span> ${name === currentVersion ? '<span class="badge bg-success">현재</span>' : ''}
                 </div>
                 ${metadata.description ? `<div class="version-item-description">${metadata.description}</div>` : ''}
                 <div class="version-item-summary">
@@ -16045,6 +16284,7 @@ let tempCourses = [];
 let tempCurriculumCellTexts = {};
 let tempCommonValuesCellTexts = {};
 let tempMatrixData = {};
+let tempMatrixChangeHistory = []; // 임시 매트릭스 변경이력
 
 // 임시 저장소 초기화 함수
 function clearTempStorage() {
@@ -16053,6 +16293,7 @@ function clearTempStorage() {
     tempCurriculumCellTexts = {};
     tempCommonValuesCellTexts = {};
     tempMatrixData = {};
+    tempMatrixChangeHistory = [];
     
     // 매트릭스 제목 변경사항도 초기화
     const titleElement = document.getElementById('matrixTitle');
