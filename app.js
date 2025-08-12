@@ -741,23 +741,48 @@ function renderChangeHistoryPanel() {
     
     // tempMatrixChangeHistory의 임시 매트릭스 수정 항목들을 diffSummary 형식으로 변환하여 추가
     if (tempMatrixChangeHistory && tempMatrixChangeHistory.length > 0) {
+        // 과목별로 그룹화
+        const groupedByCourseName = {};
         tempMatrixChangeHistory.forEach(item => {
-            // diffSummary에 중복되지 않은 경우만 추가
-            const exists = diffSummary.some(entry => 
-                entry.course && entry.course.courseName === item.courseName &&
-                entry.type === '매트릭스 수정 (임시)'
-            );
-            if (!exists) {
-                const course = courses.find(c => c.courseName === item.courseName);
-                if (course) {
-                    diffSummary.push({
-                        type: '매트릭스 수정 (임시)',
-                        course: course,
-                        changes: item.changes,
-                        timestamp: item.timestamp,
-                        isTemp: true
-                    });
-                }
+            if (!groupedByCourseName[item.courseName]) {
+                groupedByCourseName[item.courseName] = {
+                    courseName: item.courseName,
+                    courseId: item.courseId,
+                    changes: [],
+                    timestamp: item.timestamp
+                };
+            }
+            // 해당 과목의 변경사항 추가
+            groupedByCourseName[item.courseName].changes.push(...item.changes);
+            // 가장 최근 타임스탬프 사용
+            if (item.timestamp > groupedByCourseName[item.courseName].timestamp) {
+                groupedByCourseName[item.courseName].timestamp = item.timestamp;
+            }
+        });
+        
+        // 그룹화된 항목들을 diffSummary에 추가
+        Object.values(groupedByCourseName).forEach(groupedItem => {
+            const course = courses.find(c => c.courseName === groupedItem.courseName);
+            if (course) {
+                // 변경사항을 colIndex 기준으로 정렬 (PO 순서대로)
+                groupedItem.changes.sort((a, b) => {
+                    // colIndex가 있으면 그것으로 정렬
+                    if (a.colIndex !== undefined && b.colIndex !== undefined) {
+                        return a.colIndex - b.colIndex;
+                    }
+                    // field 이름으로 정렬 (PO1, PO2, ... PO18)
+                    const aNum = parseInt(a.field.replace(/[^0-9]/g, ''));
+                    const bNum = parseInt(b.field.replace(/[^0-9]/g, ''));
+                    return aNum - bNum;
+                });
+                
+                diffSummary.push({
+                    type: '매트릭스 수정 (임시)',
+                    course: course,
+                    changes: groupedItem.changes,
+                    timestamp: groupedItem.timestamp,
+                    isTemp: true
+                });
             }
         });
     }
@@ -1580,6 +1605,9 @@ function handleMatrixCellClickDirect(event) {
     } else if (currentValue === 1) {
         newMatrixValue = 0.5;
         newDisplayContent = `<span class="matrix-mark ${markClass}">◐</span>`;
+    } else if (currentValue === 0.5) {
+        newMatrixValue = 0;
+        newDisplayContent = '';
     } else {
         newMatrixValue = 0;
         newDisplayContent = '';
@@ -1700,7 +1728,12 @@ function handleMatrixCellClickSimple(cell) {
     } else {
         // 일반 과목의 경우 cell의 내용에서 판단
         const originalContent = cell.innerHTML;
-        if (originalContent.includes('●')) {
+        console.log('originalContent:', originalContent);
+        
+        // matrix-mark-removed 클래스가 있으면 삭제된 상태로 간주 (값이 0)
+        if (originalContent.includes('matrix-mark-removed')) {
+            currentValue = 0;
+        } else if (originalContent.includes('●')) {
             currentValue = 1;
         } else if (originalContent.includes('◐')) {
             currentValue = 0.5;
@@ -1763,6 +1796,8 @@ function handleMatrixCellClickSimple(cell) {
     let popupMessage = '';
     let additionalClass = '';
     
+    console.log('handleMatrixCellClickSimple - currentValue:', currentValue, 'courseName:', courseName, 'colIndex:', colIndex);
+    
     if (currentValue === 0) {
         newMatrixValue = 1;  // ●
         
@@ -1787,12 +1822,24 @@ function handleMatrixCellClickSimple(cell) {
             `<span class="matrix-mark ${additionalClass}" ${colorStyle}>◐</span>` : 
             `<span class="matrix-mark ${markClass} ${additionalClass}">◐</span>`;
         popupMessage = `${course.courseName} - ${performanceCriteria[colIndex]}: ◐ (보조)`;
+    } else if (currentValue === 0.5) {
+        newMatrixValue = 0;  // 빈 값
+        
+        // 초기에 값이 있었는데 삭제된 경우 회색으로 흔적 표시
+        if (initialValue > 0) {
+            const removedSymbol = (initialValue === 1 || initialValue === 2) ? '●' : '◐';
+            newDisplayContent = `<span class="matrix-mark matrix-mark-removed" style="color: #999999;">${removedSymbol}</span>`;
+            popupMessage = `${course.courseName} - ${performanceCriteria[colIndex]}: 삭제됨 (원래: ${removedSymbol})`;
+        } else {
+            newDisplayContent = '';
+            popupMessage = `${course.courseName} - ${performanceCriteria[colIndex]}: 비어있음`;
+        }
     } else {
         newMatrixValue = 0;  // 빈 값
         
         // 초기에 값이 있었는데 삭제된 경우 회색으로 흔적 표시
         if (initialValue > 0) {
-            const removedSymbol = initialValue === 1 ? '●' : '◐';
+            const removedSymbol = (initialValue === 1 || initialValue === 2) ? '●' : '◐';
             newDisplayContent = `<span class="matrix-mark matrix-mark-removed" style="color: #999999;">${removedSymbol}</span>`;
             popupMessage = `${course.courseName} - ${performanceCriteria[colIndex]}: 삭제됨 (원래: ${removedSymbol})`;
         } else {
@@ -2409,6 +2456,9 @@ function handleMatrixCellEdit(cell, newValue, originalContent) {
     } else if (currentValue === 1) {
         newMatrixValue = 0.5;
         newDisplayContent = '<span class="matrix-mark">◐</span>';
+    } else if (currentValue === 0.5) {
+        newMatrixValue = 0;
+        newDisplayContent = '';
     } else {
         newMatrixValue = 0;
         newDisplayContent = '';
