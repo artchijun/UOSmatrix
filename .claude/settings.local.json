@@ -14,7 +14,10 @@
       "mcp__magic__21st_magic_component_inspiration",
       "mcp__playwright__browser_snapshot",
       "mcp__playwright__browser_navigate",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_close"
     ],
     "deny": []
   }

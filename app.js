@@ -502,6 +502,14 @@ let courses = [];
 // 컬럼 순서: 18개 수행평가 기준 (0~17 인덱스)
 let matrixData = {};
 
+// 수행평가 기준 배열
+const performanceCriteria = [
+    'PO1', 'PO2', 'PO3', 'PO4',  // 건축적 사고 (0-3)
+    'PO5', 'PO6', 'PO7', 'PO8', 'PO9', 'PO10', 'PO11',  // 설계 (4-10)
+    'PO12', 'PO13', 'PO14', 'PO15', 'PO16',  // 기술 (11-15)
+    'PO17', 'PO18'  // 실무 (16-17)
+];
+
 // --- 전역 변수 추가 ---
 let curriculumCellTexts = {};
 
@@ -520,6 +528,53 @@ let changeHistory = [];
 
 // --- 실시간 변경 요약용 초기 상태 저장 변수 ---
 let initialCourses = [];
+let initialMatrixData = {};
+
+// 학년학기 표시 형식 변환 함수
+function formatYearSemester(yearSemester) {
+    if (!yearSemester) return '';
+    
+    // 이미 간단한 형식인지 확인 (예: "4-1", "4-2", "4-1/2")
+    if (yearSemester.match(/^\d+-(1|2|1\/2|계절|구분없음)$/)) {
+        // "1,2"를 "1/2"로 변환
+        if (yearSemester.includes('-1,2')) {
+            return yearSemester.replace('-1,2', '-1/2');
+        }
+        return yearSemester;
+    }
+    
+    // "학년" 포함 형식 변환 (예: "4학년-1학기" → "4-1")
+    if (yearSemester.includes('학년')) {
+        const yearMatch = yearSemester.match(/(\d+)학년/);
+        if (yearMatch) {
+            const year = yearMatch[1];
+            if (yearSemester.includes('1학기')) {
+                return `${year}-1`;
+            } else if (yearSemester.includes('2학기')) {
+                return `${year}-2`;
+            } else if (yearSemester.includes('계절')) {
+                return `${year}-계절`;
+            } else if (yearSemester.includes('구분없음') || !yearSemester.includes('학기')) {
+                return `${year}-1/2`;
+            }
+        }
+    }
+    
+    // 기존 형식 (예: "1-1", "2-2", "3-계절" 등) 처리
+    const parts = yearSemester.split('-');
+    if (parts.length === 2) {
+        const year = parts[0];
+        const semester = parts[1];
+        
+        if (semester === '구분없음') {
+            return `${year}-1/2`;
+        } else if (semester === '1,2') {
+            return `${year}-1/2`;
+        }
+    }
+    
+    return yearSemester;
+}
 
 // --- 실시간 변경 요약(diff) 함수 ---
 function getCurrentDiffSummary() {
@@ -539,7 +594,22 @@ function getCurrentDiffSummary() {
     for (const id in initialMap) {
         if (!currentMap[id]) {
             // deletedCoursesData에 저장된 최신 데이터가 있으면 사용, 없으면 initialMap 사용
-            const courseData = deletedCoursesData[id] || initialMap[id];
+            let courseData = deletedCoursesData[id] || initialMap[id];
+            
+            // deletedCoursesData에 없으면 추가하고 matrixValues 초기화
+            if (!deletedCoursesData[id]) {
+                courseData = JSON.parse(JSON.stringify(initialMap[id]));
+                // 매트릭스 데이터 확인 및 초기화
+                if (matrixData[courseData.courseName]) {
+                    courseData.matrixValues = [...matrixData[courseData.courseName]];
+                } else {
+                    courseData.matrixValues = new Array(18).fill(0);
+                }
+                deletedCoursesData[id] = courseData;
+                // localStorage에 저장
+                localStorage.setItem('deletedCoursesData', JSON.stringify(deletedCoursesData));
+            }
+            
             summary.push({ type: '삭제', course: courseData });
         }
     }
@@ -1034,6 +1104,8 @@ function initializeUI() {
     if (!Array.isArray(initialCourses) || initialCourses.length === 0) {
         initialCourses = JSON.parse(JSON.stringify(courses));
         ensureCourseIds(initialCourses);
+        // 초기 매트릭스 데이터도 저장
+        initialMatrixData = JSON.parse(JSON.stringify(matrixData));
     }
     
     // localStorage에서 deletedCoursesData 로드
@@ -1041,7 +1113,19 @@ function initializeUI() {
     if (savedDeletedCoursesData) {
         try {
             deletedCoursesData = JSON.parse(savedDeletedCoursesData);
-            console.log('Loaded deletedCoursesData from localStorage:', deletedCoursesData);
+            
+            // 각 삭제된 과목의 matrixValues가 없으면 초기화
+            for (const id in deletedCoursesData) {
+                const course = deletedCoursesData[id];
+                if (!course.matrixValues) {
+                    // matrixData에서 과목명으로 찾아보기
+                    if (matrixData[course.courseName]) {
+                        course.matrixValues = [...matrixData[course.courseName]];
+                    } else {
+                        course.matrixValues = new Array(18).fill(0);
+                    }
+                }
+            }
         } catch (e) {
             console.error('Failed to parse deletedCoursesData:', e);
             deletedCoursesData = {};
@@ -1326,6 +1410,9 @@ function handleMatrixCellClickDirect(event) {
         cell.style.backgroundColor = '';
     }, 300);
     
+    // 수정 내용 팝업 표시
+    showToast(popupMessage);
+    
     // 교과목 테이블 업데이트 (필요한 경우만)
     // renderCourses();
     
@@ -1355,24 +1442,82 @@ function handleMatrixCellClickSimple(cell) {
     let course;
     if (isDeleted && courseId) {
         course = deletedCoursesData[courseId];
+        
+        // deletedCoursesData에 없으면 getCurrentDiffSummary에서 찾기
+        if (!course) {
+            const diffSummary = getCurrentDiffSummary();
+            const deletedEntry = diffSummary.find(entry => 
+                entry.type === '삭제' && entry.course && entry.course.id === courseId
+            );
+            if (deletedEntry) {
+                course = deletedEntry.course;
+                // deletedCoursesData에 추가
+                deletedCoursesData[courseId] = course;
+                if (!course.matrixValues && matrixData[course.courseName]) {
+                    course.matrixValues = [...matrixData[course.courseName]];
+                } else if (!course.matrixValues) {
+                    course.matrixValues = new Array(18).fill(0);
+                }
+            }
+        }
+        
         if (!course) {
             return;
         }
     } else {
         course = courses.find(c => c.id === courseId || c.courseName === courseName);
+        
+        // 과목을 찾지 못한 경우 추가 시도
+        if (!course && courseName) {
+            // 과목명으로만 다시 시도
+            course = courses.find(c => c.courseName === courseName);
+        }
     }
     
     if (!course) {
-        return;
+        // 과목을 찾지 못한 경우 기본 과목 객체 생성
+        if (courseName) {
+            course = { 
+                courseName: courseName, 
+                id: courseId || courseName,
+                matrixValues: new Array(18).fill(0)
+            };
+        } else {
+            return;
+        }
     }
     
     // 순환 편집: 빈 값 → ● → ◐ → 빈 값
-    const originalContent = cell.innerHTML;
     let currentValue = 0;
-    if (originalContent.includes('●')) {
-        currentValue = 1;
-    } else if (originalContent.includes('◐')) {
-        currentValue = 0.5;
+    
+    // 삭제된 과목의 경우 deletedCoursesData에서 현재 값을 가져옴
+    if (isDeleted && course.id && deletedCoursesData[course.id]) {
+        // matrixValues가 없으면 초기화
+        if (!deletedCoursesData[course.id].matrixValues) {
+            deletedCoursesData[course.id].matrixValues = new Array(18).fill(0);
+        }
+        
+        // 먼저 data-current-value 속성 확인
+        const storedValue = cell.getAttribute('data-current-value');
+        if (storedValue !== null) {
+            currentValue = parseFloat(storedValue);
+        } else {
+            currentValue = deletedCoursesData[course.id].matrixValues[colIndex] || 0;
+        }
+    } else {
+        // 일반 과목의 경우 cell의 내용에서 판단
+        const originalContent = cell.innerHTML;
+        if (originalContent.includes('●')) {
+            currentValue = 1;
+        } else if (originalContent.includes('◐')) {
+            currentValue = 0.5;
+        } else {
+            // data-current-value 속성도 확인
+            const storedValue = cell.getAttribute('data-current-value');
+            if (storedValue !== null) {
+                currentValue = parseFloat(storedValue);
+            }
+        }
     }
     
     
@@ -1380,12 +1525,13 @@ function handleMatrixCellClickSimple(cell) {
     let newDisplayContent = '';
     let markClass = '';
     
-    // 색상 결정 - 추가된 과목인지 확인
+    // 색상 결정 - 추가된/수정된 과목인지 확인
     const diffSummary = getCurrentDiffSummary();
     const courseDiff = diffSummary.find(entry => 
         entry.course && entry.course.id === course.id
     );
     const isAddedCourse = courseDiff && courseDiff.type === '추가';
+    const isModifiedCourse = courseDiff && courseDiff.type === '수정';
     
     let colorStyle = '';
     
@@ -1393,9 +1539,13 @@ function handleMatrixCellClickSimple(cell) {
     if (isDeleted) {
         colorStyle = 'style="color: #e74c3c;"';
     }
-    // 추가된 과목은 녹색 (변경사항 표시 모드에서만)
-    else if (showChangesModeMatrix && isAddedCourse) {
+    // 추가된 과목은 녹색
+    else if (isAddedCourse) {
         colorStyle = 'style="color: #27ae60;"';
+    }
+    // 수정된 과목은 검은색
+    else if (isModifiedCourse) {
+        colorStyle = 'style="color: #000000;"';
     }
     // 일반 과목은 카테고리별 색상
     else {
@@ -1410,46 +1560,82 @@ function handleMatrixCellClickSimple(cell) {
         }
     }
     
+    // 초기 값 확인 (수정 흔적 표시용)
+    let initialValue = 0;
+    if (initialMatrixData[courseName] && initialMatrixData[courseName][colIndex] !== undefined) {
+        initialValue = initialMatrixData[courseName][colIndex];
+    }
+    
+    // 순환 토글: 빈 값(0) → ●(1) → ◐(0.5) → 빈 값(0)
+    let popupMessage = '';
+    let additionalClass = '';
+    
     if (currentValue === 0) {
-        newMatrixValue = 1;
+        newMatrixValue = 1;  // ●
+        
+        // 초기에 값이 없었던 곳에 새로 추가된 점인지 확인
+        if (initialValue === 0) {
+            additionalClass = 'matrix-mark-new';  // 새로 추가된 점 - 파란색
+        }
+        
         newDisplayContent = colorStyle ? 
-            `<span class="matrix-mark" ${colorStyle}>●</span>` : 
-            `<span class="matrix-mark ${markClass}">●</span>`;
+            `<span class="matrix-mark ${additionalClass}" ${colorStyle}>●</span>` : 
+            `<span class="matrix-mark ${markClass} ${additionalClass}">●</span>`;
+        popupMessage = `${course.courseName} - ${performanceCriteria[colIndex]}: ● (주요)`;
     } else if (currentValue === 1) {
-        newMatrixValue = 0.5;
+        newMatrixValue = 0.5;  // ◐
+        
+        // 초기에 값이 없었던 곳에 새로 추가된 점인지 확인
+        if (initialValue === 0) {
+            additionalClass = 'matrix-mark-new';  // 새로 추가된 점 - 파란색
+        }
+        
         newDisplayContent = colorStyle ? 
-            `<span class="matrix-mark" ${colorStyle}>◐</span>` : 
-            `<span class="matrix-mark ${markClass}">◐</span>`;
+            `<span class="matrix-mark ${additionalClass}" ${colorStyle}>◐</span>` : 
+            `<span class="matrix-mark ${markClass} ${additionalClass}">◐</span>`;
+        popupMessage = `${course.courseName} - ${performanceCriteria[colIndex]}: ◐ (보조)`;
     } else {
-        newMatrixValue = 0;
-        newDisplayContent = '';
+        newMatrixValue = 0;  // 빈 값
+        
+        // 초기에 값이 있었는데 삭제된 경우 흔적 표시
+        if (initialValue > 0) {
+            const removedSymbol = initialValue === 1 ? '●' : '◐';
+            newDisplayContent = `<span class="matrix-mark matrix-mark-removed">${removedSymbol}</span>`;
+            popupMessage = `${course.courseName} - ${performanceCriteria[colIndex]}: 삭제됨 (원래: ${removedSymbol})`;
+        } else {
+            newDisplayContent = '';
+            popupMessage = `${course.courseName} - ${performanceCriteria[colIndex]}: 비어있음`;
+        }
     }
     
     
     // 매트릭스 데이터 업데이트
     if (colIndex >= 0 && colIndex < 18) {
-        // 임시 저장소에 먼저 저장
-        if (!tempMatrixData[courseName]) {
-            // 기존 데이터가 있으면 복사, 없으면 새로 생성
-            tempMatrixData[courseName] = matrixData[courseName] ? 
-                [...matrixData[courseName]] : new Array(18).fill(0);
-        }
-        tempMatrixData[courseName][colIndex] = newMatrixValue;
-        
-        // 실제 데이터에도 반영
-        if (!matrixData[courseName]) {
-            matrixData[courseName] = new Array(18).fill(0);
-        }
-        matrixData[courseName][colIndex] = newMatrixValue;
-        
-        // 삭제된 과목인 경우 deletedCoursesData에 매트릭스 값 배열 저장
+        // 삭제된 과목인 경우 deletedCoursesData를 직접 업데이트
         if (isDeleted && course.id && deletedCoursesData[course.id]) {
             if (!deletedCoursesData[course.id].matrixValues) {
-                // 기존 matrixData에서 복사하거나 새로 생성
-                deletedCoursesData[course.id].matrixValues = matrixData[courseName] ? 
-                    [...matrixData[courseName]] : new Array(18).fill(0);
+                // 기존 값이 없으면 새로 생성
+                deletedCoursesData[course.id].matrixValues = new Array(18).fill(0);
             }
             deletedCoursesData[course.id].matrixValues[colIndex] = newMatrixValue;
+            
+            // localStorage에 저장
+            localStorage.setItem('deletedCoursesData', JSON.stringify(deletedCoursesData));
+        } else {
+            // 일반 과목의 경우 기존 로직 사용
+            // 임시 저장소에 먼저 저장
+            if (!tempMatrixData[courseName]) {
+                // 기존 데이터가 있으면 복사, 없으면 새로 생성
+                tempMatrixData[courseName] = matrixData[courseName] ? 
+                    [...matrixData[courseName]] : new Array(18).fill(0);
+            }
+            tempMatrixData[courseName][colIndex] = newMatrixValue;
+            
+            // 실제 데이터에도 반영
+            if (!matrixData[courseName]) {
+                matrixData[courseName] = new Array(18).fill(0);
+            }
+            matrixData[courseName][colIndex] = newMatrixValue;
         }
     }
     
@@ -1462,8 +1648,13 @@ function handleMatrixCellClickSimple(cell) {
         cell.style.backgroundColor = '';
     }, 300);
     
-    // 임시 저장 메시지 표시
-    showToast('변경사항이 임시 저장되었습니다. 버전 저장 버튼을 눌러주세요.');
+    // 셀의 속성 업데이트 (모든 과목에 대해)
+    cell.setAttribute('data-current-value', newMatrixValue);
+    
+    // 삭제된 과목인 경우 변경사항이 지속되도록 확인
+    
+    // 수정 내용 팝업 표시
+    showToast(popupMessage);
     
     // 교과목 테이블 업데이트 (필요한 경우만)
     // renderCourses();
@@ -1605,9 +1796,11 @@ function handleMatrixCellClick(cell) {
         return;
     }
     
-    // 순환 편집: 빈 값 → ● → ◐ → 빈 값
+    // 순환 편집: 빈 값 → ◎ → ● → ◐ → 빈 값
     let currentValue = 0;
-    if (originalContent.includes('●')) {
+    if (originalContent.includes('◎')) {
+        currentValue = 2;
+    } else if (originalContent.includes('●')) {
         currentValue = 1;
     } else if (originalContent.includes('◐')) {
         currentValue = 0.5;
@@ -1631,14 +1824,18 @@ function handleMatrixCellClick(cell) {
         markClass = 'matrix-mark-practice';
     }
     
+    // 순환 토글: 빈 값(0) → ◎(2) → ●(1) → ◐(0.5) → 빈 값(0)
     if (currentValue === 0) {
-        newMatrixValue = 1;
+        newMatrixValue = 2;  // ◎
+        newDisplayContent = `<span class="matrix-mark ${markClass}">◎</span>`;
+    } else if (currentValue === 2) {
+        newMatrixValue = 1;  // ●
         newDisplayContent = `<span class="matrix-mark ${markClass}">●</span>`;
     } else if (currentValue === 1) {
-        newMatrixValue = 0.5;
+        newMatrixValue = 0.5;  // ◐
         newDisplayContent = `<span class="matrix-mark ${markClass}">◐</span>`;
     } else {
-        newMatrixValue = 0;
+        newMatrixValue = 0;  // 빈 값
         newDisplayContent = '';
     }
     
@@ -2492,7 +2689,15 @@ function editCourse(index) {
     const course = courses[index];
     const form = document.getElementById('courseForm');
     // 학년-학기 분리
-    const [year, semester] = course.yearSemester.split('-');
+    const parts = course.yearSemester.split('-');
+    const year = parts[0];
+    let semester = parts[1] || '';
+    
+    // "1/2" 또는 "1,2" 형식 처리
+    if (semester === '1/2' || semester === '1,2') {
+        semester = '구분없음';
+    }
+    
     form.year.value = year;
     form.semester.value = semester;
     form.courseNumber.value = course.courseNumber;
@@ -2865,11 +3070,23 @@ function renderMatrix() {
                 } else if (colIndex >= 16 && colIndex <= 17) {
                     markClass = 'matrix-mark-practice';
                 }
-                if (value === 1) {
+                // 값 표시 로직 수정: 2=◎, 1=●, 0.5=◐
+                if (value === 2) {
+                    // 삭제된 과목은 빨간색으로 표시
+                    if (isDeleted) {
+                        cell.innerHTML = `<span class=\"matrix-mark\" style=\"color: #e74c3c;\">◎</span>`;
+                    } 
+                    // 추가된 과목은 녹색으로 표시 (변경사항 표시 모드에서만)
+                    else if (showChangesModeMatrix && courseDiff && courseDiff.type === '추가') {
+                        cell.innerHTML = `<span class=\"matrix-mark\" style=\"color: #27ae60;\">◎</span>`;
+                    } else {
+                        cell.innerHTML = `<span class=\"matrix-mark ${markClass}\">◎</span>`;
+                    }
+                } else if (value === 1) {
                     // 삭제된 과목은 빨간색으로 표시
                     if (isDeleted) {
                         cell.innerHTML = `<span class=\"matrix-mark\" style=\"color: #e74c3c;\">●</span>`;
-                    } 
+                    }
                     // 추가된 과목은 녹색으로 표시 (변경사항 표시 모드에서만)
                     else if (showChangesModeMatrix && courseDiff && courseDiff.type === '추가') {
                         cell.innerHTML = `<span class=\"matrix-mark\" style=\"color: #27ae60;\">●</span>`;
@@ -2894,11 +3111,13 @@ function renderMatrix() {
                 cell.setAttribute('data-col-index', colIndex);
                 cell.setAttribute('data-course-id', course.id);
                 cell.setAttribute('data-is-deleted', isDeleted ? 'true' : 'false');
+                cell.setAttribute('data-current-value', value);
                 
-                // onclick 속성 직접 설정 (이벤트 리스너 대신)
+                // onclick 속성 직접 설정 - 모든 과목에 동일한 함수 사용
                 cell.style.cursor = 'pointer';
                 cell.onclick = function(e) {
                     if (isEditModeMatrix) {
+                        // 모든 과목(삭제된 과목 포함)에 대해 handleMatrixCellClickSimple 사용
                         handleMatrixCellClickSimple(this);
                     }
                 };
@@ -3196,9 +3415,16 @@ function handleCourseSubmit(e) {
     // 학년-학기 조합
     const year = formData.get('year');
     const semester = formData.get('semester');
-    const yearSemester = `${year}-${semester}`;
+    let yearSemesterDisplay = '';
+    if (semester === '구분없음') {
+        yearSemesterDisplay = `${year}-1/2`;
+    } else if (semester === '계절') {
+        yearSemesterDisplay = `${year}-계절`;
+    } else {
+        yearSemesterDisplay = `${year}-${semester}`;
+    }
     const course = {
-        yearSemester: `${form.year.value}-${form.semester.value}`,
+        yearSemester: yearSemesterDisplay,
         courseNumber: form.courseNumber.value,
         courseName: form.courseName.value,
         credits: parseInt(form.credits.value),
@@ -3458,6 +3684,51 @@ window.onload = function() {
     // 🛡️ 전역 vis-network 오류 방지 시스템 활성화
     window.setupGlobalVisNetworkErrorPrevention();
     
+    // 디버깅용 함수 - 삭제된 과목 데이터 확인
+    window.checkDeletedCourses = function() {
+        return deletedCoursesData;
+    };
+    
+    // 삭제된 과목의 매트릭스 셀 테스트
+    window.testDeletedCourseClick = function() {
+        const deletedCells = document.querySelectorAll('td[data-is-deleted="true"]');
+        if (deletedCells.length > 0 && deletedCells[0].onclick) {
+            deletedCells[0].onclick();
+        }
+    };
+    
+    // 삭제된 과목 데이터 복구
+    window.fixDeletedCourses = function() {
+        const diffSummary = getCurrentDiffSummary();
+        const deletedCourses = diffSummary.filter(entry => entry.type === '삭제');
+        
+        deletedCourses.forEach(entry => {
+            const course = entry.course;
+            if (course && course.id) {
+                if (!deletedCoursesData[course.id]) {
+                    deletedCoursesData[course.id] = JSON.parse(JSON.stringify(course));
+                }
+                
+                // matrixValues 확인 및 초기화
+                if (!deletedCoursesData[course.id].matrixValues) {
+                    if (matrixData[course.courseName]) {
+                        deletedCoursesData[course.id].matrixValues = [...matrixData[course.courseName]];
+                    } else {
+                        deletedCoursesData[course.id].matrixValues = new Array(18).fill(0);
+                    }
+                }
+            }
+        });
+        
+        // localStorage에 저장
+        localStorage.setItem('deletedCoursesData', JSON.stringify(deletedCoursesData));
+        
+        // 매트릭스 다시 렌더링
+        renderMatrix();
+        
+        return deletedCoursesData;
+    };
+    
     // 교과목 추가/수정 폼 이벤트 리스너
     const courseForm = document.getElementById('courseForm');
     if (courseForm) {
@@ -3553,7 +3824,15 @@ function editCourseFromMatrix(course, isDeleted = false) {
     }
     const form = document.getElementById('courseForm');
     // 학년-학기 분리
-    const [year, semester] = course.yearSemester.split('-');
+    const parts = course.yearSemester.split('-');
+    const year = parts[0];
+    let semester = parts[1] || '';
+    
+    // "1/2" 또는 "1,2" 형식 처리
+    if (semester === '1/2' || semester === '1,2') {
+        semester = '구분없음';
+    }
+    
     form.year.value = year;
     form.semester.value = semester;
     form.courseNumber.value = course.courseNumber;
@@ -7354,10 +7633,14 @@ function getChangedCourseIds() {
 function generateUniqueId() {
     return 'c' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
 }
-// courses 배열의 모든 교과목에 id가 없으면 자동 부여
+// courses 배열의 모든 교과목에 id가 없으면 자동 부여 및 yearSemester 형식 변환
 function ensureCourseIds(arr) {
     arr.forEach(course => {
         if (!course.id) course.id = generateUniqueId();
+        // yearSemester 형식 변환
+        if (course.yearSemester) {
+            course.yearSemester = formatYearSemester(course.yearSemester);
+        }
     });
 }
 
