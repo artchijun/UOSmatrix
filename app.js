@@ -863,6 +863,9 @@ function confirmAllChanges() {
     initialCourses = JSON.parse(JSON.stringify(courses));
     ensureCourseIds(initialCourses);
     
+    // 매트릭스 초기 상태도 현재 상태로 업데이트 (파란점을 검은점으로 변경)
+    initialMatrixData = JSON.parse(JSON.stringify(matrixData));
+    
     // 변경이력 초기화
     changeHistory = [];
     saveChangeHistory();
@@ -973,6 +976,14 @@ function restoreSelectedVersionData() {
             matrixData = v.matrixTab.matrixData ? 
                 JSON.parse(JSON.stringify(v.matrixTab.matrixData)) : {};
             
+            // 저장된 initialMatrixData가 있으면 복원, 없으면 현재 matrixData로 설정
+            if (v.matrixTab.initialMatrixData) {
+                initialMatrixData = JSON.parse(JSON.stringify(v.matrixTab.initialMatrixData));
+            } else {
+                // 이전 버전 호환성: initialMatrixData가 없으면 현재 데이터로 설정
+                initialMatrixData = JSON.parse(JSON.stringify(matrixData));
+            }
+            
             if (v.matrixTab.matrixTitleText) {
             }
             
@@ -985,6 +996,8 @@ function restoreSelectedVersionData() {
         } else {
             // 기존 구조 호환성 (깊은 복사 적용)
             matrixData = v.matrixData ? JSON.parse(JSON.stringify(v.matrixData)) : {};
+            // 이전 버전 호환성: initialMatrixData가 없으면 현재 데이터로 설정
+            initialMatrixData = JSON.parse(JSON.stringify(matrixData));
             
             // matrixExtraTableData 복원 (깊은 복사 적용)
             if (v.matrixExtraTableData) {
@@ -1104,7 +1117,10 @@ function initializeUI() {
     if (!Array.isArray(initialCourses) || initialCourses.length === 0) {
         initialCourses = JSON.parse(JSON.stringify(courses));
         ensureCourseIds(initialCourses);
-        // 초기 매트릭스 데이터도 저장
+    }
+    
+    // initialMatrixData가 비어있으면 현재 matrixData로 초기화
+    if (!initialMatrixData || Object.keys(initialMatrixData).length === 0) {
         initialMatrixData = JSON.parse(JSON.stringify(matrixData));
     }
     
@@ -1597,10 +1613,10 @@ function handleMatrixCellClickSimple(cell) {
     } else {
         newMatrixValue = 0;  // 빈 값
         
-        // 초기에 값이 있었는데 삭제된 경우 흔적 표시
+        // 초기에 값이 있었는데 삭제된 경우 회색으로 흔적 표시
         if (initialValue > 0) {
             const removedSymbol = initialValue === 1 ? '●' : '◐';
-            newDisplayContent = `<span class="matrix-mark matrix-mark-removed">${removedSymbol}</span>`;
+            newDisplayContent = `<span class="matrix-mark matrix-mark-removed" style="color: #999999;">${removedSymbol}</span>`;
             popupMessage = `${course.courseName} - ${performanceCriteria[colIndex]}: 삭제됨 (원래: ${removedSymbol})`;
         } else {
             newDisplayContent = '';
@@ -3070,8 +3086,20 @@ function renderMatrix() {
                 } else if (colIndex >= 16 && colIndex <= 17) {
                     markClass = 'matrix-mark-practice';
                 }
+                
+                // 초기값 확인 (삭제된 점 흔적 표시용)
+                let initialValue = 0;
+                if (initialMatrixData[course.courseName] && initialMatrixData[course.courseName][colIndex] !== undefined) {
+                    initialValue = initialMatrixData[course.courseName][colIndex];
+                }
+                
+                // 값이 0이고 초기값이 있었다면 회색으로 흔적 표시 (수정모드이고 변경사항 표시 모드에서만)
+                if (isEditModeMatrix && showChangesModeMatrix && value === 0 && initialValue > 0) {
+                    const removedSymbol = initialValue === 1 ? '●' : '◐';
+                    cell.innerHTML = `<span class="matrix-mark matrix-mark-removed" style="color: #999999; opacity: 0.4;">${removedSymbol}</span>`;
+                }
                 // 값 표시 로직 수정: 2=◎, 1=●, 0.5=◐
-                if (value === 2) {
+                else if (value === 2) {
                     // 삭제된 과목은 빨간색으로 표시
                     if (isDeleted) {
                         cell.innerHTML = `<span class=\"matrix-mark\" style=\"color: #e74c3c;\">◎</span>`;
@@ -3083,9 +3111,16 @@ function renderMatrix() {
                         cell.innerHTML = `<span class=\"matrix-mark ${markClass}\">◎</span>`;
                     }
                 } else if (value === 1) {
+                    // 초기에 값이 없었는데 새로 추가된 점인지 확인
+                    const isNewPoint = initialValue === 0;
+                    
                     // 삭제된 과목은 빨간색으로 표시
                     if (isDeleted) {
                         cell.innerHTML = `<span class=\"matrix-mark\" style=\"color: #e74c3c;\">●</span>`;
+                    }
+                    // 새로 추가된 점은 파란색으로 표시 (수정모드이고 변경사항 표시 모드에서만)
+                    else if (isEditModeMatrix && showChangesModeMatrix && isNewPoint) {
+                        cell.innerHTML = `<span class=\"matrix-mark matrix-mark-new\" style=\"color: #007bff;\">●</span>`;
                     }
                     // 추가된 과목은 녹색으로 표시 (변경사항 표시 모드에서만)
                     else if (showChangesModeMatrix && courseDiff && courseDiff.type === '추가') {
@@ -3094,9 +3129,16 @@ function renderMatrix() {
                         cell.innerHTML = `<span class=\"matrix-mark ${markClass}\">●</span>`;
                     }
                 } else if (value === 0.5) {
+                    // 초기에 값이 없었는데 새로 추가된 점인지 확인
+                    const isNewPoint = initialValue === 0;
+                    
                     // 삭제된 과목은 빨간색으로 표시
                     if (isDeleted) {
                         cell.innerHTML = `<span class=\"matrix-mark\" style=\"color: #e74c3c;\">◐</span>`;
+                    }
+                    // 새로 추가된 점은 파란색으로 표시 (수정모드이고 변경사항 표시 모드에서만)
+                    else if (isEditModeMatrix && showChangesModeMatrix && isNewPoint) {
+                        cell.innerHTML = `<span class=\"matrix-mark matrix-mark-new\" style=\"color: #007bff;\">◐</span>`;
                     }
                     // 추가된 과목은 녹색으로 표시 (변경사항 표시 모드에서만)
                     else if (showChangesModeMatrix && courseDiff && courseDiff.type === '추가') {
@@ -3687,6 +3729,13 @@ window.onload = function() {
     // 디버깅용 함수 - 삭제된 과목 데이터 확인
     window.checkDeletedCourses = function() {
         return deletedCoursesData;
+    };
+    
+    // 디버깅용 함수 - 초기 매트릭스 데이터 확인
+    window.checkInitialMatrixData = function() {
+        console.log('initialMatrixData:', initialMatrixData);
+        console.log('currentMatrixData:', matrixData);
+        return initialMatrixData;
     };
     
     // 삭제된 과목의 매트릭스 셀 테스트
@@ -6990,6 +7039,7 @@ async function saveVersionData(event) {
             },
             matrixTab: {
                 matrixData: typeof matrixData === 'object' ? JSON.parse(JSON.stringify(matrixData)) : {},
+                initialMatrixData: typeof initialMatrixData === 'object' ? JSON.parse(JSON.stringify(initialMatrixData)) : {},
         matrixTitleText: localStorage.getItem('matrixTitleText') || '',
                 matrixExtraTableData: typeof matrixExtraTableData === 'object' ? 
                     JSON.parse(JSON.stringify(matrixExtraTableData)) : {}
@@ -7086,6 +7136,9 @@ async function saveVersionData(event) {
     updateCurrentVersionDisplay();
         renderVersionList();
         updateVersionNavigationButtons();
+    
+    // 버전 저장 후 초기 매트릭스 데이터를 현재 상태로 업데이트 (파란점을 검은점으로 변경)
+    initialMatrixData = JSON.parse(JSON.stringify(matrixData));
     
     showToast(`'${versionName}' 버전이 저장되었습니다.`);
         
@@ -7364,6 +7417,14 @@ function restoreVersion(versionName) {
         if (versionData.matrixTab) {
             matrixData = versionData.matrixTab.matrixData ? 
                 JSON.parse(JSON.stringify(versionData.matrixTab.matrixData)) : {};
+            
+            // 저장된 initialMatrixData가 있으면 복원, 없으면 현재 matrixData로 설정
+            if (versionData.matrixTab.initialMatrixData) {
+                initialMatrixData = JSON.parse(JSON.stringify(versionData.matrixTab.initialMatrixData));
+            } else {
+                // 이전 버전 호환성: initialMatrixData가 없으면 현재 데이터로 설정
+                initialMatrixData = JSON.parse(JSON.stringify(matrixData));
+            }
                 
             if (versionData.matrixTab.matrixTitleText) {
                 localStorage.setItem('matrixTitleText', versionData.matrixTab.matrixTitleText);
