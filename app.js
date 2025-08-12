@@ -1669,6 +1669,22 @@ function handleMatrixCellClickSimple(cell) {
     
     // 삭제된 과목인 경우 변경사항이 지속되도록 확인
     
+    // 변경이력 추가
+    const criteriaName = performanceCriteria[colIndex];
+    const oldValueText = currentValue === 1 ? '● (주요)' : currentValue === 0.5 ? '◐ (보조)' : '없음';
+    const newValueText = newMatrixValue === 1 ? '● (주요)' : newMatrixValue === 0.5 ? '◐ (보조)' : '없음';
+    
+    if (currentValue !== newMatrixValue) {
+        addChangeHistory('매트릭스 수정', course.courseName, [{
+            field: `수행평가 - ${criteriaName}`,
+            before: oldValueText,
+            after: newValueText
+        }]);
+        
+        // 변경이력 패널 업데이트
+        renderChangeHistoryPanel();
+    }
+    
     // 수정 내용 팝업 표시
     showToast(popupMessage);
     
@@ -1880,6 +1896,22 @@ function handleMatrixCellClick(cell) {
     setTimeout(() => {
         cell.style.backgroundColor = '';
     }, 300);
+    
+    // 변경이력 추가
+    const criteriaName = performanceCriteria[matrixColIndex];
+    const oldValueText = currentValue === 2 ? '◎ (중요)' : currentValue === 1 ? '● (주요)' : currentValue === 0.5 ? '◐ (보조)' : '없음';
+    const newValueText = newMatrixValue === 2 ? '◎ (중요)' : newMatrixValue === 1 ? '● (주요)' : newMatrixValue === 0.5 ? '◐ (보조)' : '없음';
+    
+    if (currentValue !== newMatrixValue) {
+        addChangeHistory('매트릭스 수정', course.courseName, [{
+            field: `수행평가 - ${criteriaName}`,
+            before: oldValueText,
+            after: newValueText
+        }]);
+        
+        // 변경이력 패널 업데이트
+        renderChangeHistoryPanel();
+    }
     
     showToast('변경사항이 임시 저장되었습니다. 버전 저장 버튼을 눌러주세요.');
 }
@@ -8628,10 +8660,9 @@ function renderVersionList() {
             </div>
             <div class="version-item-info" style="margin-left: 25px;">
                 <div class="version-item-name">
-                    ${name} ${name === currentVersion ? '<span class="badge bg-success">현재</span>' : ''}
+                    ${name} <span style="color: #6c757d; font-size: 0.9em; margin-left: 8px;">(${dateString})</span> ${name === currentVersion ? '<span class="badge bg-success">현재</span>' : ''}
                 </div>
                 ${metadata.description ? `<div class="version-item-description">${metadata.description}</div>` : ''}
-                <div class="version-item-date">${dateString}</div>
                 <div class="version-item-summary">
                     <small>
                         교과목 ${courseCount}개 | 
