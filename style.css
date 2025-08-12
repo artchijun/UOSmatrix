@@ -2233,6 +2233,11 @@ th, td, .matrix-table th, .matrix-table td {
     min-width: 100px;
     width: 8.33% !important; /* 12개 컬럼 중 1개씩 균등 분배 */
     max-width: none !important;
+    min-height: 80px;
+    height: auto !important; /* 내용에 따라 자동 높이 조절 */
+    position: relative;
+    vertical-align: top;
+    padding: 8px;
 }
 
 /* 범례, 번호, 구분, 학점 셀은 내용에 맞게 자동 조정 */
@@ -3551,17 +3556,7 @@ th, td, .matrix-table th, .matrix-table td {
     transition: all 0.3s ease;
 }
 
-.drag-preview-block {
-    background: #f8fff9 !important;
-    border: 2px dashed #28a745 !important;
-    opacity: 0.8 !important;
-    transform: scale(0.95) !important;
-    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3) !important;
-    pointer-events: none !important;
-    position: relative !important;
-    z-index: 5 !important;
-    transition: none !important; /* 깜박임 방지 */
-}
+/* 이전 스타일 제거 - 아래쪽에 최신 스타일 정의됨 */
 .course-block.dragging {
     opacity: 0.1 !important;
     z-index: 1000 !important;
@@ -3581,7 +3576,69 @@ th, td, .matrix-table th, .matrix-table td {
   gap: 4px;
   transition: all 0.3s ease;
   position: relative;
+  width: 100%;
+  height: auto;
+  min-height: 60px;
 }
+
+/* 드래그 중일 때 블록 추가/제거에 의한 레이아웃 변화 방지 */
+body.dragging-course .block-wrap {
+  transition: none;
+}
+
+body.dragging-course .curriculum-table td[id^="cell-"],
+body.dragging-course .common-values-table td[id^="commonValues-cell-"] {
+  transition: none;
+}
+
+/* 미리보기 블럭 스타일 - 블록 사이에 끼워넣는 효과 */
+.drag-preview-block {
+  opacity: 0.6 !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  position: relative !important;
+  z-index: 999 !important;
+  width: 100% !important;
+  height: auto !important;
+  border: 2px solid #28a745 !important;
+  background-color: rgba(40, 167, 69, 0.1) !important;
+  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3) !important;
+  border-radius: 8px !important;
+  margin: 4px 0 !important;
+  transition: all 0.2s ease !important;
+}
+
+/* 플레이스홀더가 삽입될 때 애니메이션 */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: scaleY(0);
+    margin: 0;
+  }
+  to {
+    opacity: 0.6;
+    transform: scaleY(1);
+    margin: 4px 0;
+  }
+}
+
+/* 플레이스홀더 펄스 애니메이션 */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 0.8;
+  }
+}
+
+.drag-preview-block * {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
 
 .course-block {
   transition: all 0.3s ease;
@@ -3592,6 +3649,8 @@ th, td, .matrix-table th, .matrix-table td {
   transform: scale(1.02);
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
+
+/* 구분없음 교과목 스타일 제거 - 일반 교과목과 동일하게 표시 */
 
 .course-block.dragging {
   opacity: 0.7;
@@ -4127,11 +4186,7 @@ th, td, .matrix-table th, .matrix-table td {
         border-radius: 4px;
     }
 
-    .drag-preview-block {
-        opacity: 0.8;
-        transform: scale(0.9);
-        pointer-events: none;
-    }
+    /* 모바일에서는 drag-preview-block 스타일 상속 */
 }
 
 /* 초소형 모바일 화면 최적화 */
