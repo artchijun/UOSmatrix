@@ -6504,13 +6504,14 @@ function handleBlockWrapDragOver(e) {
             previewIndicator.style.cssText = `
                 position: fixed;
                 height: 3px;
-                background: #28a745;
+                background: #2196f3;
                 width: 100%;
                 z-index: 10000;
                 pointer-events: none;
                 transition: all 0.2s ease;
-                box-shadow: 0 0 8px rgba(40, 167, 69, 0.6);
+                box-shadow: 0 0 8px rgba(33, 150, 243, 0.6);
                 display: none;
+                border-radius: 2px;
             `;
             document.body.appendChild(previewIndicator);
         }
