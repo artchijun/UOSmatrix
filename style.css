@@ -722,6 +722,7 @@ tr:hover.hover-none {
     word-wrap: break-word;
     min-width: 12px;
     width: calc((100% - 370px) / 18);
+    vertical-align: middle;
 }
 
 .matrix-table td:first-child,
@@ -815,13 +816,16 @@ tr:hover.hover-none {
 .matrix-mark {
     font-size: inherit;
     font-weight: bold;
-    display: inline-block;
+    display: inline-flex;
     width: 1.2em;
     height: 1.2em;
     text-align: center;
-    line-height: 1.2em;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
     border-radius: 50%;
     color: #333;
+    vertical-align: middle;
 }
 
 .matrix-mark-thinking,
@@ -3542,11 +3546,11 @@ th, td, .matrix-table th, .matrix-table td {
 }
 
 .drag-preview-placeholder {
-    background: #f8fff9;
-    border: 2px dashed #28a745;
-    color: #f60000;
+    background: #e3f2fd;
+    border: 2px dashed #2196f3;
+    color: #1976d2;
     font-weight: bold;
-    border-radius: 6px;
+    border-radius: 12px;
     margin: 4px 0;
     z-index: 999;
     pointer-events: none;
@@ -3600,10 +3604,10 @@ body.dragging-course .common-values-table td[id^="commonValues-cell-"] {
   z-index: 999 !important;
   width: 100% !important;
   height: auto !important;
-  border: 2px solid #28a745 !important;
-  background-color: rgba(40, 167, 69, 0.1) !important;
-  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3) !important;
-  border-radius: 8px !important;
+  border: 2px solid #2196f3 !important;
+  background-color: rgba(33, 150, 243, 0.1) !important;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3) !important;
+  border-radius: 12px !important;
   margin: 4px 0 !important;
   transition: all 0.2s ease !important;
 }
@@ -4180,10 +4184,10 @@ body.dragging-course .common-values-table td[id^="commonValues-cell-"] {
 
     /* 드래그 프리뷰 모바일 최적화 */
     .drag-preview-placeholder {
-        border: 2px dashed #ccc;
-        background-color: rgba(204, 204, 204, 0.1);
+        border: 2px dashed #2196f3;
+        background-color: rgba(33, 150, 243, 0.1);
         min-height: 20px;
-        border-radius: 4px;
+        border-radius: 12px;
     }
 
     /* 모바일에서는 drag-preview-block 스타일 상속 */
@@ -4547,4 +4551,35 @@ body.dragging-course .common-values-table td[id^="commonValues-cell-"] {
     height: 12px;
     border-radius: 3px;
     display: inline-block;
+}
+
+/* 드래그 인디케이터 스타일 */
+.drag-preview-indicator {
+    position: fixed;
+    height: 3px;
+    background: #2196f3;
+    width: 100%;
+    z-index: 10000;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 8px rgba(33, 150, 243, 0.6);
+    border-radius: 2px;
+}
+
+/* 드롭 애니메이션 */
+@keyframes dropAnimation {
+    0% {
+        transform: scale(1.05);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* 드래그 중 셀 고정 */
+.block-wrap.dragging-over {
+    min-height: inherit !important;
+    height: inherit !important;
 }

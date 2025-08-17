@@ -530,6 +530,42 @@ let changeHistory = [];
 let initialCourses = [];
 let initialMatrixData = {};
 
+// 전역 placeholder 추적 변수
+let currentDragPlaceholder = null;
+
+// 모든 placeholder 제거 함수
+function clearAllPlaceholders() {
+    // 모든 drag-preview-block 제거
+    document.querySelectorAll('.drag-preview-block').forEach(block => {
+        block.remove();
+    });
+    
+    // 드래그 인디케이터 제거
+    const indicator = document.querySelector('.drag-preview-indicator');
+    if (indicator) {
+        indicator.remove();
+    }
+    
+    // 모든 블록 스타일 초기화
+    document.querySelectorAll('.course-block').forEach(block => {
+        block.style.transform = '';
+        block.style.transition = '';
+        block.style.boxShadow = '';
+        block.style.opacity = '';
+        block.style.border = '';
+        block.style.background = '';
+    });
+    
+    // 드롭 위치 데이터 및 initialized 플래그 초기화
+    document.querySelectorAll('.block-wrap').forEach(wrap => {
+        delete wrap.dataset.dropTarget;
+        delete wrap.dataset.dropPosition;
+        delete wrap.dataset.initialized;
+    });
+    
+    currentDragPlaceholder = null;
+}
+
 // 학년학기 표시 형식 변환 함수
 function formatYearSemester(yearSemester) {
     if (!yearSemester) return '';
@@ -2990,12 +3026,7 @@ function resetFilters() {
     document.getElementById('categoryFilterText').textContent = '전체';
     document.getElementById('subjectTypeFilterText').textContent = '전체';
     
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.value = '';
-        // 플레이스홀더 명시적으로 설정 (혹시 사라지는 경우 대비)
-        searchInput.setAttribute('placeholder', '과목명 검색');
-    }
+    document.getElementById('searchInput').value = '';
     
     // 변경 상태 체크박스 모두 체크
     document.getElementById('showAdded').checked = true;
@@ -5300,43 +5331,21 @@ function renderCurriculumTable() {
     
     // 현재 교과목들 배치
     courses.forEach(course => {
-        // 구분없음 교과목은 1, 2학기 모두에 배치 (예: "4-1/2" 또는 "4-구분없음")
-        if (course.yearSemester && (course.yearSemester.includes('구분없음') || course.yearSemester.includes('1/2'))) {
-            const [year] = course.yearSemester.split('-');
-            
-            // 1학기 셀에 배치
-            const tempCourse1 = {...course, yearSemester: `${year}-1`};
-            const cellId1 = getCurriculumCellId(tempCourse1);
-            const cell1 = document.getElementById(cellId1);
-            if (cell1) {
-                const block1 = createCourseBlock(course, false, false); // 일반 교과목
-                // 특별 스타일 제거 - 일반 교과목과 동일하게 표시
-                let blockWrap1 = cell1.querySelector('.block-wrap');
-                if (!blockWrap1) {
-                    blockWrap1 = document.createElement('div');
-                    blockWrap1.className = 'block-wrap';
-                    cell1.appendChild(blockWrap1);
-                }
-                blockWrap1.appendChild(block1);
+        const cellId = getCurriculumCellId(course);
+        const cell = document.getElementById(cellId);
+        if (cell) {
+            const block = createCourseBlock(course, false, false); // 일반 교과목
+            // 여러 블럭이 들어가는 셀은 block-wrap으로 감싸서 추가
+            // (셀에 이미 block-wrap이 있으면 그 안에 추가, 없으면 새로 생성)
+            let blockWrap = cell.querySelector('.block-wrap');
+            if (!blockWrap) {
+                blockWrap = document.createElement('div');
+                blockWrap.className = 'block-wrap';
+                cell.appendChild(blockWrap);
             }
+            blockWrap.appendChild(block);
             
-            // 2학기 셀에 배치
-            const tempCourse2 = {...course, yearSemester: `${year}-2`};
-            const cellId2 = getCurriculumCellId(tempCourse2);
-            const cell2 = document.getElementById(cellId2);
-            if (cell2) {
-                const block2 = createCourseBlock(course, false, false); // 일반 교과목
-                // 특별 스타일 제거 - 일반 교과목과 동일하게 표시
-                let blockWrap2 = cell2.querySelector('.block-wrap');
-                if (!blockWrap2) {
-                    blockWrap2 = document.createElement('div');
-                    blockWrap2.className = 'block-wrap';
-                    cell2.appendChild(blockWrap2);
-                }
-                blockWrap2.appendChild(block2);
-            }
-            
-            // 변경 이력 확인 (구분없음 교과목도 동일하게 처리)
+            // 학년학기가 변경된 교과목인지 확인
             const courseChange = diffSummary.find(entry => 
                 entry.course && entry.course.id === course.id && entry.type === '수정'
             );
@@ -5346,12 +5355,14 @@ function renderCurriculumTable() {
                 const isRequiredChange = courseChange.changes.find(c => c.field === 'isRequired');
                 const categoryChange = courseChange.changes.find(c => c.field === 'category');
                 
+                // 학년학기 변경, 필수여부 변경, 또는 분야 변경이 있는 경우
                 if (yearSemesterChange || isRequiredChange || categoryChange) {
                     const oldCourse = { ...course };
                     courseChange.changes.forEach(change => {
                         oldCourse[change.field] = change.before;
                     });
                     
+                    // 학년학기 변경이 있는 경우 해당 값도 복원
                     if (yearSemesterChange) {
                         oldCourse.yearSemester = yearSemesterChange.before;
                     }
@@ -5360,51 +5371,6 @@ function renderCurriculumTable() {
                         initialCourse: oldCourse,
                         currentCourse: course
                     });
-                }
-            }
-        } else {
-            // 일반 교과목 배치 (기존 로직)
-            const cellId = getCurriculumCellId(course);
-            const cell = document.getElementById(cellId);
-            if (cell) {
-                const block = createCourseBlock(course, false, false); // 일반 교과목
-                // 여러 블럭이 들어가는 셀은 block-wrap으로 감싸서 추가
-                // (셀에 이미 block-wrap이 있으면 그 안에 추가, 없으면 새로 생성)
-                let blockWrap = cell.querySelector('.block-wrap');
-                if (!blockWrap) {
-                    blockWrap = document.createElement('div');
-                    blockWrap.className = 'block-wrap';
-                    cell.appendChild(blockWrap);
-                }
-                blockWrap.appendChild(block);
-                
-                // 학년학기가 변경된 교과목인지 확인
-                const courseChange = diffSummary.find(entry => 
-                    entry.course && entry.course.id === course.id && entry.type === '수정'
-                );
-                
-                if (courseChange) {
-                    const yearSemesterChange = courseChange.changes.find(c => c.field === 'yearSemester');
-                    const isRequiredChange = courseChange.changes.find(c => c.field === 'isRequired');
-                    const categoryChange = courseChange.changes.find(c => c.field === 'category');
-                    
-                    // 학년학기 변경, 필수여부 변경, 또는 분야 변경이 있는 경우
-                    if (yearSemesterChange || isRequiredChange || categoryChange) {
-                        const oldCourse = { ...course };
-                        courseChange.changes.forEach(change => {
-                            oldCourse[change.field] = change.before;
-                        });
-                        
-                        // 학년학기 변경이 있는 경우 해당 값도 복원
-                        if (yearSemesterChange) {
-                            oldCourse.yearSemester = yearSemesterChange.before;
-                        }
-                        
-                        movedCoursesForGhost.push({
-                            initialCourse: oldCourse,
-                            currentCourse: course
-                        });
-                    }
                 }
             }
         }
@@ -5534,12 +5500,6 @@ function calculateAndDisplayCredits() {
     activeCourses.forEach(course => {
         let [year, semester] = course.yearSemester.split('-');
         if (semester === '계절') semester = '2'; // 계절학기는 2학기로 취급
-        
-        // 구분없음 과목과 1/2 과목은 1학기에만 학점 계산 (중복 계산 방지)
-        if (semester === '구분없음' || semester === '1/2') {
-            semester = '1';
-        }
-        
         const key = `${year}-${semester}`;
         if (!creditSums[key]) {
             creditSums[key] = { required: 0, elective: 0, total: 0 };
@@ -6110,51 +6070,8 @@ function handleCourseBlockDragStart(e) {
         return;
     }
     
-    // body에 드래그 중 클래스 추가
-    document.body.classList.add('dragging-course');
-    
-    // 드래그 시작 시 셀 높이 정보만 저장 (고정하지 않음)
-    const allCells = document.querySelectorAll('.curriculum-table td[id^="cell-"], .common-values-table td[id^="commonValues-cell-"]');
-    console.log(`[DRAG START] 셀 높이 추적 시작 - 총 ${allCells.length}개 셀`);
-    const cellHeights = [];
-    allCells.forEach((cell, index) => {
-        if (cell) {
-            const currentHeight = cell.offsetHeight;
-            const cellId = cell.id || `cell-${index}`;
-            cellHeights.push({ id: cellId, height: currentHeight });
-            // 높이를 고정하지 않고 원본 높이만 저장
-            cell.dataset.originalHeight = currentHeight; // 원본 높이 저장
-            // minHeight만 설정하여 최소 높이 보장
-            if (!cell.style.minHeight || parseInt(cell.style.minHeight) < currentHeight) {
-                cell.style.minHeight = currentHeight + 'px';
-            }
-        }
-    });
-    console.log('[DRAG START] 셀 높이 추적 설정 완료:', cellHeights);
-    
-    // 타이머 정리
-    if (previewBlockTimer) {
-        clearTimeout(previewBlockTimer);
-        previewBlockTimer = null;
-    }
-    
-    // 글로벌 프리뷰 블록 초기화
-    if (globalPreviewBlock) {
-        if (globalPreviewBlock.parentNode) {
-            console.log('Cleaning up old preview block at drag start');
-            globalPreviewBlock.parentNode.removeChild(globalPreviewBlock);
-        }
-        globalPreviewBlock = null;
-    }
-    
-    // 드래그 시작 시 이전의 미리보기 블록들 모두 제거
-    document.querySelectorAll('.drag-preview-block').forEach(preview => {
-        preview.remove();
-    });
-    // 초기화 플래그들도 모두 제거
-    document.querySelectorAll('.block-wrap').forEach(wrap => {
-        delete wrap.dataset.initialized;
-    });
+    // 드래그 시작 시 기존 placeholder 정리
+    clearAllPlaceholders();
     
     const courseName = e.target.dataset.courseName;
     e.dataTransfer.setData('text/plain', courseName);
@@ -6203,58 +6120,12 @@ function handleCourseBlockDragEnd(e) {
     isCourseBlockDragging = false; // 드래그 종료 시 플래그 false
     window.hideCourseTooltip(); // 혹시 남아있을 툴팁 제거
     
-    // body에서 드래그 중 클래스 제거
-    document.body.classList.remove('dragging-course');
-    
-    // 드래그 종료 시 셀 높이 정보 정리
-    // setTimeout으로 약간의 지연을 주어 드롭 완료 후 처리
-    setTimeout(() => {
-        const allCells = document.querySelectorAll('.curriculum-table td[id^="cell-"], .common-values-table td[id^="commonValues-cell-"]');
-        console.log(`[DRAG END] 셀 높이 정보 정리 - 총 ${allCells.length}개 셀`);
-        allCells.forEach(cell => {
-            if (cell && cell.dataset.originalHeight) {
-                const finalHeight = cell.offsetHeight;
-                const originalHeight = parseInt(cell.dataset.originalHeight || 0);
-                if (finalHeight !== originalHeight && originalHeight > 0) {
-                    console.log(`[DRAG END] 셀 높이 변화 기록: ${cell.id} - ${originalHeight}px → ${finalHeight}px`);
-                }
-                // 원본 높이 정보만 삭제 (스타일은 유지)
-                delete cell.dataset.originalHeight;
-            }
-        });
-        console.log('[DRAG END] 정리 완료');
-    }, 100);
+    // 드래그 종료 시 모든 placeholder 정리
+    clearAllPlaceholders();
     
     // 모든 미리보기 효과 제거
     document.querySelectorAll('.block-wrap').forEach(wrap => {
         clearBlockWrapPreview(wrap);
-        // 초기화 플래그도 제거
-        delete wrap.dataset.initialized;
-    });
-    
-    // 타이머 정리
-    if (previewBlockTimer) {
-        clearTimeout(previewBlockTimer);
-        previewBlockTimer = null;
-    }
-    
-    // 드래그 오버 쓰로틀 타이머 정리
-    if (dragOverThrottle) {
-        clearTimeout(dragOverThrottle);
-        dragOverThrottle = null;
-    }
-    
-    // 글로벌 미리보기 블록 완전 초기화
-    if (globalPreviewBlock) {
-        if (globalPreviewBlock.parentNode) {
-            globalPreviewBlock.parentNode.removeChild(globalPreviewBlock);
-        }
-        globalPreviewBlock = null;
-    }
-    
-    // 남아있을 수 있는 모든 프리뷰 블록 제거
-    document.querySelectorAll('.drag-preview-block').forEach(preview => {
-        preview.remove();
     });
     
     // 드래그 종료 시 최종 DOM 순서 로그
@@ -6331,10 +6202,6 @@ function setupCurriculumDropZones() {
     const cells = document.querySelectorAll('[id^="cell-"]');
     
     cells.forEach(cell => {
-        // 기존 이벤트 리스너 제거
-        cell.removeEventListener('dragover', handleCurriculumDragOver);
-        cell.removeEventListener('drop', handleCurriculumDrop);
-        // 새로 추가
         cell.addEventListener('dragover', handleCurriculumDragOver);
         cell.addEventListener('drop', handleCurriculumDrop);
     });
@@ -6342,12 +6209,6 @@ function setupCurriculumDropZones() {
     // 기술분야 특별 드롭존 설정
     const techDropZones = document.querySelectorAll('#curriculum td[id*="-구조-"], #curriculum td[id*="-환경-"], #curriculum td[id*="-시공-"], #curriculum td[id*="-디지털-"]');
     techDropZones.forEach(zone => {
-        // 기존 이벤트 리스너 제거
-        zone.removeEventListener('dragover', handleTechDragOver);
-        zone.removeEventListener('drop', handleTechDrop);
-        zone.removeEventListener('dragenter', handleTechDragEnter);
-        zone.removeEventListener('dragleave', handleTechDragLeave);
-        // 새로 추가
         zone.addEventListener('dragover', handleTechDragOver);
         zone.addEventListener('drop', handleTechDrop);
         zone.addEventListener('dragenter', handleTechDragEnter);
@@ -6379,10 +6240,7 @@ function handleCurriculumDrop(e) {
     if (!course) return;
     
     // 셀 ID에서 속성 추출
-    const cellElement = e.target.closest('[id^="cell-"]');
-    if (!cellElement) return;
-    
-    const cellId = cellElement.id;
+    const cellId = e.target.closest('[id^="cell-"]').id;
     const cellInfo = cellId.split('-'); // 예: ["cell", "전공필수", "설계", "3", "2"]
     let changes = [];
     if (cellInfo.length >= 5) {
@@ -6542,14 +6400,7 @@ function handleTechDrop(e) {
     }
     
     // 셀 ID에서 기술분야와 학년-학기 정보 추출
-    const cellElement = e.target.closest('[id^="cell-"]');
-    if (!cellElement) {
-        e.target.style.backgroundColor = '';
-        e.target.style.border = '';
-        return;
-    }
-    
-    const cellId = cellElement.id;
+    const cellId = e.target.closest('[id^="cell-"]').id;
     const match = cellId.match(/cell-.*?-(구조|환경|시공|디지털)-(\d+)-(\d+)/);
     
     if (match) {
@@ -6614,375 +6465,183 @@ function classifyTechCourse(course, techField) {
 
 // --- 셀 내부 블럭 수동 정렬 기능 ---
 function setupBlockWrapDragEvents() {
-    // 모든 block-wrap에 드래그 이벤트 연결
+    // 기존 이벤트 리스너 제거 (중복 방지)
     document.querySelectorAll('.block-wrap').forEach(wrap => {
-        // 기존 이벤트 리스너 제거
         wrap.removeEventListener('dragover', handleBlockWrapDragOver);
         wrap.removeEventListener('dragleave', handleBlockWrapDragLeave);
         wrap.removeEventListener('drop', handleBlockWrapDrop);
-        // 새로 추가
+    });
+    
+    // 새로운 이벤트 리스너 추가
+    document.querySelectorAll('.block-wrap').forEach(wrap => {
         wrap.addEventListener('dragover', handleBlockWrapDragOver);
         wrap.addEventListener('dragleave', handleBlockWrapDragLeave);
         wrap.addEventListener('drop', handleBlockWrapDrop);
     });
 }
-// 글로벌 미리보기 블록 변수
-let globalPreviewBlock = null;
-let previewBlockTimer = null; // 미리보기 블록 타이머
-
-// 드래그 오버 이벤트 쓰로틀링을 위한 변수
-let dragOverThrottle = null;
-
-// block-wrap 드래그 오버 - 밀림 효과 (깜박임 방지)
+// block-wrap 드래그 오버 - 시각적 인디케이터만 표시 (셀 크기 변경 없음)
 function handleBlockWrapDragOver(e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     
-    // 드래그 중이 아니면 무시 (안전장치)
-    if (!document.body.classList.contains('dragging-course')) return;
-    
-    // 원본 드래깅 블록 찾기 (미리보기 블록 제외)
-    const draggingBlock = document.querySelector('.course-block.dragging:not(.drag-preview-block)');
-    if (!draggingBlock) return;
-    
-    const blockWrap = e.currentTarget;
-    const targetBlock = e.target.closest('.course-block');
-    
-    // 드래깅 블록 자체를 타겟으로 하면 무시
-    if (targetBlock === draggingBlock) return;
-    
-    // 타이머 초기화 - 미리보기 블럭이 사라지는 것 방지
-    if (previewBlockTimer) {
-        clearTimeout(previewBlockTimer);
-        previewBlockTimer = null;
-        console.log('[DRAG INFO] 타이머 리셋 - 플레이스홀더 유지');
-    }
-    
-    // 기존 미리보기 블록들 정리 (안전 장치)
-    document.querySelectorAll('.drag-preview-block[data-is-preview="true"]').forEach(oldPreview => {
-        if (oldPreview !== globalPreviewBlock) {
-            oldPreview.remove();
+    try {
+        // 현재 드래그 중인 블록 확인
+        const draggingBlock = document.querySelector('.course-block.dragging');
+        if (!draggingBlock) return;
+        
+        // blockWrap 유효성 검사
+        const blockWrap = e.currentTarget;
+        if (!blockWrap || !blockWrap.isConnected) return;
+        
+        // 타겟 블록 안전하게 가져오기
+        const targetBlock = e.target?.closest?.('.course-block');
+        
+        // 드래그 인디케이터 생성 또는 가져오기 (DOM에 영향 없는 absolute positioning)
+        let previewIndicator = document.querySelector('.drag-preview-indicator');
+        if (!previewIndicator) {
+            previewIndicator = document.createElement('div');
+            previewIndicator.className = 'drag-preview-indicator';
+            previewIndicator.style.cssText = `
+                position: fixed;
+                height: 3px;
+                background: #28a745;
+                width: 100%;
+                z-index: 10000;
+                pointer-events: none;
+                transition: all 0.2s ease;
+                box-shadow: 0 0 8px rgba(40, 167, 69, 0.6);
+                display: none;
+            `;
+            document.body.appendChild(previewIndicator);
         }
-    });
-    
-    // 글로벌 프리뷰 블럭 가져오기 또는 생성
-    if (!globalPreviewBlock || !document.body.contains(globalPreviewBlock)) {
-        // 기존 프리뷰 블록이 없거나 DOM에서 제거된 경우 새로 생성
-        console.log('Creating new preview block for:', draggingBlock.dataset.courseName);
-        globalPreviewBlock = draggingBlock.cloneNode(true);
-        // 모든 클래스를 초기화하고 필요한 것만 추가
-        globalPreviewBlock.className = 'course-block drag-preview-block';
         
-        // 원본 블럭의 기본 스타일 유지하면서 미리보기 효과 추가
-        const originalStyles = window.getComputedStyle(draggingBlock);
-        globalPreviewBlock.style.width = originalStyles.width;
-        // 높이를 고정값으로 설정하여 레이아웃 변화 최소화
-        const blockHeight = draggingBlock.offsetHeight;
-        globalPreviewBlock.style.height = `${blockHeight}px`;
-        globalPreviewBlock.style.minHeight = `${blockHeight}px`;
-        globalPreviewBlock.style.maxHeight = `${blockHeight}px`;
-        globalPreviewBlock.style.padding = originalStyles.padding;
-        globalPreviewBlock.style.fontSize = originalStyles.fontSize;
-        globalPreviewBlock.style.fontWeight = originalStyles.fontWeight;
-        globalPreviewBlock.style.textAlign = originalStyles.textAlign;
-        
-        // 미리보기 효과 추가
-        globalPreviewBlock.style.opacity = '0.6';
-        globalPreviewBlock.style.border = '2px solid #28a745';
-        globalPreviewBlock.style.backgroundColor = 'rgba(40, 167, 69, 0.1)';
-        globalPreviewBlock.style.pointerEvents = 'none';
-        globalPreviewBlock.style.position = 'relative';
-        globalPreviewBlock.style.margin = '4px 0';
-        globalPreviewBlock.style.transition = 'all 0.2s ease';
-        
-        globalPreviewBlock.draggable = false; // 미리보기 블록은 드래그 불가
-        globalPreviewBlock.removeAttribute('id'); // ID 충돌 방지
-        // dataset 속성들도 복사
-        globalPreviewBlock.dataset.courseName = draggingBlock.dataset.courseName;
-        globalPreviewBlock.dataset.courseId = draggingBlock.dataset.courseId;
-        globalPreviewBlock.dataset.isPreview = 'true'; // 미리보기 블록 식별용
-        // 고유 타임스탬프 추가
-        globalPreviewBlock.dataset.previewTimestamp = Date.now().toString();
-    }
-    
-    let previewBlock = globalPreviewBlock;
-    
-    // 모든 블럭 초기화 (한 번만)
-    if (!blockWrap.dataset.initialized) {
-        blockWrap.querySelectorAll('.course-block').forEach(block => {
-            if (block !== draggingBlock && !block.classList.contains('drag-preview-block')) {
-                try {
-                    block.style.transform = '';
-                    block.style.transition = 'all 0.3s ease';
-                    // 다른 스타일은 초기화하지 않음 (기존 스타일 유지)
-                } catch (err) {
-                    console.debug('Error initializing block:', err);
-                }
-            }
-        });
-        blockWrap.dataset.initialized = 'true';
-    }
-    
-    // targetBlock이 미리보기 블럭인 경우 제외
-    if (targetBlock && targetBlock.classList && targetBlock.classList.contains('drag-preview-block')) {
-        targetBlock = null;
-    }
-    
-    // dropPosition 변수를 외부에 선언
-    let dropPosition = null;
-    
-    if (targetBlock && targetBlock !== draggingBlock && blockWrap.contains(targetBlock)) {
-        try {
+        // 드롭 위치를 계산하여 인디케이터 위치만 업데이트
+        if (targetBlock && targetBlock.parentNode && targetBlock !== draggingBlock && blockWrap.contains(targetBlock)) {
             const rect = targetBlock.getBoundingClientRect();
-            // rect가 유효한지 확인
-            if (rect && rect.height > 0) {
-                const mouseY = e.clientY;
-                const blockCenterY = rect.top + rect.height / 2;
-                dropPosition = mouseY < blockCenterY ? 'before' : 'after';
-            }
-        } catch (err) {
-            console.debug('Error calculating block position:', err);
-            dropPosition = 'after'; // 기본값 설정
-        }
-        
-        // 프리뷰 블럭 위치 업데이트 (DOM 조작 최소화)
-        const currentPreviewParent = previewBlock.parentNode;
-        const targetParent = targetBlock.parentNode;
-        
-        // DOM 조작 전 유효성 검사
-        if (targetParent && dropPosition) {
-            try {
-                // 부모 셀 찾기 (curriculum 또는 common-values 테이블의 td)
-                const targetCell = blockWrap.closest('td[id^="cell-"], td[id^="commonValues-cell-"]');
-                
-                // 셀 높이 변화 감지 (로그만 남기고 동작은 계속)
-                if (targetCell) {
-                    const currentCellHeight = targetCell.offsetHeight;
-                    const originalCellHeight = parseInt(targetCell.dataset.originalHeight || 0);
-                    if (currentCellHeight !== originalCellHeight && originalCellHeight > 0) {
-                        console.log(`[DRAG INFO] 셀 높이 변화: ${targetCell.id}: ${originalCellHeight}px → ${currentCellHeight}px`);
-                        // 셀 높이가 변경되어도 플레이스홀더는 유지
-                        // 드래그 상태를 다시 확인하여 플레이스홀더 보호
-                        if (globalPreviewBlock && !document.body.contains(globalPreviewBlock)) {
-                            console.log('[DRAG FIX] 플레이스홀더가 제거됨 - 재생성');
-                            globalPreviewBlock = null; // 재생성 유도
-                        }
-                    }
-                }
-                
-                // 미리보기 블럭이 아직 DOM에 없거나 다른 부모에 있는 경우
-                if (!currentPreviewParent || currentPreviewParent !== targetParent) {
-                    console.log(`[DRAG PREVIEW] Moving to ${dropPosition} of`, targetBlock.dataset.courseName);
-                    // 위치에 따라 삽입
-                    if (dropPosition === 'before') {
-                        targetParent.insertBefore(previewBlock, targetBlock);
-                    } else {
-                        const nextSibling = targetBlock.nextElementSibling;
-                        if (nextSibling && nextSibling.classList && nextSibling.classList.contains('course-block')) {
-                            targetParent.insertBefore(previewBlock, nextSibling);
-                        } else {
-                            targetParent.appendChild(previewBlock);
-                        }
-                    }
-                } else {
-                    // 같은 block-wrap 내에서 위치만 변경
-                    const currentIndex = Array.from(targetParent.children).indexOf(previewBlock);
-                    const targetIndex = Array.from(targetParent.children).indexOf(targetBlock);
-                    const newIndex = dropPosition === 'before' ? targetIndex : targetIndex + 1;
-                    
-                    // 실제로 위치가 변경되어야 하는 경우만 이동
-                    if (currentIndex !== newIndex && currentIndex !== newIndex - 1) {
-                        if (dropPosition === 'before') {
-                            targetParent.insertBefore(previewBlock, targetBlock);
-                        } else {
-                            const nextSibling = targetBlock.nextElementSibling;
-                            if (nextSibling && nextSibling.classList && nextSibling.classList.contains('course-block')) {
-                                targetParent.insertBefore(previewBlock, nextSibling);
-                            } else {
-                                targetParent.appendChild(previewBlock);
-                            }
-                        }
-                    }
-                }
-                
-                // 플레이스홀더에 애니메이션 효과 적용
-                if (previewBlock) {
-                    // 새로 삽입된 경우 애니메이션
-                    if (!previewBlock.dataset.animated) {
-                        previewBlock.dataset.animated = 'true';
-                        previewBlock.style.animation = 'slideIn 0.2s ease';
-                        setTimeout(() => {
-                            if (previewBlock) {
-                                previewBlock.style.animation = 'pulse 1.5s ease-in-out infinite';
-                            }
-                        }, 200);
-                    }
-                }
-            } catch (err) {
-                console.error('[DRAG ERROR] 미리보기 위치 업데이트 중 오류:', err);
-                const debugCell = blockWrap.closest('td[id^="cell-"], td[id^="commonValues-cell-"]');
-                console.error('[DRAG ERROR] 현재 상태:', {
-                    targetCell: debugCell?.id || 'N/A',
-                    targetBlock: targetBlock?.dataset?.courseName || 'N/A',
-                    dropPosition: dropPosition || 'N/A',
-                    previewBlockExists: !!previewBlock,
-                    targetParentExists: !!targetParent,
-                    blockWrapId: blockWrap?.id || 'N/A'
-                });
-                // 에러 발생 시 미리보기 블록을 blockWrap 끝에 추가
-                if (blockWrap && !blockWrap.contains(previewBlock)) {
-                    blockWrap.appendChild(previewBlock);
-                }
-            }
-        }
-        
-        // 미리보기 블럭이 제대로 삽입되었는지 확인하고 순서 조정
-        // 밀림 효과 대신 실제로 미리보기 블럭을 적절한 위치에 삽입
-        if (previewBlock && blockWrap.contains(previewBlock)) {
-            // 미리보기 블럭 스타일을 실제 블럭처럼 보이도록 조정
-            previewBlock.style.margin = '4px 0';
-            previewBlock.style.opacity = '0.7';
+            const mouseY = e.clientY;
+            const blockCenterY = rect.top + rect.height / 2;
+            const dropPosition = mouseY < blockCenterY ? 'before' : 'after';
             
-            // 다른 블럭들의 transform 초기화 (밀림 효과 제거)
-            const allBlocks = Array.from(blockWrap.querySelectorAll('.course-block:not(.dragging)'));
-            allBlocks.forEach(block => {
-                if (block && block.style && block !== previewBlock) {
-                    block.style.transform = '';
-                    block.style.transition = 'transform 0.2s ease';
-                }
-            });
-        }
-        
-        
-    } else {
-        // 빈 영역에 드래그 중일 때 (targetBlock이 없는 경우)
-        try {
-            if (!blockWrap.contains(previewBlock)) {
-                // 즉시 미리보기 블럭 추가
-                blockWrap.appendChild(previewBlock);
-                
-                // 미리보기 블럭 스타일 적용
-                previewBlock.style.margin = '4px 0';
-                previewBlock.style.opacity = '0.7';
+            // 인디케이터 위치 설정 (fixed positioning 사용)
+            if (dropPosition === 'before') {
+                previewIndicator.style.top = (rect.top - 2) + 'px';
+            } else {
+                previewIndicator.style.top = (rect.bottom - 1) + 'px';
             }
-        } catch (err) {
-            console.debug('Error appending preview to empty area:', err);
+            previewIndicator.style.left = rect.left + 'px';
+            previewIndicator.style.width = rect.width + 'px';
+            previewIndicator.style.display = 'block';
+            
+            // 드롭 위치 정보를 데이터 속성으로 저장 (실제 드롭 시 사용)
+            blockWrap.dataset.dropTarget = targetBlock.dataset.courseId;
+            blockWrap.dataset.dropPosition = dropPosition;
+            
+            // 타겟 블록에 시각적 강조 효과 (선택적)
+            targetBlock.style.opacity = '0.7';
+            targetBlock.style.transition = 'opacity 0.2s ease';
+            
+        } else if (blockWrap && !targetBlock) {
+            // 빈 영역에 드래그 중 - 맨 끝에 추가될 것임을 표시
+            const lastBlock = blockWrap.querySelector('.course-block:last-child');
+            if (lastBlock) {
+                const rect = lastBlock.getBoundingClientRect();
+                previewIndicator.style.top = (rect.bottom - 1) + 'px';
+                previewIndicator.style.left = rect.left + 'px';
+                previewIndicator.style.width = rect.width + 'px';
+                previewIndicator.style.display = 'block';
+            } else {
+                // 셀이 비어있는 경우
+                const cellRect = blockWrap.getBoundingClientRect();
+                previewIndicator.style.top = cellRect.top + 'px';
+                previewIndicator.style.left = cellRect.left + 'px';
+                previewIndicator.style.width = cellRect.width + 'px';
+                previewIndicator.style.display = 'block';
+            }
+            
+            blockWrap.dataset.dropTarget = 'end';
+            blockWrap.dataset.dropPosition = 'append';
         }
+        
+        // 기존 초기화 플래그 설정 (드래그 종료 시 정리용)
+        blockWrap.dataset.initialized = 'true';
+        
+    } catch (error) {
+        console.error('Drag over error:', error);
+        clearAllPlaceholders();
     }
-    
-
 }
 
 // block-wrap 드래그 리브
 function handleBlockWrapDragLeave(e) {
-    const blockWrap = e.currentTarget;
-    const relatedTarget = e.relatedTarget;
-    
-    // 셀 높이 변경으로 인한 dragleave는 무시
-    // relatedTarget이 같은 blockWrap 내부 요소이면 무시
-    if (relatedTarget && (blockWrap.contains(relatedTarget) || relatedTarget.closest('.block-wrap') === blockWrap)) {
-        console.log('[DRAG INFO] 같은 blockWrap 내부 이동 - dragleave 무시');
-        return;
-    }
-    
-    // block-wrap을 완전히 벗어났을 때만 미리보기 효과 제거
-    if (!relatedTarget || !blockWrap.contains(relatedTarget)) {
-        // 타이머를 사용하여 잠시 후 제거 (드래그가 계속되는지 확인)
-        if (previewBlockTimer) {
-            clearTimeout(previewBlockTimer);
-        }
-        previewBlockTimer = setTimeout(() => {
-            // 드래그가 여전히 진행 중인지 확인
-            const stillDragging = document.body.classList.contains('dragging-course');
-            const draggingBlock = document.querySelector('.course-block.dragging:not(.drag-preview-block)');
+    try {
+        const blockWrap = e.currentTarget;
+        if (!blockWrap || !blockWrap.isConnected) return;
+        
+        const relatedTarget = e.relatedTarget;
+        
+        // block-wrap을 완전히 벗어났을 때만 처리
+        if (!blockWrap.contains(relatedTarget)) {
+            // 드롭 위치 데이터 초기화
+            delete blockWrap.dataset.dropTarget;
+            delete blockWrap.dataset.dropPosition;
             
-            // 드래그가 종료되었고, 실제 드래그 중인 블록이 없을 때만 제거
-            if (!stillDragging && !draggingBlock) {
-                console.log('[DRAG INFO] 드래그 종료 확인 - 플레이스홀더 제거');
-                // 글로벌 미리보기 블록이 이 wrap에 있으면 제거
-                if (globalPreviewBlock && blockWrap.contains(globalPreviewBlock)) {
-                    try {
-                        console.log('Removing preview block from wrap');
-                        blockWrap.removeChild(globalPreviewBlock);
-                    } catch (err) {
-                        // 이미 제거되었거나 다른 문제가 있는 경우 무시
-                        console.debug('Preview block already removed or error:', err);
-                    }
-                }
-            } else {
-                console.log('[DRAG INFO] 드래그 진행 중 - 플레이스홀더 유지');
-                // 타이머 해제하여 플레이스홀더가 제거되지 않도록 함
-                if (previewBlockTimer) {
-                    clearTimeout(previewBlockTimer);
-                    previewBlockTimer = null;
-                }
+            // 인디케이터 숨기기
+            const indicator = document.querySelector('.drag-preview-indicator');
+            if (indicator) {
+                indicator.style.display = 'none';
             }
-        }, 1000); // 1초로 지연 시간 증가
-        // 초기화 플래그도 제거
-        delete blockWrap.dataset.initialized;
-        // 다른 스타일 초기화
-        try {
+            
+            // 타겟 블록 스타일 초기화
             blockWrap.querySelectorAll('.course-block').forEach(block => {
-                if (block && block.style && !block.classList.contains('dragging')) {
-                    block.style.transform = '';
-                    block.style.transition = '';
-                }
+                block.style.opacity = '';
+                block.style.transition = '';
             });
-        } catch (err) {
-            console.debug('Error resetting block styles:', err);
+            
+            clearBlockWrapPreview(blockWrap);
         }
+    } catch (error) {
+        console.error('Drag leave error:', error);
+        clearAllPlaceholders();
     }
 }
 
 // 미리보기 효과 제거 함수 - 밀림 효과용 (깜박임 방지)
 function clearBlockWrapPreview(blockWrap) {
-    if (!blockWrap) return;
+    if (!blockWrap || !blockWrap.isConnected) return;
     
-    // 타이머 취소
-    if (previewBlockTimer) {
-        clearTimeout(previewBlockTimer);
-        previewBlockTimer = null;
-    }
-    
-    // 글로벌 프리뷰 블럭이 이 wrap에 있으면 제거
-    if (globalPreviewBlock && blockWrap.contains(globalPreviewBlock)) {
-        try {
-            blockWrap.removeChild(globalPreviewBlock);
-        } catch (err) {
-            // 이미 제거되었거나 다른 문제가 있는 경우 무시
-            console.debug('Preview block cleanup error:', err);
+    try {
+        // 프리뷰 블럭 제거
+        const previewBlock = blockWrap.querySelector('.drag-preview-block');
+        if (previewBlock && previewBlock.parentNode) {
+            previewBlock.remove();
         }
-    }
-    
-    // 로컬 프리뷰 블럭도 제거 (혹시 남아있을 수 있음)
-    const localPreviewBlocks = blockWrap.querySelectorAll('.drag-preview-block');
-    localPreviewBlocks.forEach(block => {
-        try {
-            block.remove();
-        } catch (err) {
-            console.debug('Local preview block removal error:', err);
+        
+        // 모든 블럭의 스타일 초기화
+        const blocks = blockWrap.querySelectorAll('.course-block');
+        blocks.forEach(block => {
+            if (block && block.isConnected) {
+                block.style.transform = '';
+                block.style.transition = '';
+                block.style.boxShadow = '';
+                block.style.opacity = '';
+                block.style.border = '';
+                block.style.background = '';
+            }
+        });
+        
+        // 초기화 플래그 제거
+        delete blockWrap.dataset.initialized;
+        
+        // 셀 하이라이트 제거
+        const cell = blockWrap.closest('td');
+        if (cell) {
+            cell.classList.remove('cell-highlight');
+            cell.style.background = '';
+            cell.style.border = '';
         }
-    });
-    
-    // 모든 블럭의 스타일 초기화
-    blockWrap.querySelectorAll('.course-block').forEach(block => {
-        block.style.transform = '';
-        block.style.transition = '';
-        block.style.boxShadow = '';
-        block.style.opacity = '';
-        block.style.border = '';
-        block.style.background = '';
-    });
-    
-    // 초기화 플래그 제거
-    delete blockWrap.dataset.initialized;
-    
-    // 셀 하이라이트 제거
-    const cell = blockWrap.closest('td');
-    if (cell) {
-        cell.classList.remove('cell-highlight');
-        cell.style.background = '';
-        cell.style.border = '';
+        
+    } catch (error) {
+        console.error('Clear preview error:', error);
     }
 }
 
@@ -6990,54 +6649,72 @@ function clearBlockWrapPreview(blockWrap) {
 function handleBlockWrapDrop(e) {
     e.preventDefault();
     
-    // 원본 드래깅 블록 찾기 (미리보기 블록 제외)
-    const draggingBlock = document.querySelector('.course-block.dragging:not(.drag-preview-block)');
-    if (!draggingBlock) return;
-    
-    const blockWrap = e.currentTarget;
-    const targetBlock = e.target.closest('.course-block');
-    const previewBlock = blockWrap.querySelector('.drag-preview-block');
-    
-    // 글로벌 프리뷰 블럭이 있으면 그 위치에 드롭
-    if (globalPreviewBlock && blockWrap.contains(globalPreviewBlock)) {
-        // 미리보기 블럭의 현재 위치를 기준으로 실제 블럭 삽입
-        const nextSibling = globalPreviewBlock.nextSibling;
+    try {
+        const draggingBlock = document.querySelector('.course-block.dragging');
+        if (!draggingBlock) return;
         
-        // 미리보기 블럭 제거
-        blockWrap.removeChild(globalPreviewBlock);
+        const blockWrap = e.currentTarget;
+        if (!blockWrap || !blockWrap.isConnected) return;
         
-        // 실제 블럭을 미리보기 블럭이 있던 위치에 삽입
-        if (nextSibling) {
-            blockWrap.insertBefore(draggingBlock, nextSibling);
-        } else {
+        // 저장된 드롭 위치 정보 가져오기
+        const dropTargetId = blockWrap.dataset.dropTarget;
+        const dropPosition = blockWrap.dataset.dropPosition;
+        
+        if (dropTargetId === 'end') {
+            // 맨 끝에 추가
             blockWrap.appendChild(draggingBlock);
-        }
-    }
-    // 같은 셀 내부에서만 순서 변경 허용 (기존 로직 유지)
-    else if (targetBlock && targetBlock !== draggingBlock && blockWrap.contains(targetBlock)) {
-        const rect = targetBlock.getBoundingClientRect();
-        const mouseY = e.clientY;
-        const blockCenterY = rect.top + rect.height / 2;
-        
-        const dropPosition = mouseY < blockCenterY ? 'before' : 'after';
-        
-        if (dropPosition === 'before') {
-            blockWrap.insertBefore(draggingBlock, targetBlock);
+        } else if (dropTargetId) {
+            // 특정 위치에 삽입
+            const targetBlock = blockWrap.querySelector(`[data-course-id="${dropTargetId}"]`);
+            if (targetBlock) {
+                if (dropPosition === 'before') {
+                    blockWrap.insertBefore(draggingBlock, targetBlock);
+                } else {
+                    const nextSibling = targetBlock.nextElementSibling;
+                    if (nextSibling && nextSibling.classList.contains('course-block')) {
+                        blockWrap.insertBefore(draggingBlock, nextSibling);
+                    } else {
+                        blockWrap.appendChild(draggingBlock);
+                    }
+                }
+            }
         } else {
-            const nextSibling = targetBlock.nextElementSibling;
-            if (nextSibling && nextSibling.classList.contains('course-block')) {
-                blockWrap.insertBefore(draggingBlock, nextSibling);
-            } else {
-                blockWrap.appendChild(draggingBlock);
+            // 폴백: 저장된 위치 정보가 없는 경우 기존 로직 사용
+            const targetBlock = e.target.closest('.course-block');
+            if (targetBlock && targetBlock !== draggingBlock && blockWrap.contains(targetBlock)) {
+                const rect = targetBlock.getBoundingClientRect();
+                const mouseY = e.clientY;
+                const blockCenterY = rect.top + rect.height / 2;
+                const dropPos = mouseY < blockCenterY ? 'before' : 'after';
+                
+                if (dropPos === 'before') {
+                    blockWrap.insertBefore(draggingBlock, targetBlock);
+                } else {
+                    const nextSibling = targetBlock.nextElementSibling;
+                    if (nextSibling && nextSibling.classList.contains('course-block')) {
+                        blockWrap.insertBefore(draggingBlock, nextSibling);
+                    } else {
+                        blockWrap.appendChild(draggingBlock);
+                    }
+                }
             }
         }
+        
+        // 드롭 완료 후 부드러운 애니메이션 적용
+        draggingBlock.style.animation = 'dropAnimation 0.3s ease';
+        setTimeout(() => {
+            draggingBlock.style.animation = '';
+        }, 300);
+        
+        // courses 배열 순서 동기화
+        updateCoursesOrderFromDOM();
+        
+    } catch (error) {
+        console.error('Drop error:', error);
+    } finally {
+        // 드롭 완료 후 모든 placeholder 정리
+        clearAllPlaceholders();
     }
-    
-    // courses 배열 순서 동기화
-    updateCoursesOrderFromDOM();
-    
-    // 미리보기 효과 제거
-    clearBlockWrapPreview(blockWrap);
 }
 
 // DOM 순서대로 courses 배열 재정렬
@@ -7606,20 +7283,8 @@ function saveVersion() {
         }
         
         // 입력 필드 초기화
-        const versionNameInput = document.getElementById('versionNameInput');
-        const versionDescriptionInput = document.getElementById('versionDescriptionInput');
-        
-        if (versionNameInput) {
-            versionNameInput.value = defaultName;
-            // 플레이스홀더 명시적으로 설정
-            versionNameInput.setAttribute('placeholder', '예: 2024-12-20_1차');
-        }
-        
-        if (versionDescriptionInput) {
-            versionDescriptionInput.value = '';
-            // 플레이스홀더 명시적으로 설정
-            versionDescriptionInput.setAttribute('placeholder', '버전에 대한 설명을 입력하세요');
-        }
+        document.getElementById('versionNameInput').value = defaultName;
+        document.getElementById('versionDescriptionInput').value = '';
         
 
         
