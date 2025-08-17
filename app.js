@@ -371,12 +371,12 @@ async function syncLocalDataToFirebase() {
             await saveDataToFirebase('settings/matrixTitle', matrixTitle);
         }
         
-        const curriculumTitle = document.getElementById('curriculumTitleText')?.textContent;
+        const curriculumTitle = document.getElementById('curriculumTitle')?.textContent;
         if (curriculumTitle) {
             await saveDataToFirebase('settings/curriculumTitle', curriculumTitle);
         }
         
-        const commonValuesTitle = document.getElementById('commonValuesTitleText')?.textContent;
+        const commonValuesTitle = document.getElementById('commonValuesTitle')?.textContent;
         if (commonValuesTitle) {
             await saveDataToFirebase('settings/commonValuesTitle', commonValuesTitle);
         }
@@ -439,18 +439,7 @@ async function loadAllDataFromFirebase() {
             designSettings = firebaseDesignSettings;
         }
         
-        // 제목들 로드
-        const firebaseMatrixTitle = await loadDataFromFirebase('settings/matrixTitle');
-        if (firebaseMatrixTitle) {
-        }
-        
-        const firebaseCurriculumTitle = await loadDataFromFirebase('settings/curriculumTitle');
-        if (firebaseCurriculumTitle) {
-        }
-        
-        const firebaseCommonValuesTitle = await loadDataFromFirebase('settings/commonValuesTitle');
-        if (firebaseCommonValuesTitle) {
-        }
+        // 제목들은 버전 데이터에서 관리됨 - localStorage 사용하지 않음
         
         showToast('클라우드에서 데이터를 불러왔습니다.');
         return true;
@@ -463,6 +452,9 @@ async function loadAllDataFromFirebase() {
 
 // 전역 변수
 let editingIndex = -1;
+
+// 화살표 스타일 설정 (기본값: 'straight-curve')
+let arrowStyle = localStorage.getItem('curriculumArrowStyle') || 'straight-curve';
 let filteredCourses = null;
 let isEditMode = false;
 let isEditModeMatrix = false;
@@ -1223,6 +1215,10 @@ function restoreSelectedVersionData() {
             }
             
             if (v.matrixTab.matrixTitleText) {
+                const titleElement = document.getElementById('matrixTitle');
+                if (titleElement) {
+                    titleElement.textContent = v.matrixTab.matrixTitleText;
+                }
             }
             
             // matrixExtraTableData 복원 (깊은 복사 적용)
@@ -1249,6 +1245,10 @@ function restoreSelectedVersionData() {
         if (v.curriculumTab) {
             curriculumCellTexts = v.curriculumTab.curriculumCellTexts || {};
             if (v.curriculumTab.curriculumTitleText) {
+                const titleElement = document.getElementById('curriculumTitle');
+                if (titleElement) {
+                    titleElement.textContent = v.curriculumTab.curriculumTitleText;
+                }
             }
         } else {
             // 기존 구조 호환성
@@ -1262,6 +1262,10 @@ function restoreSelectedVersionData() {
             // 비교과 병합 텍스트 복원 추가
             extracurricularMergedTexts = v.commonValuesTab.extracurricularMergedTexts || [];
             if (v.commonValuesTab.commonValuesTitleText) {
+                const titleElement = document.getElementById('commonValuesTitle');
+                if (titleElement) {
+                    titleElement.textContent = v.commonValuesTab.commonValuesTitleText;
+                }
             }
         } else {
             // 기존 구조 호환성
@@ -1348,6 +1352,24 @@ function init() {
 }
 // UI 초기화 함수
 function initializeUI() {
+    // 제목들을 버전 데이터에서 복원
+    if (versions[currentVersion]) {
+        const matrixTitle = document.getElementById('matrixTitle');
+        if (matrixTitle && versions[currentVersion].matrixTab?.matrixTitleText) {
+            matrixTitle.textContent = versions[currentVersion].matrixTab.matrixTitleText;
+        }
+        
+        const curriculumTitle = document.getElementById('curriculumTitle');
+        if (curriculumTitle && versions[currentVersion].curriculumTab?.curriculumTitleText) {
+            curriculumTitle.textContent = versions[currentVersion].curriculumTab.curriculumTitleText;
+        }
+        
+        const commonValuesTitle = document.getElementById('commonValuesTitle');
+        if (commonValuesTitle && versions[currentVersion].commonValuesTab?.commonValuesTitleText) {
+            commonValuesTitle.textContent = versions[currentVersion].commonValuesTab.commonValuesTitleText;
+        }
+    }
+    
     // id 보장
     ensureCourseIds(courses);
 
@@ -2593,8 +2615,8 @@ function applyHoverEffect(effect) {
 // 디자인 설정 저장
 function saveDesignSettings() {
     
-    // Firebase에 저장
-    saveDataToFirebase('settings/design', designSettings);
+    // Firebase 즉시 저장 제거 - 버전 저장 시에만 저장
+    // saveDataToFirebase('settings/design', designSettings);
     
     showToast('디자인 설정이 저장되었습니다.');
 }
@@ -2693,11 +2715,17 @@ function showTab(tabName, event) {
     document.getElementById(tabName).classList.add('active');
     if (event) event.currentTarget.classList.add('active');
 
-    // 탭 전환 시 모든 수정모드 상태 초기화
-    resetAllEditModes();
+    // 탭 전환 시 수정모드 UI만 초기화 (임시 데이터는 유지)
+    // resetAllEditModes() 대신 UI만 초기화하는 함수 호출
+    resetEditModeUIOnly();
 
     // 공통가치대응 탭이면 테이블 렌더링
     if (tabName === 'commonValues') {
+        // 제목 복원
+        const titleElement = document.getElementById('commonValuesTitle');
+        if (titleElement && versions[currentVersion]?.commonValuesTab?.commonValuesTitleText) {
+            titleElement.textContent = versions[currentVersion].commonValuesTab.commonValuesTitleText;
+        }
         // 셀 편집 중이 아닐 때만 테이블 렌더링
         if (!isCommonValuesCellEditing) {
         renderCommonValuesTable();
@@ -2737,6 +2765,15 @@ function showTab(tabName, event) {
         if (window.physicsEffects) {
             window.physicsEffects.pauseEffects();
         }
+    }
+    
+    // 매트릭스 탭 클릭 시 제목 복원
+    if (tabName === 'matrix') {
+        const titleElement = document.getElementById('matrixTitle');
+        if (titleElement && versions[currentVersion]?.matrixTab?.matrixTitleText) {
+            titleElement.textContent = versions[currentVersion].matrixTab.matrixTitleText;
+        }
+        renderMatrix();
     }
     
     // 이수모형 탭 클릭 시 변경이력 처리
@@ -3215,12 +3252,13 @@ function updateStats() {
 }
 // 매트릭스 테이블 렌더링 (카테고리별 그룹화 반영, 학년-학기 순 정렬)
 function renderMatrix() {
-    // 매트릭스 제목 업데이트
+    // 매트릭스 제목 업데이트 (편집 중이 아닐 때만)
     const titleElement = document.getElementById('matrixTitle');
-    if (titleElement) {
-        const savedTitle = localStorage.getItem('matrixTitleText');
-        if (savedTitle) {
-            titleElement.textContent = savedTitle;
+    if (titleElement && titleElement.contentEditable !== 'true') {
+        // 제목은 버전 데이터에서 가져옴
+        const versionTitle = versions[currentVersion]?.matrixTab?.matrixTitleText;
+        if (versionTitle) {
+            titleElement.textContent = versionTitle;
         } else {
             titleElement.textContent = '수행평가 매트릭스';
         }
@@ -4186,6 +4224,12 @@ window.onload = function() {
     updateFontSize(); // 폰트 사이즈 초기화
     // 매트릭스 탭을 기본으로 표시
     showTab('matrix');
+    
+    // 화살표 스타일 설정 복원
+    const arrowSelector = document.getElementById('arrowStyleSelector');
+    if (arrowSelector) {
+        arrowSelector.value = arrowStyle;
+    }
     // 창 크기 변경 시 매트릭스 컬럼 폭 재조정
     window.addEventListener('resize', function() {
         if (document.getElementById('matrix').classList.contains('active')) {
@@ -4199,13 +4243,14 @@ window.onload = function() {
     const verBtn2 = document.querySelector('button[onclick="showMatrixVersionManager()"]');
     if (verBtn1) verBtn1.style.display = 'none';
     if (verBtn2) verBtn2.style.display = 'none';
-    // 최초 로딩 시 제목 불러오기 및 이벤트 연결
+    // 최초 로딩 시 제목 불러오기
     const title = document.getElementById('matrixTitle');
     if (title) {
-        const saved = localStorage.getItem('matrixTitleText');
-        if (saved) title.textContent = saved;
-        title.addEventListener('input', handleMatrixTitleInput);
-        setMatrixTitleEditable(false);
+        // 제목은 버전 데이터에서 가져옴
+        const versionTitle = versions[currentVersion]?.matrixTab?.matrixTitleText;
+        if (versionTitle) title.textContent = versionTitle;
+        // 초기 로드 시에는 편집 불가능 상태로만 설정 (이벤트 리스너 등록하지 않음)
+        title.contentEditable = false;
     }
 };
 // 매트릭스에서 교과목 수정
@@ -4560,78 +4605,12 @@ function exportToPDF() {
 
 // 이수모형 제목 편집 가능 여부 설정
 function setCurriculumTitleEditable(editable) {
-    const titleElement = document.getElementById('curriculumTitle');
-    if (!titleElement) return;
-        
-        if (editable) {
-        // 편집 모드로 설정
-        titleElement.contentEditable = true;
-        titleElement.style.border = '2px solid #007bff';
-        titleElement.style.padding = '8px';
-        titleElement.style.borderRadius = '4px';
-        titleElement.style.backgroundColor = '#f8f9fa';
-        titleElement.style.cursor = 'text';
-        titleElement.focus();
-        
-        // 원본 제목 저장
-        if (!titleElement.getAttribute('data-original-title')) {
-            titleElement.setAttribute('data-original-title', titleElement.textContent);
-        }
-        
-        // 편집 완료 이벤트 리스너 추가
-        titleElement.addEventListener('blur', handleCurriculumTitleInput);
-        titleElement.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                titleElement.blur();
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                titleElement.textContent = titleElement.getAttribute('data-original-title');
-                titleElement.blur();
-            }
-        });
-        
-        } else {
-        // 일반 모드로 설정
-        titleElement.contentEditable = false;
-        titleElement.style.border = '';
-        titleElement.style.padding = '';
-        titleElement.style.borderRadius = '';
-        titleElement.style.backgroundColor = '';
-        titleElement.style.cursor = '';
-        
-        // 이벤트 리스너 제거
-        titleElement.removeEventListener('blur', handleCurriculumTitleInput);
-        
-    }
+    setTitleEditable('curriculumTitle', editable, handleCurriculumTitleInput, tempCurriculumCellTexts, {}, '건축학전공 교과과정 이수모형');
 }
 
 // 이수모형 제목 입력 처리
 function handleCurriculumTitleInput() {
-    const titleElement = document.getElementById('curriculumTitle');
-    if (!titleElement) return;
-    
-    const newTitle = titleElement.textContent.trim();
-    const originalTitle = titleElement.getAttribute('data-original-title') || '';
-    
-    if (newTitle !== originalTitle) {
-        // 제목 변경사항을 임시 저장소에 저장
-        if (!tempCurriculumCellTexts._titleChanged) {
-            tempCurriculumCellTexts._titleChanged = true;
-            tempCurriculumCellTexts._oldTitle = originalTitle;
-            tempCurriculumCellTexts._newTitle = newTitle;
-        } else {
-            tempCurriculumCellTexts._newTitle = newTitle;
-        }
-        
-        // localStorage에 즉시 저장
-        // localStorage.setItem('curriculumTitleText', newTitle);
-        
-        showToast('제목이 임시 저장되었습니다. 버전 저장 버튼을 눌러주세요.');
-    }
-    
-    // 편집 모드 비활성화
-    setCurriculumTitleEditable(false);
+    handleTitleInput('curriculumTitle', tempCurriculumCellTexts, '건축학전공 교과과정 이수모형');
 }
 
 // 이수모형 셀 편집 활성화
@@ -5102,88 +5081,136 @@ function showToast(msg) {
     }, displayTime);
 }
 
-// 매트릭스 제목 인라인 편집 (수정모드에서만)
-function setMatrixTitleEditable(editable) {
-    const title = document.getElementById('matrixTitle');
-    if (!title) return;
+// ============================================
+// 제목 편집 공통 함수
+// ============================================
+
+// 공통 제목 편집 함수
+function setTitleEditable(titleId, editable, handleInputFn, tempStorageObj, tempDataObj, defaultTitle) {
+    const titleElement = document.getElementById(titleId);
+    if (!titleElement) return;
     
     if (editable) {
-        // 편집 시작 시 원본 제목 저장
-        if (!title.getAttribute('data-original-title')) {
-            title.setAttribute('data-original-title', title.textContent);
+        // 편집 모드로 설정
+        titleElement.contentEditable = true;
+        titleElement.style.border = '2px solid #007bff';
+        titleElement.style.padding = '8px';
+        titleElement.style.borderRadius = '4px';
+        titleElement.style.backgroundColor = '#f8f9fa';
+        titleElement.style.cursor = 'text';
+        titleElement.focus();
+        
+        // 원본 제목 저장
+        if (!titleElement.getAttribute('data-original-title')) {
+            titleElement.setAttribute('data-original-title', titleElement.textContent);
         }
         
-        // 편집 모드 시작 시 tempMatrixData 상태 확인 및 초기화
-        if (Object.keys(tempMatrixData).length === 0) {
-            // tempMatrixData가 비어있으면 현재 matrixData를 복사
-            tempMatrixData = { ...matrixData };
+        // 편집 모드 시작 시 임시 저장소 초기화 (매트릭스 탭만 해당)
+        if (titleId === 'matrixTitle' && Object.keys(tempDataObj).length === 0) {
+            Object.assign(tempDataObj, matrixData);
         }
         
-        title.contentEditable = true;
-        title.style.outline = '2px dashed #4a90e2';
-        title.style.cursor = 'text';
-        title.style.backgroundColor = '#fffbe7';
-        title.style.padding = '4px 8px';
-        title.style.borderRadius = '4px';
-        title.style.border = '1px solid #bdbdbd';
+        // 기존 리스너 제거 후 새로 등록
+        titleElement.removeEventListener('blur', handleInputFn);
+        titleElement.removeEventListener('keydown', handleTitleKeydown);
         
-        // 편집 시작 시 포커스
-        title.focus();
+        // 편집 완료 이벤트 리스너 추가
+        titleElement.addEventListener('blur', handleInputFn);
+        titleElement.addEventListener('keydown', handleTitleKeydown);
         
-        // 편집 완료 이벤트 추가
-        title.addEventListener('blur', handleMatrixTitleInput);
-        title.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                title.blur();
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                title.textContent = localStorage.getItem('matrixTitleText') || '수행평가 매트릭스';
-                title.blur();
-            }
-        });
     } else {
-        title.contentEditable = false;
-        title.style.outline = 'none';
-        title.style.cursor = 'default';
-        title.style.backgroundColor = 'transparent';
-        title.style.padding = '';
-        title.style.borderRadius = '';
-        title.style.border = '';
+        // 일반 모드로 설정
+        titleElement.contentEditable = false;
+        titleElement.style.border = '';
+        titleElement.style.padding = '';
+        titleElement.style.borderRadius = '';
+        titleElement.style.backgroundColor = '';
+        titleElement.style.cursor = '';
         
         // 이벤트 리스너 제거
-        title.removeEventListener('blur', handleMatrixTitleInput);
+        titleElement.removeEventListener('blur', handleInputFn);
+        titleElement.removeEventListener('keydown', handleTitleKeydown);
     }
+    
+    // 키다운 이벤트 핸들러 (내부 함수)
+    function handleTitleKeydown(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.target.blur();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            e.target.textContent = e.target.getAttribute('data-original-title');
+            e.target.blur();
+        }
+    }
+}
+
+// 공통 제목 입력 처리 함수
+function handleTitleInput(titleId, tempStorageObj, defaultTitle) {
+    const titleElement = document.getElementById(titleId);
+    if (!titleElement) return;
+    
+    const newTitle = titleElement.textContent.trim();
+    const originalTitle = titleElement.getAttribute('data-original-title') || '';
+    
+    if (newTitle && newTitle !== originalTitle) {
+        // 제목 변경사항을 임시 저장소에 저장
+        if (!tempStorageObj._titleChanged) {
+            tempStorageObj._titleChanged = true;
+            tempStorageObj._oldTitle = originalTitle;
+            tempStorageObj._newTitle = newTitle;
+        } else {
+            tempStorageObj._newTitle = newTitle;
+        }
+        
+        // 현재 버전에 메모리에만 저장 (버전 저장 시 Firebase에 저장됨)
+        if (versions[currentVersion]) {
+            if (titleId === 'matrixTitle') {
+                if (!versions[currentVersion].matrixTab) {
+                    versions[currentVersion].matrixTab = {};
+                }
+                versions[currentVersion].matrixTab.matrixTitleText = newTitle;
+            } else if (titleId === 'curriculumTitle') {
+                if (!versions[currentVersion].curriculumTab) {
+                    versions[currentVersion].curriculumTab = {};
+                }
+                versions[currentVersion].curriculumTab.curriculumTitleText = newTitle;
+            } else if (titleId === 'commonValuesTitle') {
+                if (!versions[currentVersion].commonValuesTab) {
+                    versions[currentVersion].commonValuesTab = {};
+                }
+                versions[currentVersion].commonValuesTab.commonValuesTitleText = newTitle;
+            }
+        }
+        
+        // data-original-title 업데이트
+        titleElement.setAttribute('data-original-title', newTitle);
+        
+        showToast('제목이 저장되었습니다.');
+    }
+    
+    // 편집 모드 비활성화
+    const setEditableFn = titleId === 'matrixTitle' ? setMatrixTitleEditable :
+                          titleId === 'curriculumTitle' ? setCurriculumTitleEditable :
+                          titleId === 'commonValuesTitle' ? setCommonValuesTitleEditable : null;
+    
+    if (setEditableFn) {
+        setEditableFn(false);
+    }
+}
+
+// ============================================
+// 탭별 제목 편집 함수 (공통 함수 활용)
+// ============================================
+
+// 매트릭스 제목 인라인 편집 (수정모드에서만)
+function setMatrixTitleEditable(editable) {
+    setTitleEditable('matrixTitle', editable, handleMatrixTitleInput, tempMatrixData, tempMatrixData, '수행평가 매트릭스');
 }
 
 // 제목 변경 시 저장
 function handleMatrixTitleInput() {
-    const title = document.getElementById('matrixTitle');
-    if (!title) return;
-    
-    const newTitle = title.textContent.trim();
-    const oldTitle = localStorage.getItem('matrixTitleText') || '수행평가 매트릭스';
-    
-    if (newTitle !== oldTitle) {
-        // localStorage에 저장
-        // localStorage.setItem('matrixTitleText', newTitle);
-        
-        // 임시 저장소에 변경사항 기록
-        if (!tempMatrixData._titleChanged) {
-            tempMatrixData._titleChanged = true;
-            tempMatrixData._oldTitle = oldTitle;
-            tempMatrixData._newTitle = newTitle;
-        }
-        
-        // 현재 matrixData도 tempMatrixData에 복사 (제목 변경 정보가 있으면 항상 matrixData를 복사)
-        if (tempMatrixData._titleChanged) {
-            // 기존 matrixData를 tempMatrixData에 복사 (제목 관련 속성은 유지)
-            const currentMatrixData = { ...matrixData };
-            tempMatrixData = { ...currentMatrixData, ...tempMatrixData };
-        }
-        
-        showToast('매트릭스 제목이 임시 저장되었습니다. 버전 저장 버튼을 눌러주세요.');
-    }
+    handleTitleInput('matrixTitle', tempMatrixData, '수행평가 매트릭스');
 }
 
 // ... existing code ...
@@ -5302,12 +5329,13 @@ if (document.readyState === 'loading') {
 
 // 이수모형표에 교과목 배치 (삭제 diff 교과목도 별도로 배치)
 function renderCurriculumTable() {
-    // 이수모형 제목 업데이트
+    // 이수모형 제목 업데이트 (편집 중이 아닐 때만)
     const titleElement = document.getElementById('curriculumTitle');
-    if (titleElement) {
-        const savedTitle = localStorage.getItem('curriculumTitleText');
-        if (savedTitle) {
-            titleElement.textContent = savedTitle;
+    if (titleElement && titleElement.contentEditable !== 'true') {
+        // localStorage 사용 안 함 - 버전 데이터에서 가져오기
+        const versionTitle = versions[currentVersion]?.curriculumTab?.curriculumTitleText;
+        if (versionTitle) {
+            titleElement.textContent = versionTitle;
         } else {
             titleElement.textContent = '건축학전공 교과과정 이수모형';
         }
@@ -6855,6 +6883,7 @@ function updateAllCourseBlocksDraggable() {
 // 이수모형 탭 수정모드 토글
 function toggleEditModeCurriculum() {
     isEditModeCurriculum = !isEditModeCurriculum;
+    
     const button = document.getElementById('editModeToggleCurriculum');
     const textSpan = document.getElementById('editModeTextCurriculum');
     
@@ -7125,6 +7154,42 @@ function loadAllVersions() {
         // 로컬 스토리지 사용 안 함 - 메모리에 있는 데이터만 사용
         // versions 객체는 이미 Firebase에서 로드되었거나 메모리에 있음
         
+        // 버전이 하나도 없으면 기본 버전 생성
+        if (!versions || Object.keys(versions).length === 0) {
+            versions = {
+                '기본': {
+                    coursesTab: {
+                        courses: [],
+                        initialCourses: []
+                    },
+                    matrixTab: {
+                        matrixData: {},
+                        matrixTitleText: '수행평가 매트릭스',
+                        matrixExtraTableData: {}
+                    },
+                    curriculumTab: {
+                        curriculumCellTexts: {},
+                        curriculumTitleText: '건축학전공 교과과정 이수모형 2025'
+                    },
+                    commonValuesTab: {
+                        commonValuesCellTexts: {},
+                        commonValuesCopiedBlocks: {},
+                        commonValuesTitleText: '공통가치대응 매트릭스'
+                    },
+                    settings: {
+                        designSettings: {},
+                        changeHistory: []
+                    },
+                    metadata: {
+                        description: '기본 버전',
+                        saveDate: new Date().toISOString(),
+                        timestamp: Date.now()
+                    }
+                }
+            };
+            currentVersion = '기본';
+        }
+        
         // Firebase에서 로드되지 않은 경우 최근 버전 자동 선택
         if (!currentVersion || currentVersion === '기본') {
             selectLatestVersion();
@@ -7199,40 +7264,43 @@ function saveCurrentVersion() {
     matrixExtraTableData = collectMatrixExtraTableData();
     
     const versionData = {
-        // 교과목 관리 탭 - 교과목 데이터
-        courses: courses,
+        // 1. 교과목 관리 탭
+        coursesTab: {
+            courses: courses,
+            initialCourses: initialCourses
+        },
         
-        // 수행평가 매트릭스 탭 - 매트릭스 데이터
-        matrixData: matrixData,
+        // 2. 수행평가 매트릭스 탭
+        matrixTab: {
+            matrixData: matrixData,
+            matrixTitleText: tempMatrixData._newTitle || versions[currentVersion]?.matrixTab?.matrixTitleText || '수행평가 매트릭스',
+            matrixExtraTableData: matrixExtraTableData
+        },
         
-        // 이수모형 탭 - 셀 텍스트 데이터
-        curriculumCellTexts: curriculumCellTexts,
+        // 3. 이수모형 탭
+        curriculumTab: {
+            curriculumCellTexts: curriculumCellTexts,
+            curriculumTitleText: tempCurriculumCellTexts._newTitle || versions[currentVersion]?.curriculumTab?.curriculumTitleText || '건축학전공 교과과정 이수모형'
+        },
         
-        // 매트릭스 하부 안내 표 데이터
-        matrixExtraTableData: matrixExtraTableData,
+        // 4. 공통가치대응 탭
+        commonValuesTab: {
+            commonValuesCellTexts: commonValuesCellTexts,
+            commonValuesCopiedBlocks: commonValuesCopiedBlocks,
+            commonValuesTitleText: tempCommonValuesCellTexts._newTitle || versions[currentVersion]?.commonValuesTab?.commonValuesTitleText || '공통가치대응'
+        },
         
-        // 공통가치대응 탭 - 셀 텍스트 데이터
-        commonValuesCellTexts: commonValuesCellTexts,
+        // 5. 공통 설정
+        settings: {
+            designSettings: designSettings,
+            changeHistory: getCurrentDiffSummary()
+        },
         
-        // 공통가치대응 탭 - 노드 그룹 속성 데이터 (value1,2,3 컬럼의 교과목 블록 정보)
-        commonValuesCopiedBlocks: commonValuesCopiedBlocks,
-        
-        // 제목 텍스트들
-        matrixTitleText: localStorage.getItem('matrixTitleText') || '',
-        curriculumTitleText: localStorage.getItem('curriculumTitleText') || '',
-        commonValuesTitleText: localStorage.getItem('commonValuesTitleText') || '',
-        
-        // 디자인 설정
-        designSettings: designSettings,
-        
-
-        
-        // 기타 데이터
-        initialCourses: initialCourses,
-        changeHistory: getCurrentDiffSummary(),
-        
-        // 메타데이터
-        saveDate: new Date().toISOString()
+        // 6. 메타데이터
+        metadata: {
+            saveDate: new Date().toISOString(),
+            timestamp: Date.now()
+        }
     };
     
     versions[currentVersion] = versionData;
@@ -7334,13 +7402,7 @@ async function saveVersionData(event) {
         // tempMatrixData 처리 - 비어있어도 현재 matrixData는 유지해야 함
         if (Object.keys(tempMatrixData).length > 0) {
             
-            // 매트릭스 제목 변경사항 처리
-            if (tempMatrixData._titleChanged) {
-                localStorage.setItem('matrixTitleText', tempMatrixData._newTitle);
-                delete tempMatrixData._titleChanged;
-                delete tempMatrixData._oldTitle;
-                delete tempMatrixData._newTitle;
-            }
+            // 매트릭스 제목 변경사항은 버전 데이터에만 저장됨
             
             // tempMatrixData에서 제목 관련 속성들을 제외한 실제 matrixData만 추출
             const actualMatrixData = { ...tempMatrixData };
@@ -7374,17 +7436,17 @@ async function saveVersionData(event) {
         }
         
         if (Object.keys(tempCurriculumCellTexts).length > 0) {
-            // 이수모형 제목 변경사항 처리
-            if (tempCurriculumCellTexts._titleChanged) {
-                localStorage.setItem('curriculumTitleText', tempCurriculumCellTexts._newTitle);
-                delete tempCurriculumCellTexts._titleChanged;
-                delete tempCurriculumCellTexts._oldTitle;
-                delete tempCurriculumCellTexts._newTitle;
-            }
+            // 이수모형 제목 변경사항은 버전 데이터에만 저장됨
+            
+            // tempCurriculumCellTexts에서 제목 관련 속성들을 제외한 실제 데이터만 추출
+            const actualCurriculumData = { ...tempCurriculumCellTexts };
+            delete actualCurriculumData._titleChanged;
+            delete actualCurriculumData._oldTitle;
+            delete actualCurriculumData._newTitle;
             
             // 임시 저장소와 현재 표 데이터를 병합
             const currentCurriculumData = collectCurriculumTableData();
-            curriculumCellTexts = { ...currentCurriculumData, ...tempCurriculumCellTexts };
+            curriculumCellTexts = { ...currentCurriculumData, ...actualCurriculumData };
             tempCurriculumCellTexts = {};
         } else {
             // 임시 저장소에 데이터가 없으면 현재 표의 모든 셀 내용을 수집
@@ -7393,20 +7455,20 @@ async function saveVersionData(event) {
         
         if (Object.keys(tempCommonValuesCellTexts).length > 0) {
             
-            // 공통가치대응 제목 변경사항 처리
-            if (tempCommonValuesCellTexts._titleChanged) {
-                localStorage.setItem('commonValuesTitleText', tempCommonValuesCellTexts._newTitle);
-                delete tempCommonValuesCellTexts._titleChanged;
-                delete tempCommonValuesCellTexts._oldTitle;
-                delete tempCommonValuesCellTexts._newTitle;
-            }
+            // 공통가치대응 제목 변경사항은 버전 데이터에만 저장됨
+            
+            // tempCommonValuesCellTexts에서 제목 관련 속성들을 제외한 실제 데이터만 추출
+            const actualCommonValuesData = { ...tempCommonValuesCellTexts };
+            delete actualCommonValuesData._titleChanged;
+            delete actualCommonValuesData._oldTitle;
+            delete actualCommonValuesData._newTitle;
             
             // 임시 저장소와 현재 표 데이터를 병합 (2차원 구조만 유지)
             const currentCommonValuesData = collectCommonValuesTableData();
             
             // 1차원 key 제거하고 2차원 구조만 유지
             const cleanedTempData = {};
-            Object.entries(tempCommonValuesCellTexts).forEach(([key, value]) => {
+            Object.entries(actualCommonValuesData).forEach(([key, value]) => {
                 if (key.includes('-cell-') && key.includes('-value')) {
                     // 1차원 key는 무시 (예: "commonValues-cell-설계-value1")
                 } else if (typeof value === 'object' && value !== null) {
@@ -7443,14 +7505,14 @@ async function saveVersionData(event) {
             matrixTab: {
                 matrixData: typeof matrixData === 'object' ? JSON.parse(JSON.stringify(matrixData)) : {},
                 initialMatrixData: typeof initialMatrixData === 'object' ? JSON.parse(JSON.stringify(initialMatrixData)) : {},
-        matrixTitleText: localStorage.getItem('matrixTitleText') || '',
+        matrixTitleText: tempMatrixData._newTitle || versions[currentVersion]?.matrixTab?.matrixTitleText || '수행평가 매트릭스',
                 matrixExtraTableData: typeof matrixExtraTableData === 'object' ? 
                     JSON.parse(JSON.stringify(matrixExtraTableData)) : {}
             },
             curriculumTab: {
                 curriculumCellTexts: typeof curriculumCellTexts === 'object' ? 
                     JSON.parse(JSON.stringify(curriculumCellTexts)) : {},
-                curriculumTitleText: localStorage.getItem('curriculumTitleText') || ''
+                curriculumTitleText: tempCurriculumCellTexts._newTitle || versions[currentVersion]?.curriculumTab?.curriculumTitleText || '건축학전공 교과과정 이수모형'
             },
             commonValuesTab: {
                 commonValuesCellTexts: typeof commonValuesCellTexts === 'object' ? 
@@ -7463,7 +7525,7 @@ async function saveVersionData(event) {
                     JSON.parse(JSON.stringify(extracurricularBlocks)) : {},
                 extracurricularMergedTexts: Array.isArray(extracurricularMergedTexts) ? 
                     JSON.parse(JSON.stringify(extracurricularMergedTexts)) : [],
-                commonValuesTitleText: localStorage.getItem('commonValuesTitleText') || ''
+                commonValuesTitleText: tempCommonValuesCellTexts._newTitle || versions[currentVersion]?.commonValuesTab?.commonValuesTitleText || '공통가치대응'
             },
             settings: {
                 designSettings: typeof designSettings === 'object' ? 
@@ -7569,13 +7631,7 @@ async function saveCurrentVersion() {
     
     if (Object.keys(tempMatrixData).length > 0) {
         
-        // 매트릭스 제목 변경사항 처리
-        if (tempMatrixData._titleChanged) {
-            localStorage.setItem('matrixTitleText', tempMatrixData._newTitle);
-            delete tempMatrixData._titleChanged;
-            delete tempMatrixData._oldTitle;
-            delete tempMatrixData._newTitle;
-        }
+        // 매트릭스 제목 변경사항은 버전 데이터에만 저장됨
         
         // tempMatrixData에서 제목 관련 속성들을 제외한 실제 matrixData만 추출
         const actualMatrixData = { ...tempMatrixData };
@@ -7599,17 +7655,17 @@ async function saveCurrentVersion() {
     }
     
     if (Object.keys(tempCurriculumCellTexts).length > 0) {
-        // 이수모형 제목 변경사항 처리
-        if (tempCurriculumCellTexts._titleChanged) {
-            localStorage.setItem('curriculumTitleText', tempCurriculumCellTexts._newTitle);
-            delete tempCurriculumCellTexts._titleChanged;
-            delete tempCurriculumCellTexts._oldTitle;
-            delete tempCurriculumCellTexts._newTitle;
-        }
+        // 이수모형 제목 변경사항은 버전 데이터에만 저장됨
+        
+        // tempCurriculumCellTexts에서 제목 관련 속성들을 제외한 실제 데이터만 추출
+        const actualCurriculumData = { ...tempCurriculumCellTexts };
+        delete actualCurriculumData._titleChanged;
+        delete actualCurriculumData._oldTitle;
+        delete actualCurriculumData._newTitle;
         
         // 임시 저장소와 현재 표 데이터를 병합
         const currentCurriculumData = collectCurriculumTableData();
-        curriculumCellTexts = { ...currentCurriculumData, ...tempCurriculumCellTexts };
+        curriculumCellTexts = { ...currentCurriculumData, ...actualCurriculumData };
         tempCurriculumCellTexts = {};
     } else {
         // 임시 저장소에 데이터가 없으면 현재 표의 모든 셀 내용을 수집
@@ -7618,20 +7674,20 @@ async function saveCurrentVersion() {
     
             if (Object.keys(tempCommonValuesCellTexts).length > 0) {
             
-            // 공통가치대응 제목 변경사항 처리
-            if (tempCommonValuesCellTexts._titleChanged) {
-                localStorage.setItem('commonValuesTitleText', tempCommonValuesCellTexts._newTitle);
-                delete tempCommonValuesCellTexts._titleChanged;
-                delete tempCommonValuesCellTexts._oldTitle;
-                delete tempCommonValuesCellTexts._newTitle;
-            }
+            // 공통가치대응 제목 변경사항은 버전 데이터에만 저장됨
+            
+            // tempCommonValuesCellTexts에서 제목 관련 속성들을 제외한 실제 데이터만 추출
+            const actualCommonValuesData = { ...tempCommonValuesCellTexts };
+            delete actualCommonValuesData._titleChanged;
+            delete actualCommonValuesData._oldTitle;
+            delete actualCommonValuesData._newTitle;
             
             // 임시 저장소와 현재 표 데이터를 병합 (2차원 구조만 유지)
             const currentCommonValuesData = collectCommonValuesTableData();
             
             // 1차원 key 제거하고 2차원 구조만 유지
             const cleanedTempData = {};
-            Object.entries(tempCommonValuesCellTexts).forEach(([key, value]) => {
+            Object.entries(actualCommonValuesData).forEach(([key, value]) => {
                 if (key.includes('-cell-') && key.includes('-value')) {
                     // 1차원 key는 무시 (예: "commonValues-cell-설계-value1")
                 } else if (typeof value === 'object' && value !== null) {
@@ -7672,7 +7728,7 @@ async function saveCurrentVersion() {
         // 2. 수행평가 매트릭스 탭
         matrixTab: {
             matrixData: typeof matrixData === 'object' ? JSON.parse(JSON.stringify(matrixData)) : {},
-            matrixTitleText: localStorage.getItem('matrixTitleText') || '',
+            matrixTitleText: tempMatrixData._newTitle || versions[currentVersion]?.matrixTab?.matrixTitleText || '수행평가 매트릭스',
             matrixExtraTableData: typeof matrixExtraTableData === 'object' ? 
                 JSON.parse(JSON.stringify(matrixExtraTableData)) : {}
         },
@@ -7681,7 +7737,7 @@ async function saveCurrentVersion() {
         curriculumTab: {
             curriculumCellTexts: typeof curriculumCellTexts === 'object' ? 
                 JSON.parse(JSON.stringify(curriculumCellTexts)) : {},
-            curriculumTitleText: localStorage.getItem('curriculumTitleText') || ''
+            curriculumTitleText: tempCurriculumCellTexts._newTitle || versions[currentVersion]?.curriculumTab?.curriculumTitleText || '건축학전공 교과과정 이수모형'
         },
         
         // 4. 공통가치대응 탭
@@ -7692,7 +7748,7 @@ async function saveCurrentVersion() {
                 JSON.parse(JSON.stringify(commonValuesCopiedBlocks)) : {},
             extracurricularMergedTexts: Array.isArray(extracurricularMergedTexts) ? 
                 JSON.parse(JSON.stringify(extracurricularMergedTexts)) : [],
-            commonValuesTitleText: localStorage.getItem('commonValuesTitleText') || ''
+            commonValuesTitleText: tempCommonValuesCellTexts._newTitle || versions[currentVersion]?.commonValuesTab?.commonValuesTitleText || '공통가치대응'
         },
         
         // 공통 설정
@@ -7835,9 +7891,7 @@ function restoreVersion(versionName) {
                 initialMatrixData = JSON.parse(JSON.stringify(matrixData));
             }
                 
-            if (versionData.matrixTab.matrixTitleText) {
-                localStorage.setItem('matrixTitleText', versionData.matrixTab.matrixTitleText);
-            }
+            // 제목은 버전 데이터에서 직접 사용됨 - localStorage 사용 안 함
             
             // matrixExtraTableData 복원 (null 체크 추가)
             if (versionData.matrixTab.matrixExtraTableData) {
@@ -7853,9 +7907,7 @@ function restoreVersion(versionName) {
                 JSON.parse(JSON.stringify(versionData.curriculumTab.curriculumCellTexts)) : {};
                 
                 
-            if (versionData.curriculumTab.curriculumTitleText) {
-                localStorage.setItem('curriculumTitleText', versionData.curriculumTab.curriculumTitleText);
-            }
+            // 제목은 버전 데이터에서 직접 사용됨 - localStorage 사용 안 함
         }
         
         // 4. 공통가치대응 탭 데이터 복원 (깊은 복사 적용)
@@ -7907,9 +7959,7 @@ function restoreVersion(versionName) {
                 extracurricularMergedTexts = [];
             }
         
-            if (versionData.commonValuesTab.commonValuesTitleText) {
-                localStorage.setItem('commonValuesTitleText', versionData.commonValuesTab.commonValuesTitleText);
-            }
+            // 제목은 버전 데이터에서 직접 사용됨 - localStorage 사용 안 함
         }
         
         // 공통 설정 복원 (깊은 복사 적용)
@@ -7929,6 +7979,22 @@ function restoreVersion(versionName) {
         
         // 현재 버전 업데이트
         currentVersion = versionName;
+        
+        // 제목들을 즉시 업데이트
+        const matrixTitle = document.getElementById('matrixTitle');
+        if (matrixTitle && versionData.matrixTab?.matrixTitleText) {
+            matrixTitle.textContent = versionData.matrixTab.matrixTitleText;
+        }
+        
+        const curriculumTitle = document.getElementById('curriculumTitle');
+        if (curriculumTitle && versionData.curriculumTab?.curriculumTitleText) {
+            curriculumTitle.textContent = versionData.curriculumTab.curriculumTitleText;
+        }
+        
+        const commonValuesTitle = document.getElementById('commonValuesTitle');
+        if (commonValuesTitle && versionData.commonValuesTab?.commonValuesTitleText) {
+            commonValuesTitle.textContent = versionData.commonValuesTab.commonValuesTitleText;
+        }
             
         // 모든 탭 렌더링
         renderCourses();
@@ -8451,10 +8517,9 @@ function startArrowAnimation() {
     
     // 화살표 그리기 헬퍼 함수
     function drawArrow(ctx, arrow, offset, isHovered) {
-        // 베지어 곡선 그리기
-        ctx.beginPath();
-        ctx.moveTo(arrow.fromX, arrow.fromY);
-        ctx.bezierCurveTo(arrow.cp1X, arrow.cp1Y, arrow.cp2X, arrow.cp2Y, arrow.toX, arrow.toY);
+        // 선택된 스타일로 화살표 경로 계산 및 그리기
+        const pathData = calculateArrowPath(arrow.fromX, arrow.fromY, arrow.toX, arrow.toY, arrowStyle);
+        drawArrowPath(ctx, pathData);
         
         // 호버 상태에 따른 스타일
         if (isHovered) {
@@ -8477,7 +8542,22 @@ function startArrowAnimation() {
         ctx.stroke();
         
         // 화살표 머리 그리기
-        const angle = Math.atan2(arrow.toY - arrow.cp2Y, arrow.toX - arrow.cp2X);
+        let angle;
+        if (arrowStyle === 'straight-curve') {
+            // straight-curve 스타일의 경우
+            const dx = arrow.toX - arrow.fromX;
+            const dy = arrow.toY - arrow.fromY;
+            if (Math.abs(dy) > 300) {
+                // 수직 거리가 300픽셀 이상이면 수직 방향
+                angle = dy > 0 ? Math.PI / 2 : -Math.PI / 2; // 아래 또는 위
+            } else {
+                // 그 외의 경우 마지막 선분은 수평
+                angle = dx > 0 ? 0 : Math.PI; // 오른쪽 또는 왼쪽
+            }
+        } else {
+            // 다른 스타일의 경우 control point 기반 계산
+            angle = Math.atan2(arrow.toY - arrow.cp2Y, arrow.toX - arrow.cp2X);
+        }
         const arrowLength = isHovered ? 10 : 10;
         const arrowAngle = Math.PI / 6;
         
@@ -8516,6 +8596,197 @@ function startArrowAnimation() {
     }
     
     animate();
+}
+
+// 화살표 스타일에 따른 경로 계산
+function calculateArrowPath(fromX, fromY, toX, toY, style) {
+    const deltaX = toX - fromX;
+    const deltaY = toY - fromY;
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    
+    switch(style) {
+        case 'straight':
+            // 직선 화살표
+            return {
+                type: 'line',
+                points: [fromX, fromY, toX, toY]
+            };
+            
+        case 'curved':
+            // 부드러운 곡선 화살표
+            const cp1X = fromX + deltaX * 0.5;
+            const cp1Y = fromY;
+            const cp2X = toX - deltaX * 0.5;
+            const cp2Y = toY;
+            return {
+                type: 'bezier',
+                points: [fromX, fromY, cp1X, cp1Y, cp2X, cp2Y, toX, toY]
+            };
+            
+        case 'straight-curve':
+            // 직선 + 곡선 혼합 (현재 스타일)
+            // 수직 거리가 300픽셀 이상이면 수직 연결로 처리
+            if (Math.abs(deltaY) > 300) {
+                return {
+                    type: 'vertical-mixed',
+                    straightLength: 20,
+                    points: [fromX, fromY, toX, toY]
+                };
+            } else {
+                return {
+                    type: 'mixed',
+                    straightLength: 20,
+                    points: [fromX, fromY, toX, toY]
+                };
+            }
+            
+        case 'right-angle':
+            // 직각 화살표
+            const midX = fromX + deltaX / 2;
+            return {
+                type: 'polyline',
+                points: [fromX, fromY, midX, fromY, midX, toY, toX, toY]
+            };
+            
+        case 'smooth-right':
+            // 부드러운 직각 화살표
+            const radius = Math.min(15, Math.abs(deltaX) * 0.15, Math.abs(deltaY) * 0.15);
+            return {
+                type: 'smooth-right',
+                radius: radius,
+                points: [fromX, fromY, toX, toY]
+            };
+            
+        case 'arc':
+            // 호 형태 화살표
+            return {
+                type: 'arc',
+                points: [fromX, fromY, toX, toY]
+            };
+            
+        default:
+            return calculateArrowPath(fromX, fromY, toX, toY, 'straight-curve');
+    }
+}
+
+// 화살표 경로 그리기
+function drawArrowPath(ctx, pathData) {
+    ctx.beginPath();
+    
+    switch(pathData.type) {
+        case 'line':
+            ctx.moveTo(pathData.points[0], pathData.points[1]);
+            ctx.lineTo(pathData.points[2], pathData.points[3]);
+            break;
+            
+        case 'bezier':
+            ctx.moveTo(pathData.points[0], pathData.points[1]);
+            ctx.bezierCurveTo(
+                pathData.points[2], pathData.points[3],
+                pathData.points[4], pathData.points[5],
+                pathData.points[6], pathData.points[7]
+            );
+            break;
+            
+        case 'mixed':
+            const [fromX, fromY, toX, toY] = pathData.points;
+            const deltaX = toX - fromX;
+            const straightLen = pathData.straightLength;
+            
+            ctx.moveTo(fromX, fromY);
+            const straightX1 = fromX + (deltaX > 0 ? straightLen : -straightLen);
+            ctx.lineTo(straightX1, fromY);
+            
+            const straightX2 = toX - (deltaX > 0 ? straightLen : -straightLen);
+            const cp1X = straightX1 + (deltaX > 0 ? 30 : -30);
+            const cp2X = straightX2 - (deltaX > 0 ? 30 : -30);
+            
+            ctx.bezierCurveTo(cp1X, fromY, cp2X, toY, straightX2, toY);
+            ctx.lineTo(toX, toY);
+            break;
+            
+        case 'vertical-mixed':
+            const [vfromX, vfromY, vtoX, vtoY] = pathData.points;
+            const vdeltaY = vtoY - vfromY;
+            const vstraightLen = pathData.straightLength;
+            
+            ctx.moveTo(vfromX, vfromY);
+            // 수직으로 시작
+            const straightY1 = vfromY + (vdeltaY > 0 ? vstraightLen : -vstraightLen);
+            ctx.lineTo(vfromX, straightY1);
+            
+            // 중간 부분 - 베지어 곡선으로 연결
+            const straightY2 = vtoY - (vdeltaY > 0 ? vstraightLen : -vstraightLen);
+            const vcp1Y = straightY1 + (vdeltaY > 0 ? 30 : -30);
+            const vcp2Y = straightY2 - (vdeltaY > 0 ? 30 : -30);
+            
+            ctx.bezierCurveTo(vfromX, vcp1Y, vtoX, vcp2Y, vtoX, straightY2);
+            // 수직으로 끝
+            ctx.lineTo(vtoX, vtoY);
+            break;
+            
+        case 'polyline':
+            ctx.moveTo(pathData.points[0], pathData.points[1]);
+            for (let i = 2; i < pathData.points.length; i += 2) {
+                ctx.lineTo(pathData.points[i], pathData.points[i + 1]);
+            }
+            break;
+            
+        case 'smooth-right':
+            // 부드러운 직각 화살표
+            const [fx, fy, tx, ty] = pathData.points;
+            const dx = tx - fx;
+            const dy = ty - fy;
+            const r = pathData.radius;
+            
+            ctx.moveTo(fx, fy);
+            
+            if (Math.abs(dx) > Math.abs(dy) * 1.5) {
+                // 수평 이동이 주요한 경우
+                const midX = fx + dx * 0.7;
+                
+                ctx.lineTo(midX - r, fy);
+                ctx.quadraticCurveTo(midX, fy, midX, fy + (dy > 0 ? r : -r));
+                ctx.lineTo(midX, ty - (dy > 0 ? r : -r));
+                ctx.quadraticCurveTo(midX, ty, midX + r, ty);
+                ctx.lineTo(tx, ty);
+            } else if (Math.abs(dy) > Math.abs(dx) * 1.5) {
+                // 수직 이동이 주요한 경우
+                const midY = fy + dy * 0.7;
+                
+                ctx.lineTo(fx, midY - r);
+                ctx.quadraticCurveTo(fx, midY, fx + (dx > 0 ? r : -r), midY);
+                ctx.lineTo(tx - (dx > 0 ? r : -r), midY);
+                ctx.quadraticCurveTo(tx, midY, tx, midY + r);
+                ctx.lineTo(tx, ty);
+            } else {
+                // 대각선 이동
+                const midX = fx + dx * 0.6;
+                const midY = fy + dy * 0.4;
+                
+                ctx.lineTo(midX - r, fy);
+                ctx.quadraticCurveTo(midX, fy, midX, fy + (dy > 0 ? r : -r));
+                ctx.lineTo(midX, midY);
+                ctx.lineTo(midX, ty - (dy > 0 ? r : -r));
+                ctx.quadraticCurveTo(midX, ty, midX + r, ty);
+                ctx.lineTo(tx, ty);
+            }
+            break;
+            
+        case 'arc':
+            const [arcFromX, arcFromY, arcToX, arcToY] = pathData.points;
+            const arcDeltaX = arcToX - arcFromX;
+            const arcDeltaY = arcToY - arcFromY;
+            const controlDist = Math.sqrt(arcDeltaX * arcDeltaX + arcDeltaY * arcDeltaY) * 0.5;
+            
+            ctx.moveTo(arcFromX, arcFromY);
+            ctx.quadraticCurveTo(
+                arcFromX + arcDeltaX * 0.5 + arcDeltaY * 0.3,
+                arcFromY + arcDeltaY * 0.5 - arcDeltaX * 0.3,
+                arcToX, arcToY
+            );
+            break;
+    }
 }
 
 // 두 교과목 블럭 사이에 화살표 그리기 (Canvas 버전)
@@ -8588,32 +8859,31 @@ function drawArrowBetweenCells(ctx, containerRect, fromCell, toCell, index, move
     const deltaY = toY - fromY;
     const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
     
-    // 연결점이 좌우 중심점인지 상하 중심점인지 판단
-    // fromEdge와 toEdge의 위치를 기반으로 판단
-    const fromIsHorizontal = Math.abs(fromEdge.x - (fromRect.left + fromRect.width / 2)) > 1; // 좌우 중심점
-    const toIsHorizontal = Math.abs(toEdge.x - (toRect.left + toRect.width / 2)) > 1; // 좌우 중심점
+    // 블록 중심 간의 실제 수직 거리 계산
+    const actualDeltaY = toCenterY - fromCenterY;
     
-    // 둘 중 하나라도 좌우 연결이면 horizontal 커브 사용
-    const useHorizontalCurve = fromIsHorizontal || toIsHorizontal;
+    // 연결점이 좌우 중심점인지 상하 중심점인지 판단
+    // 블록 중심 간 수직 거리가 300픽셀 이상이면 수직 연결로 처리
+    const isVerticalConnection = Math.abs(actualDeltaY) > 300 || Math.abs(deltaY) > Math.abs(deltaX);
     const roundness = 0.4; // vis-network와 동일한 roundness 값
     
     let cp1X, cp1Y, cp2X, cp2Y;
     
-    if (useHorizontalCurve) {
-        // horizontal 커브 - 좌우 연결에 적합
-        // horizontal의 경우 더 긴 벡터를 위해 roundness 증가
-        const horizontalRoundness = 0.6; // horizontal의 경우 더 큰 값 사용
-        const controlPointOffset = Math.abs(deltaX) * horizontalRoundness;
+    if (!isVerticalConnection) {
+        // 수평 연결 - 좌우 연결에 적합
+        // 수평 직선 구간을 먼저 가진 후 곡선으로 연결
+        const straightSectionLength = 30; // 직선 구간 길이 (픽셀)
+        const curveControlOffset = Math.min(Math.abs(deltaX) * 0.3, 50); // 곡선 제어점 오프셋
         
-        // 첫 번째 컨트롤 포인트 (시작점에서 수평으로 이동)
-        cp1X = fromX + (deltaX > 0 ? controlPointOffset : -controlPointOffset);
+        // 첫 번째 컨트롤 포인트 (시작점에서 수평 직선 구간만큼 이동)
+        cp1X = fromX + (deltaX > 0 ? straightSectionLength : -straightSectionLength);
         cp1Y = fromY;
         
-        // 두 번째 컨트롤 포인트 (끝점에서 수평으로 이동)
-        cp2X = toX - (deltaX > 0 ? controlPointOffset : -controlPointOffset);
+        // 두 번째 컨트롤 포인트 (끝점에서 수평 직선 구간만큼 이동)
+        cp2X = toX - (deltaX > 0 ? straightSectionLength : -straightSectionLength);
         cp2Y = toY;
     } else {
-        // vertical 커브 - 상하 연결에 적합
+        // 수직 연결 - 상하 연결에 적합
         const controlPointOffset = Math.abs(deltaY) * roundness;
         
         // 첫 번째 컨트롤 포인트 (시작점에서 수직으로 이동)
@@ -8625,10 +8895,9 @@ function drawArrowBetweenCells(ctx, containerRect, fromCell, toCell, index, move
         cp2Y = toY - (deltaY > 0 ? controlPointOffset : -controlPointOffset);
     }
     
-    // Canvas로 베지어 곡선 그리기
-    ctx.beginPath();
-    ctx.moveTo(fromX, fromY);
-    ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, toX, toY);
+    // 선택된 스타일로 화살표 경로 계산 및 그리기
+    const pathData = calculateArrowPath(fromX, fromY, toX, toY, arrowStyle);
+    drawArrowPath(ctx, pathData);
     
     // 화살표 스타일 설정
     ctx.strokeStyle = 'rgba(189, 189, 189, 0.85)';
@@ -8637,7 +8906,20 @@ function drawArrowBetweenCells(ctx, containerRect, fromCell, toCell, index, move
     ctx.stroke();
     
     // 화살표 머리 그리기
-    const angle = Math.atan2(toY - cp2Y, toX - cp2X);
+    let angle;
+    if (arrowStyle === 'straight-curve') {
+        // straight-curve 스타일의 경우
+        if (Math.abs(actualDeltaY) > 300) {
+            // 블록 중심 간 수직 거리가 300픽셀 이상이면 수직 방향
+            angle = actualDeltaY > 0 ? Math.PI / 2 : -Math.PI / 2; // 아래 또는 위
+        } else {
+            // 그 외의 경우 마지막 선분은 수평
+            angle = deltaX > 0 ? 0 : Math.PI; // 오른쪽 또는 왼쪽
+        }
+    } else {
+        // 다른 스타일의 경우 control point 기반 계산
+        angle = Math.atan2(toY - cp2Y, toX - cp2X);
+    }
     const arrowLength = 10;
     const arrowAngle = Math.PI / 6;
     
@@ -9181,12 +9463,13 @@ function renderCommonValuesTable() {
         return;
     }
     
-    // 공통가치대응 제목 업데이트
+    // 공통가치대응 제목 업데이트 (편집 중이 아닐 때만)
     const titleElement = document.getElementById('commonValuesTitle');
-    if (titleElement) {
-        const savedTitle = localStorage.getItem('commonValuesTitleText');
-        if (savedTitle) {
-            titleElement.textContent = savedTitle;
+    if (titleElement && titleElement.contentEditable !== 'true') {
+        // localStorage 사용 안 함 - 버전 데이터에서 가져오기
+        const versionTitle = versions[currentVersion]?.commonValuesTab?.commonValuesTitleText;
+        if (versionTitle) {
+            titleElement.textContent = versionTitle;
         } else {
             titleElement.textContent = '공통가치대응';
         }
@@ -16418,7 +16701,18 @@ function startMatrixExtraCellEdit(cell) {
     textarea.select();
 }
 
+// ============================================
 // 임시 저장소 (버전 저장 전까지 임시 보관)
+// ============================================
+// 각 탭별 제목 변경사항과 데이터를 임시로 보관
+// 버전 저장 시 실제 데이터로 이동됨
+//
+// 제목 관련 임시 저장 구조:
+// - tempMatrixData._titleChanged, _oldTitle, _newTitle
+// - tempCurriculumCellTexts._titleChanged, _oldTitle, _newTitle  
+// - tempCommonValuesCellTexts._titleChanged, _oldTitle, _newTitle
+// ============================================
+
 let tempMatrixExtraTableData = {};
 let tempCourses = [];
 let tempCurriculumCellTexts = {};
@@ -16450,7 +16744,46 @@ function clearTempStorage() {
     }
 }
 
-// 모든 탭의 수정모드 상태 초기화
+// 탭 전환 시 UI만 초기화 (임시 데이터는 유지)
+function resetEditModeUIOnly() {
+    // 수정모드 상태는 유지하되, UI만 비활성화
+    
+    // 각 탭의 수정모드 버튼 상태만 초기화
+    const buttons = [
+        { id: 'editModeToggleCourses', textId: 'editModeTextCourses' },
+        { id: 'editModeToggle', textId: 'editModeText' },
+        { id: 'editModeToggleCurriculum', textId: 'editModeTextCurriculum' },
+        { id: 'editModeToggleCommonValues', textId: 'editModeTextCommonValues' }
+    ];
+    
+    buttons.forEach(btn => {
+        const button = document.getElementById(btn.id);
+        const text = document.getElementById(btn.textId);
+        if (button) {
+            button.classList.remove('active');
+        }
+        if (text) {
+            text.textContent = '일반모드';
+        }
+    });
+    
+    // 편집 UI만 비활성화 (임시 데이터는 그대로 유지)
+    disableCellEditing();
+    setMatrixTitleEditable(false);
+    setCurriculumTitleEditable(false);
+    setCommonValuesTitleEditable(false);
+    toggleMatrixExtraTableEditMode();
+    updateAllCourseBlocksDraggable();
+    updateCommonValuesCourseBlocksDraggable();
+    
+    // 수정모드 플래그도 false로 설정
+    isEditMode = false;
+    isEditModeMatrix = false;
+    isEditModeCurriculum = false;
+    isEditModeCommonValues = false;
+}
+
+// 모든 탭의 수정모드 상태 초기화 (임시 데이터도 초기화)
 function resetAllEditModes() {
     isEditMode = false;
     isEditModeMatrix = false;
@@ -16815,78 +17148,12 @@ function collectCommonValuesTableData() {
 
 // 공통가치대응 제목 편집 가능하게 설정
 function setCommonValuesTitleEditable(editable) {
-    const titleElement = document.getElementById('commonValuesTitle');
-    if (!titleElement) return;
-    
-    if (editable) {
-        // 편집 모드로 설정
-        titleElement.contentEditable = true;
-        titleElement.style.border = '2px solid #007bff';
-        titleElement.style.padding = '8px';
-        titleElement.style.borderRadius = '4px';
-        titleElement.style.backgroundColor = '#f8f9fa';
-        titleElement.style.cursor = 'text';
-        titleElement.focus();
-        
-        // 원본 제목 저장
-        if (!titleElement.getAttribute('data-original-title')) {
-            titleElement.setAttribute('data-original-title', titleElement.textContent);
-        }
-        
-        // 편집 완료 이벤트 리스너 추가
-        titleElement.addEventListener('blur', handleCommonValuesTitleInput);
-        titleElement.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                titleElement.blur();
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                titleElement.textContent = titleElement.getAttribute('data-original-title');
-                titleElement.blur();
-            }
-        });
-        
-    } else {
-        // 일반 모드로 설정
-        titleElement.contentEditable = false;
-        titleElement.style.border = '';
-        titleElement.style.padding = '';
-        titleElement.style.borderRadius = '';
-        titleElement.style.backgroundColor = '';
-        titleElement.style.cursor = '';
-        
-        // 이벤트 리스너 제거
-        titleElement.removeEventListener('blur', handleCommonValuesTitleInput);
-        
-    }
+    setTitleEditable('commonValuesTitle', editable, handleCommonValuesTitleInput, tempCommonValuesCellTexts, {}, '공통가치대응');
 }
 
 // 공통가치대응 제목 입력 처리
 function handleCommonValuesTitleInput() {
-    const titleElement = document.getElementById('commonValuesTitle');
-    if (!titleElement) return;
-    
-    const newTitle = titleElement.textContent.trim();
-    const originalTitle = titleElement.getAttribute('data-original-title');
-    
-    if (newTitle !== originalTitle) {
-        // 제목 변경사항을 임시 저장소에 저장
-        if (!tempCommonValuesCellTexts._titleChanged) {
-            tempCommonValuesCellTexts._titleChanged = true;
-            tempCommonValuesCellTexts._oldTitle = originalTitle;
-            tempCommonValuesCellTexts._newTitle = newTitle;
-        } else {
-            tempCommonValuesCellTexts._newTitle = newTitle;
-        }
-        
-        // localStorage에 즉시 저장
-        // localStorage.setItem('commonValuesTitleText', newTitle);
-        
-        showToast('제목이 임시 저장되었습니다. 버전 저장 버튼을 눌러주세요.');
-    }
-    
-    // 편집 모드 비활성화
-    setCommonValuesTitleEditable(false);
+    handleTitleInput('commonValuesTitle', tempCommonValuesCellTexts, '공통가치대응');
 }
 // 버전 저장/복원에 matrixExtraTableData 포함
 // saveVersionData, saveCurrentVersion, restoreVersion 등에서 matrixExtraTableData를 함께 저장/복원
