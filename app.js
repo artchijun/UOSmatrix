@@ -430,7 +430,8 @@ async function loadAllDataFromFirebase() {
         // 버전 순서 로드
         const firebaseVersionOrder = await loadDataFromFirebase('versionOrder');
         if (firebaseVersionOrder && Array.isArray(firebaseVersionOrder)) {
-            localStorage.setItem('versionOrder', JSON.stringify(firebaseVersionOrder));
+            // versionOrder는 메모리에만 유지, localStorage 사용하지 않음
+            window.versionOrder = firebaseVersionOrder;
         }
         
         // 설정 데이터 로드
@@ -454,7 +455,7 @@ async function loadAllDataFromFirebase() {
 let editingIndex = -1;
 
 // 화살표 스타일 설정 (기본값: 'straight-curve')
-let arrowStyle = localStorage.getItem('curriculumArrowStyle') || 'straight-curve';
+let arrowStyle = 'straight-curve';
 let filteredCourses = null;
 let isEditMode = false;
 let isEditModeMatrix = false;
@@ -1290,7 +1291,7 @@ function restoreSelectedVersionData() {
     }
     
     // 복원 후 curriculum 탭이 마지막 탭이면 diff가 올바르게 반영되도록 강제 showTab 호출
-    const lastTab = localStorage.getItem('uosLastTab') || 'courses';
+    const lastTab = 'courses';
     if (lastTab === 'curriculum') {
         setTimeout(() => {
             showTab('curriculum');
@@ -2614,20 +2615,17 @@ function applyHoverEffect(effect) {
 
 // 디자인 설정 저장
 function saveDesignSettings() {
-    
-    // Firebase 즉시 저장 제거 - 버전 저장 시에만 저장
-    // saveDataToFirebase('settings/design', designSettings);
+    // localStorage 사용하지 않음 - 메모리에만 유지하고 버전 저장 시 Firebase에 저장됨
+    // designSettings 객체는 이미 updateTableDesign()에서 업데이트됨
     
     showToast('디자인 설정이 저장되었습니다.');
 }
 
 // 디자인 설정 불러오기
 function loadDesignSettings() {
-    const saved = localStorage.getItem('designSettings');
-    if (saved) {
-        designSettings = JSON.parse(saved);
-        applyDesignSettings();
-    }
+    // localStorage 사용하지 않음 - Firebase에서만 로드
+    // designSettings는 Firebase에서 로드되거나 기본값 사용
+    applyDesignSettings();
 }
 
 // 디자인 설정 적용
@@ -2662,7 +2660,7 @@ function resetDesignSettings() {
             hoverEffect: 'background'
         };
         applyDesignSettings();
-        localStorage.removeItem('designSettings');
+        // localStorage.removeItem('designSettings'); // localStorage 사용하지 않음
         alert('기본 디자인으로 복원되었습니다.');
     }
 }
@@ -9122,20 +9120,199 @@ function getRectEdgePoint(rect, targetX, targetY) {
 }
 
 // 버전 관리/불러오기 모달 표시
-function showVersionManager() {
+function showVersionManager(event) {
     const modal = document.getElementById('versionManagerModal');
     if (modal) {
-        modal.style.display = 'block';
-        renderVersionList();
+        // Ctrl 키가 눌렸는지 확인
+        if (event && (event.ctrlKey || event.metaKey)) {
+            // 전체 버전 목록 관리 모드
+            showFullVersionManager();
+        } else {
+            // 일반 버전 관리 모드
+            modal.style.display = 'block';
+            renderVersionList();
+        }
+    }
+}
+
+// 전체 버전 목록 관리 (Firebase의 모든 버전 표시)
+async function showFullVersionManager() {
+    const modal = document.getElementById('versionManagerModal');
+    if (!modal) return;
+    
+    modal.style.display = 'block';
+    
+    // 제목 변경
+    const modalTitle = modal.querySelector('.modal-header h2');
+    if (modalTitle) {
+        modalTitle.textContent = '전체 버전 관리 (Firebase)';
+    }
+    
+    const versionList = document.getElementById('versionList');
+    if (!versionList) return;
+    
+    versionList.innerHTML = '<p style="text-align: center; padding: 20px;">Firebase에서 버전 목록을 불러오는 중...</p>';
+    
+    try {
+        // Firebase에서 직접 버전 목록 로드
+        const firebaseVersionList = await loadDataFromFirebase('versionList');
+        const firebaseVersions = await loadDataFromFirebase('versions');
+        
+        versionList.innerHTML = '';
+        
+        // 버전 목록과 실제 데이터 비교
+        const listVersions = firebaseVersionList || [];
+        const actualVersions = firebaseVersions ? Object.keys(firebaseVersions) : [];
+        const allVersions = new Set([...listVersions, ...actualVersions]);
+        
+        if (allVersions.size === 0) {
+            versionList.innerHTML = '<p style="text-align: center; color: #6c757d; padding: 20px;">Firebase에 저장된 버전이 없습니다.</p>';
+            return;
+        }
+        
+        // 정보 표시
+        const infoDiv = document.createElement('div');
+        infoDiv.style.cssText = 'background: #f8f9fa; padding: 15px; margin-bottom: 20px; border-radius: 5px;';
+        infoDiv.innerHTML = `
+            <h4>Firebase 버전 상태</h4>
+            <p>versionList 항목: ${listVersions.length}개</p>
+            <p>실제 버전 데이터: ${actualVersions.length}개</p>
+            <p>전체 고유 버전: ${allVersions.size}개</p>
+            ${listVersions.length !== actualVersions.length ? '<p style="color: red;">⚠️ 버전 목록과 실제 데이터가 일치하지 않습니다.</p>' : ''}
+        `;
+        versionList.appendChild(infoDiv);
+        
+        // 모든 버전 표시
+        allVersions.forEach(versionName => {
+            const inList = listVersions.includes(versionName);
+            const hasData = actualVersions.includes(versionName);
+            
+            const versionItem = document.createElement('div');
+            versionItem.className = 'version-item';
+            versionItem.style.cssText = 'border: 1px solid #ddd; padding: 10px; margin: 10px 0; border-radius: 5px;';
+            
+            versionItem.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>${versionName}</strong>
+                        <span style="margin-left: 10px;">
+                            ${inList ? '✅ 목록' : '❌ 목록'}
+                            ${hasData ? '✅ 데이터' : '❌ 데이터'}
+                        </span>
+                    </div>
+                    <div>
+                        ${!inList && hasData ? `<button onclick="addToVersionList('${versionName}')" class="btn btn-sm">목록에 추가</button>` : ''}
+                        ${inList && !hasData ? `<button onclick="removeFromVersionList('${versionName}')" class="btn btn-sm btn-danger">목록에서 제거</button>` : ''}
+                        ${hasData ? `<button onclick="deleteVersionFromFirebase('${versionName}')" class="btn btn-sm btn-danger">완전 삭제</button>` : ''}
+                    </div>
+                </div>
+            `;
+            
+            versionList.appendChild(versionItem);
+        });
+        
+        // 동기화 버튼 추가
+        const syncButton = document.createElement('button');
+        syncButton.className = 'btn btn-primary';
+        syncButton.style.cssText = 'width: 100%; margin-top: 20px;';
+        syncButton.textContent = '버전 목록 동기화';
+        syncButton.onclick = syncVersionList;
+        versionList.appendChild(syncButton);
+        
+    } catch (error) {
+        console.error('Firebase 버전 로드 실패:', error);
+        versionList.innerHTML = '<p style="text-align: center; color: red; padding: 20px;">Firebase 버전 로드에 실패했습니다.</p>';
+    }
+}
+
+// 버전 목록에 추가
+async function addToVersionList(versionName) {
+    try {
+        const versionList = await loadDataFromFirebase('versionList') || [];
+        if (!versionList.includes(versionName)) {
+            versionList.push(versionName);
+            await saveDataToFirebase('versionList', versionList);
+            showToast(`'${versionName}'이(가) 버전 목록에 추가되었습니다.`);
+            showFullVersionManager();
+        }
+    } catch (error) {
+        showToast('버전 목록 추가에 실패했습니다.');
+    }
+}
+
+// 버전 목록에서 제거
+async function removeFromVersionList(versionName) {
+    try {
+        const versionList = await loadDataFromFirebase('versionList') || [];
+        const index = versionList.indexOf(versionName);
+        if (index > -1) {
+            versionList.splice(index, 1);
+            await saveDataToFirebase('versionList', versionList);
+            showToast(`'${versionName}'이(가) 버전 목록에서 제거되었습니다.`);
+            showFullVersionManager();
+        }
+    } catch (error) {
+        showToast('버전 목록 제거에 실패했습니다.');
+    }
+}
+
+// Firebase에서 버전 완전 삭제
+async function deleteVersionFromFirebase(versionName) {
+    if (!confirm(`'${versionName}' 버전을 Firebase에서 완전히 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) {
+        return;
+    }
+    
+    try {
+        // 버전 데이터 삭제
+        await db.ref(`versions/${versionName}`).remove();
+        
+        // 버전 목록에서도 제거
+        const versionList = await loadDataFromFirebase('versionList') || [];
+        const index = versionList.indexOf(versionName);
+        if (index > -1) {
+            versionList.splice(index, 1);
+            await saveDataToFirebase('versionList', versionList);
+        }
+        
+        // 로컬 메모리에서도 제거
+        if (versions[versionName]) {
+            delete versions[versionName];
+        }
+        
+        showToast(`'${versionName}' 버전이 완전히 삭제되었습니다.`);
+        showFullVersionManager();
+    } catch (error) {
+        showToast('버전 삭제에 실패했습니다.');
+    }
+}
+
+// 버전 목록 동기화 (실제 데이터와 일치시키기)
+async function syncVersionList() {
+    if (!confirm('버전 목록을 실제 데이터와 동기화하시겠습니까?')) {
+        return;
+    }
+    
+    try {
+        const firebaseVersions = await loadDataFromFirebase('versions') || {};
+        const actualVersionNames = Object.keys(firebaseVersions);
+        
+        // versionList를 실제 데이터와 일치시킴
+        await saveDataToFirebase('versionList', actualVersionNames);
+        
+        showToast('버전 목록이 동기화되었습니다.');
+        showFullVersionManager();
+    } catch (error) {
+        showToast('버전 목록 동기화에 실패했습니다.');
     }
 }
 
 // 버전 순서 가져오기 (버전 관리 모달과 동일한 순서)
 function getVersionOrder() {
-    const savedOrder = localStorage.getItem('versionOrder');
+    // localStorage 대신 메모리에서 가져오기
+    const savedOrder = window.versionOrder;
     
     if (savedOrder) {
-        const orderArray = JSON.parse(savedOrder);
+        const orderArray = Array.isArray(savedOrder) ? savedOrder : JSON.parse(savedOrder);
         
         // 저장된 순서에 없는 새 버전들을 먼저 수집 (최신순)
         const newVersions = [];
@@ -9217,10 +9394,10 @@ function renderVersionList() {
     
     // 버전 순서가 저장되어 있으면 사용, 없으면 날짜순으로 정렬
     let versionEntries;
-    const savedOrder = localStorage.getItem('versionOrder');
+    const savedOrder = window.versionOrder;
     
     if (savedOrder) {
-        const orderArray = JSON.parse(savedOrder);
+        const orderArray = Array.isArray(savedOrder) ? savedOrder : JSON.parse(savedOrder);
         
         // 저장된 순서에 없는 새 버전들을 먼저 수집 (최신순)
         const newVersions = [];
@@ -9420,10 +9597,10 @@ async function saveVersionOrder() {
     const versionItems = versionList.querySelectorAll('.version-item');
     const order = Array.from(versionItems).map(item => item.dataset.versionName);
     
-    // localStorage에 저장
-    localStorage.setItem('versionOrder', JSON.stringify(order));
+    // 메모리에 저장
+    window.versionOrder = order;
     
-    // Firebase에도 저장
+    // Firebase에 저장
     if (firebaseInitialized && isOnline) {
         try {
             await saveDataToFirebase('versionOrder', order);

@@ -546,10 +546,18 @@ h1 {
 .content {
     display: none;
     animation: fadeIn 0.3s ease;
+    position: relative;
 }
 
 .content.active {
     display: block;
+}
+
+#courses {
+    overflow: visible !important;
+    position: relative;
+    min-height: 300px;
+    z-index: 1;
 }
 
 @keyframes fadeIn {
@@ -566,43 +574,71 @@ h1 {
     display: flex;
     gap: 20px;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: stretch;
+    position: relative;
+    overflow: visible;
+    z-index: 100;
 }
 
 .filter-group {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    min-width: 120px;
+    min-width: 140px;
+    position: relative;
 }
 
-.filter-group label {
-    font-size: 14px;
-    font-weight: 500;
-    color: #6c757d;
+.filter-group > label:first-child {
+    font-size: 13px;
+    font-weight: 600;
+    color: #495057;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    height: 20px;
+    line-height: 20px;
+    margin: 0;
+    margin-bottom: 4px;
+    margin-left: 8px;
+    display: flex;
+    align-items: flex-end;
 }
 
 select, input {
-    padding: 8px 12px;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    font-size: 14px;
+    padding: 6px 12px;
+    border: 1.5px solid #e1e7ed;
+    border-radius: 8px;
+    font-size: 13px;
     background: white;
-    transition: border-color 0.3s ease;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+}
+
+select:hover, input:hover {
+    border-color: #adb5bd;
 }
 
 select:focus, input:focus {
     outline: none;
-    border-color: #4a90e2;
+    border-color: #2196f3;
+    box-shadow: 0 0 0 3px rgba(33,150,243,0.1);
+    transform: translateY(-1px);
+}
+
+input[type="text"]::placeholder {
+    color: #adb5bd;
+    font-weight: 400;
 }
 
 .table-container {
     background: var(--table-bg-color);
     border-radius: 10px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    overflow: hidden;
     width: 100%;
     overflow-x: auto;
+    overflow-y: visible !important;
+    position: relative;
+    min-height: 300px;
+    padding-bottom: 150px;
+    margin-bottom: -150px;
 }
 
 table, .matrix-table, #coursesTable {
@@ -1228,9 +1264,11 @@ th.resizable:hover .column-resizer {
         width: 100%;
     }
 
-    .filter-group label {
+    .filter-group > label:first-child {
         font-size: 12px;
         margin-bottom: 4px;
+        height: 18px;
+        line-height: 18px;
     }
 
     .filter-group select,
@@ -1478,8 +1516,10 @@ th.resizable:hover .column-resizer {
     }
 
     /* 필터 더 작은 화면 최적화 */
-    .filter-group label {
+    .filter-group > label:first-child {
         font-size: 11px;
+        height: 16px;
+        line-height: 16px;
     }
 
     .filter-group select,
@@ -3830,12 +3870,12 @@ body.dragging-course .common-values-table td[id^="commonValues-cell-"] {
 
 /* 인라인 체크박스 스타일 (교과목 관리 탭) */
 .change-status-filter {
-    margin-top: 10px;
+    margin-top: 0px;
 }
 
 .change-status-checkboxes {
     display: flex;
-    gap: 15px;
+    gap: 12px;
     flex-wrap: wrap;
     align-items: center;
 }
@@ -3845,14 +3885,49 @@ body.dragging-course .common-values-table td[id^="commonValues-cell-"] {
     align-items: center;
     cursor: pointer;
     font-size: 14px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: #f8f9fa;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+    user-select: none;
+}
+
+.inline-checkbox:hover {
+    background: #e9ecef;
+    transform: translateY(-1px);
 }
 
 .inline-checkbox input[type="checkbox"] {
-    margin-right: 5px;
+    width: 14px;
+    height: 14px;
+    margin-right: 8px;
+    cursor: pointer;
+    accent-color: #2196f3;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+}
+
+.inline-checkbox.checked {
+    background: #e7f3ff;
 }
 
 .inline-checkbox span {
     line-height: 1;
+    font-weight: 500;
+}
+
+/* 드롭다운 애니메이션 */
+@keyframes dropdownFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* 수행평가 매트릭스 필터 내 컬러 인디케이터 */
@@ -3865,43 +3940,65 @@ body.dragging-course .common-values-table td[id^="commonValues-cell-"] {
     position: relative;
     display: inline-block;
     width: 100%;
+    overflow: visible;
 }
 
 .filter-dropdown-btn {
     width: 100%;
-    padding: 8px 12px;
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    padding: 5px 10px;
+    background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+    border: 1.5px solid #e1e7ed;
+    border-radius: 8px;
     cursor: pointer;
     text-align: left;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 14px;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
 }
 
 .filter-dropdown-btn:hover {
-    background: #f8f9fa;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-color: #2196f3;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(33,150,243,0.15);
+}
+
+.filter-dropdown-btn:active {
+    transform: translateY(0);
+}
+
+.filter-dropdown-btn span {
+    font-size: 13px !important;
 }
 
 .dropdown-arrow {
-    font-size: 10px;
-    color: #666;
+    font-size: 10px !important;
+    color: #868e96;
+    transition: transform 0.3s ease;
+}
+
+.filter-dropdown-btn.active .dropdown-arrow {
+    transform: rotate(180deg);
+    color: #2196f3;
 }
 
 .filter-dropdown-content {
     display: none;
     position: absolute;
-    background-color: white;
+    background: white;
     min-width: 100%;
-    box-shadow: 0px 8px 16px rgba(0,0,0,0.1);
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    z-index: 1000;
-    margin-top: 2px;
-    max-height: 200px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    border: 1px solid #e1e7ed;
+    border-radius: 10px;
+    z-index: 9999;
+    margin-top: 6px;
+    max-height: 320px;
     overflow-y: auto;
+    animation: dropdownFadeIn 0.3s ease;
 }
 
 .filter-dropdown-content.show {
@@ -3909,19 +4006,36 @@ body.dragging-course .common-values-table td[id^="commonValues-cell-"] {
 }
 
 .filter-checkbox-item {
-    display: block;
+    display: flex;
+    align-items: center;
     padding: 8px 12px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 13px;
+    transition: all 0.2s ease;
+    border-radius: 6px;
+    margin: 2px 4px;
+    line-height: 1;
 }
 
 .filter-checkbox-item:hover {
-    background-color: #f1f1f1;
+    background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%);
+    padding-left: 16px;
+}
+
+.filter-checkbox-item span {
+    display: inline-block;
+    line-height: 12px;
 }
 
 .filter-checkbox-item input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
     margin-right: 8px;
     cursor: pointer;
+    accent-color: #2196f3;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
 }
 
 /* 추가 모바일 최적화 스타일 */
@@ -4461,7 +4575,7 @@ body.dragging-course .common-values-table td[id^="commonValues-cell-"] {
     background: white;
     border: 1px solid #dee2e6;
     border-radius: 6px;
-    padding: 8px 12px;
+    padding: 4px 12px;
     font-size: 14px;
     cursor: pointer;
     display: flex;
@@ -4529,6 +4643,14 @@ body.dragging-course .common-values-table td[id^="commonValues-cell-"] {
     align-items: flex-start;
 }
 
+.change-status-filter > label:first-child {
+    height: 20px !important;
+    line-height: 20px !important;
+    display: flex !important;
+    align-items: flex-end !important;
+    margin-bottom: 4px !important;
+}
+
 .change-status-checkboxes {
     display: flex;
     gap: 12px;
@@ -4547,10 +4669,12 @@ body.dragging-course .common-values-table td[id^="commonValues-cell-"] {
 }
 
 .color-indicator {
-    width: 12px;
-    height: 12px;
-    border-radius: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
     display: inline-block;
+    margin: 0 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
 
 /* 드래그 인디케이터 스타일 */

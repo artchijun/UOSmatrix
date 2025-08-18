@@ -70,7 +70,7 @@
                     </div>
                     <div class="version-buttons-line">
                                     <button class="btn btn-sm" onclick="saveVersion()">버전 저장</button>
-            <button class="btn btn-sm" onclick="showVersionManager()">버전 관리</button>
+            <button class="btn btn-sm" onclick="showVersionManager(event)" title="Ctrl+클릭: 전체 버전 관리">버전 관리</button>
                 <button class="btn btn-sm" onclick="toggleChangeHistoryPanel()">변경 이력</button>
                     </div>
                 </div>
@@ -306,23 +306,23 @@
                 <div class="filter-group change-status-filter">
                     <label>변경 상태</label>
                     <div class="change-status-checkboxes">
-                        <label class="inline-checkbox">
-                            <input type="checkbox" id="showAdded" onchange="filterCourses()" checked>
+                        <label class="inline-checkbox checked">
+                            <input type="checkbox" id="showAdded" onchange="filterCourses(); this.parentElement.classList.toggle('checked', this.checked)" checked>
                             <span class="color-indicator" style="background: #28a745;"></span>
                             <span>추가</span>
                         </label>
-                        <label class="inline-checkbox">
-                            <input type="checkbox" id="showModified" onchange="filterCourses()" checked>
+                        <label class="inline-checkbox checked">
+                            <input type="checkbox" id="showModified" onchange="filterCourses(); this.parentElement.classList.toggle('checked', this.checked)" checked>
                             <span class="color-indicator" style="background: #07bdff;"></span>
                             <span>수정</span>
                         </label>
-                        <label class="inline-checkbox">
-                            <input type="checkbox" id="showDeleted" onchange="filterCourses()" checked>
+                        <label class="inline-checkbox checked">
+                            <input type="checkbox" id="showDeleted" onchange="filterCourses(); this.parentElement.classList.toggle('checked', this.checked)" checked>
                             <span class="color-indicator" style="background: #dc3545;"></span>
                             <span>삭제</span>
                         </label>
-                        <label class="inline-checkbox">
-                            <input type="checkbox" id="showUnchanged" onchange="filterCourses()" checked>
+                        <label class="inline-checkbox checked">
+                            <input type="checkbox" id="showUnchanged" onchange="filterCourses(); this.parentElement.classList.toggle('checked', this.checked)" checked>
                             <span class="color-indicator" style="background: #6c757d;"></span>
                             <span>변경없음</span>
                         </label>
@@ -333,15 +333,15 @@
                 <table id="coursesTable">
                     <thead>
                         <tr>
-                            <th class="resizable sortable" data-sort="yearSemester">학년-학기 <span class="sort-icon">↕</span></th>
-                            <th class="resizable sortable" data-sort="courseNumber">교과목번호 <span class="sort-icon">↕</span></th>
-                            <th class="resizable sortable" data-sort="courseName">과목명 <span class="sort-icon">↕</span></th>
-                            <th class="resizable sortable" data-sort="professor">담당교수 <span class="sort-icon">↕</span></th>
-                            <th class="resizable sortable" data-sort="credits">학점 <span class="sort-icon">↕</span></th>
-                            <th class="resizable sortable" data-sort="category">구분 <span class="sort-icon">↕</span></th>
-                            <th class="resizable sortable" data-sort="subjectType">과목분류 <span class="sort-icon">↕</span></th>
-                            <th class="resizable sortable" data-sort="isRequired">필수여부 <span class="sort-icon">↕</span></th>
-                            <th class="resizable sortable" data-sort="performanceCriteria">수행평가기준 <span class="sort-icon">↕</span></th>
+                            <th class="resizable sortable" data-sort="yearSemester">학년-학기 <span class="sort-icon"></span></th>
+                            <th class="resizable sortable" data-sort="courseNumber">교과목번호 <span class="sort-icon"></span></th>
+                            <th class="resizable sortable" data-sort="courseName">과목명 <span class="sort-icon"></span></th>
+                            <th class="resizable sortable" data-sort="professor">담당교수 <span class="sort-icon"></span></th>
+                            <th class="resizable sortable" data-sort="credits">학점 <span class="sort-icon"></span></th>
+                            <th class="resizable sortable" data-sort="category">구분 <span class="sort-icon"></span></th>
+                            <th class="resizable sortable" data-sort="subjectType">과목분류 <span class="sort-icon"></span></th>
+                            <th class="resizable sortable" data-sort="isRequired">필수여부 <span class="sort-icon"></span></th>
+                            <th class="resizable sortable" data-sort="performanceCriteria">수행평가기준 <span class="sort-icon"></span></th>
                             <th class="resizable">작업</th>
                         </tr>
                     </thead>
