@@ -2137,14 +2137,15 @@ th, td, .matrix-table th, .matrix-table td {
     border: none;
     border-radius: 12px;
     margin: 1px auto; /* 중앙 정렬 */
-    padding: 2px 6px;
+    padding: 2px 6px;  /* 원래대로 복원 */
     cursor: grab;
     user-select: none;
     transition: all 0.2s ease;
-    font-size: 12px;
-    min-height: 32px;
-    max-width: 280px;
-    min-width: 150px;
+    font-size: 12px;  /* 원래대로 복원 */
+    min-height: 32px;  /* 원래대로 복원 */
+    min-width: 100px;  /* 최소 폭 설정 */
+    max-width: 200px;  /* 최대 폭 200px로 제한 */
+    width: 100%;  /* 컬럼 폭에 맞춤 */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -2230,8 +2231,8 @@ th, td, .matrix-table th, .matrix-table td {
     font-weight: 600;
     color: #495057;
     margin-bottom: 0px;
-    line-height: 1.2;
-    font-size: 13px;
+    line-height: 1.2;  /* 원래대로 복원 */
+    font-size: 13px;  /* 원래대로 복원 */
 }
 
 .course-credits-text {
@@ -2242,7 +2243,7 @@ th, td, .matrix-table th, .matrix-table td {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 11px;
+    font-size: 11px;  /* 원래대로 복원 */
     color: #6c757d;
     width: 100%;
 }
@@ -2277,11 +2278,11 @@ th, td, .matrix-table th, .matrix-table td {
     min-width: 100px;
     width: 8.33% !important; /* 12개 컬럼 중 1개씩 균등 분배 */
     max-width: none !important;
-    min-height: 80px;
+    min-height: 20px;  /* 80px에서 40px로 줄임 */
     height: auto !important; /* 내용에 따라 자동 높이 조절 */
     position: relative;
     vertical-align: top;
-    padding: 8px;
+    padding: 10px;  /* 셀 내부 여백 5px */
 }
 
 /* 범례, 번호, 구분, 학점 셀은 내용에 맞게 자동 조정 */
@@ -2301,7 +2302,7 @@ th, td, .matrix-table th, .matrix-table td {
 .curriculum-table td[id*="-시공-"],
 .curriculum-table td[id*="-디지털-"] {
     position: relative;
-    min-height: 60px;
+    min-height: 0px;  /* 60px에서 35px로 줄임 */
     transition: all 0.3s ease;
 }
 
@@ -2309,6 +2310,13 @@ th, td, .matrix-table th, .matrix-table td {
 .curriculum-table td[id^="cell-"]:has(.course-block:hover) {
     background-color: #f8f9fa;
     border-color: #bbb;
+}
+
+/* 이수모형 테이블의 교과목 블럭 폭 설정 */
+.curriculum-table .course-block {
+    min-width: 100px;  /* 최소 폭 100px */
+    max-width: 200px;  /* 최대 폭 200px로 제한 */
+    width: calc(100% - 4px);  /* 셀 폭에서 마진 제외한 전체 */
 }
 
 /* 학점 열 폭 조정 */
@@ -2420,7 +2428,7 @@ th, td, .matrix-table th, .matrix-table td {
 /* 이수모형 테이블 셀 텍스트 가운데 정렬 */
 .curriculum-table td[id^="cell-"] {
     text-align: center;
-    vertical-align: middle;
+    vertical-align: top;
 }
 
 /* 변경된 교과목 블록 강조 스타일 */
@@ -3242,6 +3250,11 @@ th, td, .matrix-table th, .matrix-table td {
     background: #ffebee; /* 구분 모드: 회색 */
 }
 
+/* 공통가치대응 테이블 셀 기본 스타일 */
+.common-values-table td {
+    padding: 5px;  /* 셀 내부 여백 5px */
+}
+
 .common-values-table td[rowspan] {
     font-weight: bold;
     text-align: center;
@@ -3260,7 +3273,9 @@ th, td, .matrix-table th, .matrix-table td {
 }
 
 .common-values-table .course-block {
-    min-width: 150px;
+    min-width: 100px;  /* 최소 폭 100px로 통일 */
+    max-width: 200px;  /* 최대 폭 200px로 제한 */
+    width: 100%;  /* 컬럼 폭에 맞춤 */
 }
 
 #coursesTable th, #coursesTable td {
@@ -3622,7 +3637,7 @@ th, td, .matrix-table th, .matrix-table td {
   position: relative;
   width: 100%;
   height: auto;
-  min-height: 60px;
+  min-height: 30%;
 }
 
 /* 드래그 중일 때 블록 추가/제거에 의한 레이아웃 변화 방지 */

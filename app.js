@@ -4491,19 +4491,435 @@ function updateFontSize() {
     }
 }
 
-// PDF 내보내기 (벡터 기반, 페이지 모습 보존)
-function exportToPDF() {
+// ============================================================================
+// PDF Export Utility Functions - 재사용 가능한 유틸리티 함수
+// ============================================================================
+
+/**
+ * PDF 내보내기 설정 객체
+ */
+const PDFExportConfig = {
+    quality: {
+        scale: 2,           // 해상도 높임 (1-4)
+        imageFormat: 'png', // png 또는 jpeg
+        compression: 'FAST' // FAST, SLOW, MEDIUM, NONE
+    },
+    page: {
+        format: 'a2',       // A2로 변경하여 더 큰 페이지
+        orientation: 'landscape', // landscape, portrait
+        margin: 10          // 페이지 여백 (mm)
+    },
+    ui: {
+        showProgress: true, // 진행률 표시 여부
+        autoClose: true,    // 완료 후 자동 닫기
+        closeDelay: 500     // 자동 닫기 지연 시간 (ms)
+    }
+};
+
+/**
+ * PDF 생성을 위한 로딩 UI 표시
+ * @param {string} title - 탭 제목
+ * @param {string} subtitle - 부제목
+ * @returns {Object} 로딩 UI 요소와 메서드
+ */
+function createPDFLoadingUI(title, subtitle) {
+    const loadingMsg = document.createElement('div');
+    loadingMsg.id = 'pdfExportMsg';
+    loadingMsg.className = 'pdf-export-modal';
+    loadingMsg.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: linear-gradient(135deg, #333 0%, #222 100%);
+        color: white;
+        padding: 25px;
+        border-radius: 12px;
+        z-index: 10000;
+        text-align: center;
+        min-width: 320px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    `;
+    
+    loadingMsg.innerHTML = `
+        <div style="font-size:18px;margin-bottom:8px;font-weight:600">${title}</div>
+        <div style="font-size:13px;opacity:0.9;margin-bottom:20px">${subtitle}</div>
+        <div style="margin-top:15px">
+            <div style="background:rgba(255,255,255,0.1);height:6px;border-radius:3px;overflow:hidden">
+                <div id="pdfProgress" style="background:linear-gradient(90deg, #4CAF50, #45a049);height:100%;width:0%;transition:width 0.3s ease"></div>
+            </div>
+            <div id="pdfProgressText" style="margin-top:8px;font-size:12px;opacity:0.8">0%</div>
+        </div>
+        <div id="pdfErrorMsg" style="color:#ff6b6b;margin-top:10px;font-size:12px;display:none"></div>
+    `;
+    
+    document.body.appendChild(loadingMsg);
+    
+    return {
+        element: loadingMsg,
+        updateProgress: (percent, text = null) => {
+            const progressBar = document.getElementById('pdfProgress');
+            const progressText = document.getElementById('pdfProgressText');
+            if (progressBar) {
+                progressBar.style.width = Math.min(percent, 100) + '%';
+            }
+            if (progressText) {
+                progressText.textContent = text || `${Math.round(percent)}%`;
+            }
+        },
+        showError: (message) => {
+            const errorMsg = document.getElementById('pdfErrorMsg');
+            if (errorMsg) {
+                errorMsg.textContent = message;
+                errorMsg.style.display = 'block';
+            }
+        },
+        close: (delay = PDFExportConfig.ui.closeDelay) => {
+            setTimeout(() => {
+                if (loadingMsg && loadingMsg.parentNode) {
+                    loadingMsg.style.opacity = '0';
+                    loadingMsg.style.transition = 'opacity 0.3s';
+                    setTimeout(() => loadingMsg.remove(), 300);
+                }
+            }, delay);
+        }
+    };
+}
+
+/**
+ * HTML2Canvas 라이브러리 로드 보장
+ * @returns {Promise<boolean>}
+ */
+function ensureHTML2Canvas() {
+    return new Promise((resolve, reject) => {
+        if (typeof html2canvas !== 'undefined') {
+            resolve(true);
+            return;
+        }
+        
+        console.log('🔄 HTML2Canvas 동적 로드 시작...');
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        script.onload = () => {
+            console.log('✅ HTML2Canvas 로드 성공');
+            resolve(true);
+        };
+        script.onerror = () => {
+            reject(new Error('HTML2Canvas 라이브러리를 로드할 수 없습니다.'));
+        };
+        document.head.appendChild(script);
+    });
+}
+
+/**
+ * jsPDF 라이브러리 정규화 및 확인
+ * @returns {boolean}
+ */
+function ensureJsPDF() {
+    if (!window.jsPDF) {
+        if (window.jspdf && window.jspdf.jsPDF) {
+            window.jsPDF = window.jspdf.jsPDF;
+        } else if (typeof jspdf !== 'undefined' && jspdf.jsPDF) {
+            window.jsPDF = jspdf.jsPDF;
+        }
+    }
+    return window.jsPDF !== undefined;
+}
+
+/**
+ * HTML 요소를 PDF로 변환하는 공통 함수
+ * @param {HTMLElement} element - 변환할 HTML 요소
+ * @param {string} title - PDF 제목
+ * @param {string} filename - 저장할 파일명
+ * @param {Object} options - 추가 옵션
+ * @returns {Promise<void>}
+ */
+async function convertElementToPDF(element, title, filename, options = {}) {
+    const config = { ...PDFExportConfig, ...options };
+    const loadingUI = config.ui.showProgress ? 
+        createPDFLoadingUI('PDF 생성 중...', title) : null;
+    
+    try {
+        // 1. 라이브러리 확인
+        loadingUI?.updateProgress(10, '라이브러리 확인 중...');
+        await ensureHTML2Canvas();
+        
+        if (!ensureJsPDF()) {
+            throw new Error('jsPDF 라이브러리를 사용할 수 없습니다.');
+        }
+        
+        // 2. 컨테이너 생성 (원본 비율 유지)
+        loadingUI?.updateProgress(20, '컨텐츠 준비 중...');
+        const container = document.createElement('div');
+        
+        // 원본 요소의 실제 크기와 비율 가져오기
+        const originalRect = element.getBoundingClientRect();
+        const originalWidth = originalRect.width;
+        const originalHeight = originalRect.height;
+        const aspectRatio = originalWidth / originalHeight;
+        
+        // 원본과 동일한 크기로 컨테이너 생성 (비율 정확히 유지)
+        container.style.cssText = `
+            background: #ffffff;
+            padding: 20px;
+            position: absolute;
+            left: -9999px;
+            width: ${originalWidth}px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+        
+        // 제목 추가
+        if (title) {
+            const titleDiv = document.createElement('div');
+            titleDiv.innerHTML = `<h1 style="text-align:center;margin:0 0 20px 0;font-size:28px;color:#000;font-weight:600">${title}</h1>`;
+            container.appendChild(titleDiv);
+        }
+        
+        // 요소 복사 (원본 비율과 스타일 유지)
+        const elementClone = element.cloneNode(true);
+        elementClone.style.width = '100%';
+        elementClone.style.height = 'auto';
+        
+        // 원본의 계산된 스타일 복사
+        const originalStyles = window.getComputedStyle(element);
+        elementClone.style.fontFamily = originalStyles.fontFamily;
+        elementClone.style.fontSize = originalStyles.fontSize;
+        
+        // 테이블인 경우 원본 레이아웃 유지
+        if (elementClone.tagName === 'TABLE') {
+            elementClone.style.tableLayout = originalStyles.tableLayout || 'auto';
+        }
+        
+        container.appendChild(elementClone);
+        document.body.appendChild(container);
+        
+        // 3. HTML2Canvas로 렌더링
+        loadingUI?.updateProgress(40, '이미지 생성 중...');
+        const canvas = await html2canvas(container, {
+            scale: config.quality.scale,
+            logging: false,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#ffffff',
+            width: container.scrollWidth,
+            height: container.scrollHeight,
+            windowWidth: container.scrollWidth,
+            windowHeight: container.scrollHeight,
+            onclone: (clonedDoc) => {
+                // 클론된 문서에서 테이블 스타일 조정
+                const tables = clonedDoc.querySelectorAll('table');
+                tables.forEach(table => {
+                    table.style.width = '100%';
+                    table.style.borderCollapse = 'collapse';
+                    // 테이블 레이아웃 자동으로 컬럼 폭 최적화
+                    table.style.tableLayout = 'auto';
+                });
+                
+                // 셀 스타일 - 원본 비율 정확히 유지
+                const cells = clonedDoc.querySelectorAll('td, th');
+                cells.forEach(cell => {
+                    if (!cell.style.border) {
+                        cell.style.border = '1px solid #ddd';
+                    }
+                    // 높이 자동 조정으로 비율 유지
+                    cell.style.height = 'auto';
+                    // 수직 정렬 중앙으로 설정
+                    cell.style.verticalAlign = 'middle';
+                });
+                
+                // 교과목 블록 - PDF에 최적화된 스타일
+                const courseBlocks = clonedDoc.querySelectorAll('.course-block');
+                courseBlocks.forEach(block => {
+                    // PDF에서 컬럼 폭에 맞춤
+                    block.style.display = 'flex';
+                    block.style.flexDirection = 'column';
+                    block.style.justifyContent = 'center';
+                    block.style.alignItems = 'center';
+                    block.style.width = '100%';
+                    block.style.minWidth = '100px';
+                    block.style.maxWidth = 'none';  // PDF에서는 최대 폭 제한 없음
+                    block.style.padding = '4px 8px';
+                    block.style.margin = '2px';
+                });
+                
+                // 교과목 블록 제목 - 중앙 정렬
+                const blockTitles = clonedDoc.querySelectorAll('.course-block-title');
+                blockTitles.forEach(title => {
+                    title.style.textAlign = 'center';
+                    title.style.width = '100%';
+                    title.style.display = 'block';
+                });
+                
+                // 교과목 블록 정보 - 중앙 정렬
+                const blockInfos = clonedDoc.querySelectorAll('.course-block-info');
+                blockInfos.forEach(info => {
+                    info.style.textAlign = 'center';
+                    info.style.width = '100%';
+                    info.style.display = 'flex';
+                    info.style.justifyContent = 'center';
+                    info.style.alignItems = 'center';
+                });
+            }
+        });
+        
+        // 컨테이너 제거
+        document.body.removeChild(container);
+        
+        // 4. PDF 생성
+        loadingUI?.updateProgress(60, 'PDF 문서 생성 중...');
+        const { jsPDF } = window;
+        const imgData = canvas.toDataURL(`image/${config.quality.imageFormat}`);
+        
+        const doc = new jsPDF(
+            config.page.orientation,
+            'mm',
+            config.page.format
+        );
+        
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = config.page.margin;
+        
+        // 단일 페이지에 맞게 이미지 크기 조정
+        const availableWidth = pageWidth - (margin * 2);
+        const availableHeight = pageHeight - (margin * 2);
+        
+        // 캔버스의 실제 비율
+        const canvasRatio = canvas.width / canvas.height;
+        // 페이지의 비율
+        const pageRatio = availableWidth / availableHeight;
+        
+        let imgWidth, imgHeight;
+        
+        if (canvasRatio > pageRatio) {
+            // 이미지가 페이지보다 더 넓음 - 너비에 맞춤
+            imgWidth = availableWidth;
+            imgHeight = imgWidth / canvasRatio;
+        } else {
+            // 이미지가 페이지보다 더 높음 - 높이에 맞춤
+            imgHeight = availableHeight;
+            imgWidth = imgHeight * canvasRatio;
+        }
+        
+        // 중앙 정렬을 위한 위치 계산
+        const xPosition = margin + (availableWidth - imgWidth) / 2;
+        const yPosition = margin + (availableHeight - imgHeight) / 2;
+        
+        // 5. 단일 페이지에 이미지 추가
+        loadingUI?.updateProgress(80, '페이지 생성 중...');
+        doc.addImage(
+            imgData,
+            config.quality.imageFormat.toUpperCase(),
+            xPosition,
+            yPosition,
+            imgWidth,
+            imgHeight,
+            undefined,
+            config.quality.compression
+        );
+        
+        const pageNumber = 1;
+        
+        // 6. 메타데이터 설정
+        doc.setProperties({
+            title: title || 'UOSARCH Export',
+            subject: options.subject || 'UOSARCH Document',
+            author: 'UOSARCH 교과목 관리 시스템',
+            keywords: options.keywords || 'UOSARCH, PDF',
+            creator: 'UOSARCH System v2.0'
+        });
+        
+        // 7. 파일 저장
+        loadingUI?.updateProgress(95, '파일 저장 중...');
+        doc.save(filename);
+        
+        // 8. 완료
+        loadingUI?.updateProgress(100, '완료!');
+        if (config.ui.autoClose) {
+            loadingUI?.close();
+        }
+        
+        return { success: true, pageCount: pageNumber };
+        
+    } catch (error) {
+        console.error('PDF 생성 오류:', error);
+        loadingUI?.showError(error.message);
+        loadingUI?.close(3000);
+        throw error;
+    }
+}
+
+/**
+ * 현재 날짜/시간 기반 파일명 생성
+ * @param {string} prefix - 파일명 접두사
+ * @returns {string}
+ */
+function generatePDFFilename(prefix) {
+    const now = new Date();
+    const dateStr = now.getFullYear() + 
+                   String(now.getMonth() + 1).padStart(2, '0') + 
+                   String(now.getDate()).padStart(2, '0') + '_' +
+                   String(now.getHours()).padStart(2, '0') +
+                   String(now.getMinutes()).padStart(2, '0');
+    return `${prefix}_${dateStr}.pdf`;
+}
+
+// ============================================================================
+// PDF Export Main Functions - 각 탭의 PDF 내보내기 함수
+// ============================================================================
+
+/**
+ * 수행평가 매트릭스 PDF 내보내기
+ */
+async function exportToPDF() {
+    const table = document.getElementById('matrixTable');
+    if (!table) {
+        alert('내보낼 테이블을 찾을 수 없습니다.');
+        return;
+    }
+    
+    const matrixTitle = document.getElementById('matrixTitle');
+    const titleText = matrixTitle ? matrixTitle.textContent.trim() : '학생수행평가기준과 교과목 매트릭스 2025';
+    const filename = generatePDFFilename('수행평가매트릭스');
+    
+    try {
+        await convertElementToPDF(table, titleText, filename, {
+            subject: '수행평가 매트릭스',
+            keywords: '수행평가, 매트릭스, 교과목, UOSARCH'
+        });
+    } catch (error) {
+        // 폴백: 벡터 기반 방식 시도
+        if (ensureJsPDF()) {
+            console.log('🔄 폴백: 벡터 기반 PDF 생성 시도...');
+            exportToPDFVector();
+        } else {
+            alert('PDF 생성 중 오류가 발생했습니다.\n' + error.message);
+        }
+    }
+}
+
+// 벡터 기반 PDF 내보내기 (폴백용)
+function exportToPDFVector() {
     const table = document.getElementById('matrixTable');
     if (!table) return;
     
-    // jsPDF 라이브러리 확인
+    // jsPDF 라이브러리 확인 및 정규화
+    if (!window.jsPDF) {
+        if (window.jspdf && window.jspdf.jsPDF) {
+            window.jsPDF = window.jspdf.jsPDF;
+        } else if (typeof jspdf !== 'undefined' && jspdf.jsPDF) {
+            window.jsPDF = jspdf.jsPDF;
+        }
+    }
+    
     if (typeof window.jsPDF === 'undefined') {
         alert('PDF 내보내기 기능을 사용하려면 jsPDF 라이브러리가 필요합니다.');
         return;
     }
     
     // jsPDF 인스턴스 생성 (가로 방향)
-    const { jsPDF } = window.jsPDF;
+    const { jsPDF } = window;
     const doc = new jsPDF('landscape', 'mm', 'a4');
     
     // 페이지 크기 설정
@@ -7048,19 +7464,57 @@ function exportCurriculumToExcel() {
     XLSX.writeFile(wb, filename);
 }
 
-// 이수모형 PDF 내보내기
-function exportCurriculumToPDF() {
+/**
+ * 이수모형 PDF 내보내기
+ */
+async function exportCurriculumToPDF() {
+    const table = document.querySelector('.curriculum-table');
+    if (!table) {
+        alert('내보낼 테이블을 찾을 수 없습니다.');
+        return;
+    }
+    
+    const curriculumTitle = document.getElementById('curriculumTitle');
+    const titleText = curriculumTitle ? curriculumTitle.textContent.trim() : '건축학전공 교과과정 이수모형';
+    const filename = generatePDFFilename('이수모형');
+    
+    try {
+        await convertElementToPDF(table, titleText, filename, {
+            subject: '건축학전공 이수모형',
+            keywords: '이수모형, 교과과정, 건축학, UOSARCH'
+        });
+    } catch (error) {
+        // 폴백: 벡터 기반 방식 시도
+        if (ensureJsPDF()) {
+            console.log('🔄 폴백: 벡터 기반 PDF 생성 시도...');
+            exportCurriculumToPDFVector();
+        } else {
+            alert('PDF 생성 중 오류가 발생했습니다.\n' + error.message);
+        }
+    }
+}
+
+// 벡터 기반 이수모형 PDF 내보내기 (폴백용)
+function exportCurriculumToPDFVector() {
     const table = document.querySelector('.curriculum-table');
     if (!table) return;
     
-    // jsPDF 라이브러리 확인
+    // jsPDF 라이브러리 확인 및 정규화
+    if (!window.jsPDF) {
+        if (window.jspdf && window.jspdf.jsPDF) {
+            window.jsPDF = window.jspdf.jsPDF;
+        } else if (typeof jspdf !== 'undefined' && jspdf.jsPDF) {
+            window.jsPDF = jspdf.jsPDF;
+        }
+    }
+    
     if (typeof window.jsPDF === 'undefined') {
         alert('PDF 내보내기 기능을 사용하려면 jsPDF 라이브러리가 필요합니다.');
         return;
     }
     
     // jsPDF 인스턴스 생성 (가로 방향)
-    const { jsPDF } = window.jsPDF;
+    const { jsPDF } = window;
     const doc = new jsPDF('landscape', 'mm', 'a4');
     
     // 페이지 크기 설정
@@ -16554,19 +17008,57 @@ function exportCommonValuesToExcel() {
     XLSX.writeFile(wb, filename);
 }
 
-// 공통가치대응 PDF 내보내기 (벡터 기반, 페이지 모습 보존)
-function exportCommonValuesToPDF() {
+/**
+ * 공통가치대응 PDF 내보내기
+ */
+async function exportCommonValuesToPDF() {
+    const table = document.querySelector('.common-values-table');
+    if (!table) {
+        alert('내보낼 테이블을 찾을 수 없습니다.');
+        return;
+    }
+    
+    const commonValuesTitle = document.getElementById('commonValuesTitle');
+    const titleText = commonValuesTitle ? commonValuesTitle.textContent.trim() : '공통가치대응 매트릭스';
+    const filename = generatePDFFilename('공통가치대응');
+    
+    try {
+        await convertElementToPDF(table, titleText, filename, {
+            subject: '공통가치대응 매트릭스',
+            keywords: '공통가치, 매트릭스, 교과목, UOSARCH'
+        });
+    } catch (error) {
+        // 폴백: 벡터 기반 방식 시도
+        if (ensureJsPDF()) {
+            console.log('🔄 폴백: 벡터 기반 PDF 생성 시도...');
+            exportCommonValuesToPDFVector();
+        } else {
+            alert('PDF 생성 중 오류가 발생했습니다.\n' + error.message);
+        }
+    }
+}
+
+// 벡터 기반 공통가치대응 PDF 내보내기 (폴백용)
+function exportCommonValuesToPDFVector() {
     const table = document.querySelector('.common-values-table');
     if (!table) return;
     
-    // jsPDF 라이브러리 확인
+    // jsPDF 라이브러리 확인 및 정규화
+    if (!window.jsPDF) {
+        if (window.jspdf && window.jspdf.jsPDF) {
+            window.jsPDF = window.jspdf.jsPDF;
+        } else if (typeof jspdf !== 'undefined' && jspdf.jsPDF) {
+            window.jsPDF = jspdf.jsPDF;
+        }
+    }
+    
     if (typeof window.jsPDF === 'undefined') {
         alert('PDF 내보내기 기능을 사용하려면 jsPDF 라이브러리가 필요합니다.');
         return;
     }
     
     // jsPDF 인스턴스 생성 (가로 방향)
-    const { jsPDF } = window.jsPDF;
+    const { jsPDF } = window;
     const doc = new jsPDF('landscape', 'mm', 'a4');
     
     // 페이지 크기 설정
