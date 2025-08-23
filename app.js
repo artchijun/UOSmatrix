@@ -1323,15 +1323,19 @@ loadChangeHistory();
 
 // 페이지 초기화
 function init() {
+    console.log('init() 함수 시작');
+    
     // Firebase 초기화
     initializeFirebase();
     
     // Firebase에서 데이터 로드 시도
     loadAllDataFromFirebase().then(firebaseLoaded => {
         if (firebaseLoaded) {
+            console.log('Firebase 데이터 로드 성공');
             // Firebase 로드 성공 시 최근 버전 자동 선택
             selectLatestVersion();
         } else {
+            console.log('Firebase 데이터 로드 실패 또는 오프라인');
         }
         
         // 동기화 완료 후 로컬 버전 로드
@@ -1342,12 +1346,56 @@ function init() {
         
         // UI 초기화
         initializeUI();
+        
+        // 모든 렌더링 함수 호출
+        renderCourses();
+        renderMatrix();
+        renderCurriculumTable();
+        renderCommonValuesTable();
+        updateStats();
+        updateDesignDisplay();
+        updateCurriculumSummaryDisplay();
+        
+        // 디자인 설정 적용
+        if (designSettings) {
+            if (designSettings.curriculum) {
+                applyCurriculumColorScheme();
+                updateCurriculumFontSize();
+            }
+        }
+        
+        // 버전 정보 표시
+        if (typeof updateVersionDisplay === 'function') {
+            updateVersionDisplay();
+        } else {
+            // 버전 표시 업데이트
+            const versionElement = document.getElementById('currentVersion');
+            if (versionElement) {
+                versionElement.textContent = currentVersion || '기본';
+            }
+        }
+        
+        // 첫 탭 활성화 (커리큘럼 탭을 기본으로)
+        showTab('curriculum');
+        
+        console.log('초기화 완료');
     }).catch(error => {
+        console.error('Firebase 데이터 로드 중 오류:', error);
         
         // 오류 발생 시 로컬 데이터로 폴백
         loadAllVersions();
         restoreSelectedVersionData();
         initializeUI();
+        
+        // 모든 렌더링 함수 호출
+        renderCourses();
+        renderMatrix();
+        renderCurriculumTable();
+        renderCommonValuesTable();
+        updateStats();
+        showTab('curriculum');
+        
+        console.log('오프라인 모드로 초기화 완료');
     });
 
 }
@@ -4105,11 +4153,15 @@ window.onclick = function(event) {
 
 // 페이지 로드 시 초기화
 window.onload = function() {
+    console.log('페이지 로드 시작');
+    
     // init() 함수를 먼저 호출하여 데이터 로드
     init();
     
     // 🛡️ 전역 vis-network 오류 방지 시스템 활성화
-    window.setupGlobalVisNetworkErrorPrevention();
+    if (typeof window.setupGlobalVisNetworkErrorPrevention === 'function') {
+        window.setupGlobalVisNetworkErrorPrevention();
+    }
     
     // 디버깅용 함수 - 삭제된 과목 데이터 확인
     window.checkDeletedCourses = function() {
@@ -4172,13 +4224,8 @@ window.onload = function() {
     // 키보드 이벤트 리스너 추가
     document.addEventListener('keydown', handleMatrixKeyboardEdit);
     
-    // 탭 버튼 이벤트 리스너
-    document.querySelectorAll('.tab').forEach(tab => {
-        tab.addEventListener('click', function(e) {
-            const tabName = this.getAttribute('onclick').match(/'(.*?)'/)[1];
-            showTab(tabName, e);
-        });
-    });
+    // 탭 버튼 이벤트 리스너 - onclick과 중복되지 않도록 제거
+    // (HTML에 이미 onclick이 있으므로 추가 리스너 불필요)
     
     // 필터 이벤트 리스너 - null 체크 추가
     const yearFilter = document.getElementById('yearFilter');
@@ -4500,19 +4547,36 @@ function updateFontSize() {
  */
 const PDFExportConfig = {
     quality: {
-        scale: 2,           // 해상도 높임 (1-4)
+        scale: 3,           // 해상도 높임 (1-4) - 3으로 증가
         imageFormat: 'png', // png 또는 jpeg
-        compression: 'FAST' // FAST, SLOW, MEDIUM, NONE
+        compression: 'SLOW' // FAST, SLOW, MEDIUM, NONE - 최고 품질
     },
     page: {
-        format: 'a2',       // A2로 변경하여 더 큰 페이지
+        format: 'a3',       // A3로 변경하여 적절한 크기
         orientation: 'landscape', // landscape, portrait
-        margin: 10          // 페이지 여백 (mm)
+        margin: 15          // 페이지 여백 (mm) - 증가
     },
     ui: {
         showProgress: true, // 진행률 표시 여부
         autoClose: true,    // 완료 후 자동 닫기
-        closeDelay: 500     // 자동 닫기 지연 시간 (ms)
+        closeDelay: 800     // 자동 닫기 지연 시간 (ms) - 증가
+    },
+    font: {
+        korean: true,       // 한글 폰트 지원
+        family: 'Malgun Gothic, Noto Sans KR, sans-serif', // 한글 폰트
+        size: {
+            title: 16,      // 제목 크기
+            header: 9,      // 헤더 크기
+            body: 8,        // 본문 크기
+            small: 7        // 작은 텍스트
+        }
+    },
+    table: {
+        autoWidth: true,    // 자동 너비 조정
+        wrapText: true,     // 텍스트 자동 줄바꿈
+        headerColor: [44, 62, 80],    // 헤더 배경색
+        alternateRow: [248, 249, 250], // 교대로 나타나는 행 색상
+        borderColor: [189, 195, 199]   // 테두리 색상
     }
 };
 
@@ -4716,16 +4780,25 @@ async function convertElementToPDF(element, title, filename, options = {}) {
                     table.style.tableLayout = 'auto';
                 });
                 
-                // 셀 스타일 - 원본 비율 정확히 유지
+                // 셀 스타일 - 개선된 디자인
                 const cells = clonedDoc.querySelectorAll('td, th');
                 cells.forEach(cell => {
                     if (!cell.style.border) {
                         cell.style.border = '1px solid #ddd';
                     }
-                    // 높이 자동 조정으로 비율 유지
+                    // 셀 패딩 및 스타일 개선
+                    cell.style.padding = '10px';
                     cell.style.height = 'auto';
-                    // 수직 정렬 중앙으로 설정
                     cell.style.verticalAlign = 'middle';
+                    cell.style.fontSize = '14px';
+                    cell.style.lineHeight = '1.6';
+                    
+                    // 헤더 셀 강조
+                    if (cell.tagName === 'TH') {
+                        cell.style.backgroundColor = '#f8f9fa';
+                        cell.style.fontWeight = 'bold';
+                        cell.style.fontSize = '15px';
+                    }
                 });
                 
                 // 교과목 블록 - PDF에 최적화된 스타일
@@ -4834,6 +4907,9 @@ async function convertElementToPDF(element, title, filename, options = {}) {
         loadingUI?.updateProgress(95, '파일 저장 중...');
         doc.save(filename);
         
+        // 성공 메시지
+        showToast('PDF 내보내기가 완료되었습니다. (이미지 방식)', 'success');
+        
         // 8. 완료
         loadingUI?.updateProgress(100, '완료!');
         if (config.ui.autoClose) {
@@ -4870,9 +4946,91 @@ function generatePDFFilename(prefix) {
 // ============================================================================
 
 /**
+ * PDF 드롭다운 토글 함수
+ */
+function togglePDFDropdown(type) {
+    const dropdownId = `pdfDropdown${type.charAt(0).toUpperCase() + type.slice(1)}`;
+    const dropdown = document.getElementById(dropdownId);
+    
+    // 다른 드롭다운 닫기
+    document.querySelectorAll('.dropdown-menu').forEach(menu => {
+        if (menu.id !== dropdownId) {
+            menu.style.display = 'none';
+        }
+    });
+    
+    // 현재 드롭다운 토글
+    if (dropdown) {
+        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+// 문서 클릭시 드롭다운 닫기
+window.addEventListener('click', function(event) {
+    if (!event.target.matches('.dropdown-toggle')) {
+        document.querySelectorAll('.dropdown-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
+    }
+});
+
+/**
  * 수행평가 매트릭스 PDF 내보내기
  */
-async function exportToPDF() {
+function exportToPDF() {
+    const table = document.getElementById('matrixTable');
+    if (!table) {
+        alert('내보낼 테이블을 찾을 수 없습니다.');
+        return;
+    }
+    
+    // 드롭다운 닫기
+    const dropdown = document.getElementById('pdfDropdownMatrix');
+    if (dropdown) {
+        dropdown.style.display = 'none';
+    }
+    
+    // 이미지 기반 PDF 생성 (고품질)
+    exportToPDFImage();
+}
+
+/**
+ * 수행평가 매트릭스 SVG 내보내기
+ */
+function exportToSVG() {
+    const table = document.getElementById('matrixTable');
+    if (!table) {
+        alert('내보낼 테이블을 찾을 수 없습니다.');
+        return;
+    }
+    
+    // 드롭다운 닫기
+    const dropdown = document.getElementById('pdfDropdownMatrix');
+    if (dropdown) {
+        dropdown.style.display = 'none';
+    }
+    
+    // SVG 생성
+    const svg = tableToSVG(table);
+    
+    // 다운로드
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `수행평가매트릭스_${new Date().toISOString().split('T')[0]}.svg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showToast('SVG 파일이 다운로드되었습니다.', 'success');
+}
+
+/**
+ * 이미지 기반 PDF 내보내기 (고품질)
+ */
+async function exportToPDFImage() {
     const table = document.getElementById('matrixTable');
     if (!table) {
         alert('내보낼 테이블을 찾을 수 없습니다.');
@@ -4881,7 +5039,7 @@ async function exportToPDF() {
     
     const matrixTitle = document.getElementById('matrixTitle');
     const titleText = matrixTitle ? matrixTitle.textContent.trim() : '학생수행평가기준과 교과목 매트릭스 2025';
-    const filename = generatePDFFilename('수행평가매트릭스');
+    const filename = generatePDFFilename('수행평가매트릭스_이미지');
     
     try {
         await convertElementToPDF(table, titleText, filename, {
@@ -4899,123 +5057,610 @@ async function exportToPDF() {
     }
 }
 
-// 벡터 기반 PDF 내보내기 (폴백용)
-function exportToPDFVector() {
-    const table = document.getElementById('matrixTable');
-    if (!table) return;
+/**
+ * HTML 테이블을 SVG로 변환
+ * @param {HTMLTableElement} table - 변환할 테이블 엘리먼트
+ * @returns {string} SVG 문자열
+ */
+function tableToSVG(table) {
+    if (!table) return '';
     
-    // jsPDF 라이브러리 확인 및 정규화
-    if (!window.jsPDF) {
-        if (window.jspdf && window.jspdf.jsPDF) {
-            window.jsPDF = window.jspdf.jsPDF;
-        } else if (typeof jspdf !== 'undefined' && jspdf.jsPDF) {
-            window.jsPDF = jspdf.jsPDF;
-        }
-    }
+    // 테이블 크기 계산
+    const rows = table.querySelectorAll('tr');
+    const cols = rows[0] ? rows[0].querySelectorAll('th, td').length : 0;
+    const cellWidth = 80;
+    const cellHeight = 30;
+    const padding = 5;
+    const fontSize = 12;
     
-    if (typeof window.jsPDF === 'undefined') {
-        alert('PDF 내보내기 기능을 사용하려면 jsPDF 라이브러리가 필요합니다.');
-        return;
-    }
+    // SVG 크기 설정
+    const svgWidth = cols * cellWidth + 100;
+    const svgHeight = rows.length * cellHeight + 150;
     
-    // jsPDF 인스턴스 생성 (가로 방향)
-    const { jsPDF } = window;
-    const doc = new jsPDF('landscape', 'mm', 'a4');
-    
-    // 페이지 크기 설정
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 15;
-    const contentWidth = pageWidth - (margin * 2);
-    const contentHeight = pageHeight - (margin * 2);
+    // SVG 시작
+    let svg = `<?xml version="1.0" encoding="UTF-8"?>
+`;
+    svg += `<svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}">
+`;
+    svg += `<defs>
+`;
+    svg += `  <style>
+`;
+    svg += `    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap');
+`;
+    svg += `    text { font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; }
+`;
+    svg += `    .header-text { font-weight: bold; fill: white; }
+`;
+    svg += `    .cell-text { fill: #333; }
+`;
+    svg += `    .checkmark { font-size: 16px; }
+`;
+    svg += `  </style>
+`;
+    svg += `</defs>
+`;
     
     // 제목 추가
     const matrixTitle = document.getElementById('matrixTitle');
     const titleText = matrixTitle ? matrixTitle.textContent.trim() : '학생수행평가기준과 교과목 매트릭스 2025';
     
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text(titleText, pageWidth / 2, margin + 10, { align: 'center' });
+    // 제목 배경
+    svg += `<rect x="0" y="0" width="${svgWidth}" height="60" fill="#2c3e50"/>\n`;
     
-    // 테이블 데이터 추출
-    const tableData = [];
-    const rows = table.querySelectorAll('tr');
+    // 제목 텍스트
+    svg += `<text x="${svgWidth/2}" y="35" text-anchor="middle" font-size="20" font-weight="bold" fill="white">${titleText}</text>\n`;
     
-    rows.forEach(row => {
-        const rowData = [];
-        const cells = row.querySelectorAll('th, td');
+    // 날짜 및 버전 정보
+    const dateStr = new Date().toISOString().split('T')[0];
+    const versionStr = currentVersion ? `Ver: ${currentVersion}` : '';
+    svg += `<text x="${svgWidth - 20}" y="45" text-anchor="end" font-size="12" fill="#dcdcdc">${dateStr} ${versionStr}</text>\n`;
+    
+    // 테이블 그리기 시작 위치
+    let startX = 50;
+    let startY = 80;
+    let currentY = startY;
+    
+    // 헤더 그리기
+    const thead = table.querySelector('thead');
+    const tbody = table.querySelector('tbody');
+    
+    // 헤더 그리기
+    if (thead) {
+        const headerRows = thead.querySelectorAll('tr');
         
-        cells.forEach(cell => {
-            let text = cell.textContent || cell.innerText || '';
-            // 줄바꿈 처리
-            text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-            rowData.push(text);
+        headerRows.forEach((row, rowIndex) => {
+            let currentX = startX;
+            const cells = row.querySelectorAll('th');
+            
+            cells.forEach((cell, cellIndex) => {
+                const text = cell.textContent.trim();
+                const colspan = parseInt(cell.getAttribute('colspan') || 1);
+                const rowspan = parseInt(cell.getAttribute('rowspan') || 1);
+                const width = cellWidth * colspan;
+                const height = cellHeight * rowspan;
+                
+                // 헤더 셀 배경
+                svg += `<rect x="${currentX}" y="${currentY}" width="${width}" height="${height}" fill="#34495e" stroke="#2c3e50" stroke-width="1"/>\n`;
+                
+                // 헤더 텍스트
+                const textX = currentX + width / 2;
+                const textY = currentY + height / 2 + 4;
+                svg += `<text x="${textX}" y="${textY}" text-anchor="middle" class="header-text" font-size="${fontSize}">${text}</text>\n`;
+                
+                currentX += width;
+            });
+            
+            currentY += cellHeight;
+        });
+    }
+    
+    // 바디 그리기
+    if (tbody) {
+        const bodyRows = tbody.querySelectorAll('tr');
+        bodyRows.forEach((row, rowIndex) => {
+            let currentX = startX;
+            const cells = row.querySelectorAll('td, th');
+            const bgColor = rowIndex % 2 === 0 ? '#ffffff' : '#f8f9fa';
+            
+            cells.forEach((cell, cellIndex) => {
+                const text = cell.textContent.trim();
+                const isHeader = cell.tagName === 'TH';
+                const isCheckmark = text === '○' || text === '●' || text === '◎';
+                
+                // 셀 배경
+                const fillColor = isHeader ? '#e9ecef' : bgColor;
+                svg += `<rect x="${currentX}" y="${currentY}" width="${cellWidth}" height="${cellHeight}" fill="${fillColor}" stroke="#dee2e6" stroke-width="0.5"/>\n`;
+                
+                // 텍스트 위치와 정렬
+                let textAnchor = 'middle';
+                let textX = currentX + cellWidth / 2;
+                
+                // 교과목명 열은 왼쪽 정렬
+                if (cellIndex === 2 && !isHeader) {
+                    textAnchor = 'start';
+                    textX = currentX + padding;
+                }
+                
+                const textY = currentY + cellHeight / 2 + 4;
+                const textClass = isHeader ? 'header-text' : 'cell-text';
+                const fontWeight = isHeader || cellIndex === 0 ? 'bold' : 'normal';
+                const checkmarkClass = isCheckmark ? 'checkmark' : '';
+                
+                if (text) {
+                    svg += `<text x="${textX}" y="${textY}" text-anchor="${textAnchor}" class="${textClass} ${checkmarkClass}" font-size="${fontSize}" font-weight="${fontWeight}">${text}</text>\n`;
+                }
+                
+                currentX += cellWidth;
+            });
+            
+            currentY += cellHeight;
+        });
+    }
+    
+    // SVG 닫기
+    svg += '</svg>\n';
+    
+    return svg;
+}
+
+// 수동 테이블 그리기 함수 (autoTable 없을 때 사용)
+function drawManualTable(doc, headers, tableData, margin, contentWidth, pageHeight) {
+    let y = margin + 15;
+    const fontSize = 6;
+    doc.setFontSize(fontSize);
+    doc.setFont('helvetica', 'normal');
+    
+    // 헤더 그리기
+    if (headers.length > 0) {
+        doc.setFont('helvetica', 'bold');
+        headers.forEach((headerRow) => {
+            let x = margin;
+            const cellHeight = 7;
+            
+            headerRow.forEach((cell) => {
+                const cellWidth = contentWidth / headerRow.length;
+                
+                // 셀 테두리
+                doc.setDrawColor(80, 80, 80);
+                doc.rect(x, y, cellWidth, cellHeight);
+                
+                // 셀 텍스트
+                doc.text(cell.content || '', x + cellWidth / 2, y + cellHeight / 2 + 2, { align: 'center' });
+                x += cellWidth;
+            });
+            
+            y += cellHeight;
+        });
+    }
+    
+    // 바디 그리기
+    doc.setFont('helvetica', 'normal');
+    tableData.forEach((row) => {
+        let x = margin;
+        const cellHeight = 6;
+        
+        // 페이지 넘김 체크
+        if (y > pageHeight - margin - 10) {
+            doc.addPage();
+            y = margin;
+            
+            // 새 페이지에 헤더 다시 그리기
+            if (headers.length > 0) {
+                doc.setFont('helvetica', 'bold');
+                headers.forEach((headerRow) => {
+                    let headerX = margin;
+                    const headerCellHeight = 7;
+                    headerRow.forEach((cell) => {
+                        const cellWidth = contentWidth / headerRow.length;
+                        doc.setDrawColor(80, 80, 80);
+                        doc.rect(headerX, y, cellWidth, headerCellHeight);
+                        doc.setFillColor(245, 245, 245);
+                        doc.rect(headerX, y, cellWidth, headerCellHeight, 'F');
+                        doc.setTextColor(0, 0, 0);
+                        const text = cell.content || '';
+                        const textWidth = doc.getTextWidth(text);
+                        const textX = headerX + (cellWidth - textWidth) / 2;
+                        doc.text(text, textX, y + headerCellHeight / 2 + 1, { baseline: 'middle' });
+                        headerX += cellWidth;
+                    });
+                    y += headerCellHeight;
+                });
+                doc.setFont('helvetica', 'normal');
+            }
+        }
+        
+        row.forEach((cell, cellIndex) => {
+            const cellWidth = contentWidth / row.length;
+            
+            // 셀 테두리
+            doc.setDrawColor(80, 80, 80);
+            doc.rect(x, y, cellWidth, cellHeight);
+            
+            // 텍스트 추가
+            doc.setTextColor(0, 0, 0);
+            const cellText = cell.content || '';
+            doc.text(cellText, x + 2, y + cellHeight / 2 + 1, { baseline: 'middle' });
+            
+            x += cellWidth;
         });
         
-        if (rowData.some(cell => cell !== '')) {
-            tableData.push(rowData);
+        y += cellHeight;
+    });
+}
+
+// 이수모형 제목 편집 가능 여부 설정
+function setCurriculumTitleEditable(editable) {
+    setTitleEditable('curriculumTitle', editable, handleCurriculumTitleInput, tempCurriculumCellTexts, {}, '건축학전공 교과과정 이수모형');
+}
+
+// 이수모형 제목 입력 처리
+function handleCurriculumTitleInput() {
+    handleTitleInput('curriculumTitle', tempCurriculumCellTexts, '건축학전공 교과과정 이수모형');
+}
+
+// 이수모형 셀 편집 활성화
+function enableCurriculumCellEditing() {
+    // 이수모형 셀 편집 기능 활성화
+    const curriculumCells = document.querySelectorAll('#curriculumTable td:not(.no-edit)');
+    curriculumCells.forEach(cell => {
+        cell.classList.add('editable-cell');
+        cell.addEventListener('click', handleCurriculumCellClick);
+    });
+}
+
+// 이수모형 셀 클릭 처리
+function handleCurriculumCellClick(event) {
+    if (!isEditModeCurriculum) return;
+    
+    const cell = event.target;
+    if (cell.classList.contains('editing-cell')) return;
+    
+    startCurriculumCellEdit(cell);
+}
+
+// 이수모형 셀 편집 시작
+function startCurriculumCellEdit(cell) {
+    const originalContent = cell.innerHTML;
+    cell.setAttribute('data-original-content', originalContent);
+    cell.classList.add('editing-cell');
+    
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = cell.textContent.trim();
+    input.className = 'cell-edit-input';
+    
+    input.addEventListener('blur', () => saveCurriculumCellEdit(cell));
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            saveCurriculumCellEdit(cell);
+        } else if (e.key === 'Escape') {
+            cancelCurriculumCellEdit(cell);
         }
     });
     
-    // 테이블 스타일 설정
+    cell.innerHTML = '';
+    cell.appendChild(input);
+    input.focus();
+    input.select();
+}
+
+// 이수모형 셀 편집 저장
+function saveCurriculumCellEdit(cell) {
+    const input = cell.querySelector('.cell-edit-input');
+    if (!input) return;
+    
+    const newValue = input.value.trim();
+    const originalContent = cell.getAttribute('data-original-content');
+    
+    if (newValue !== cell.textContent.trim()) {
+        // 이수모형 셀 데이터 업데이트
+        const row = cell.closest('tr');
+        const colIndex = Array.from(cell.parentNode.children).indexOf(cell);
+        const rowIndex = Array.from(row.parentNode.children).indexOf(row);
+        
+        // curriculumCellTexts 업데이트
+        const key = `${rowIndex}-${colIndex}`;
+        if (newValue) {
+            curriculumCellTexts[key] = newValue;
+        } else {
+            delete curriculumCellTexts[key];
+        }
+        
+        cell.innerHTML = newValue;
+        showToast('이수모형 셀이 수정되었습니다.');
+    } else {
+        cell.innerHTML = originalContent;
+    }
+    
+    cell.classList.remove('editing-cell');
+    cell.removeAttribute('data-original-content');
+}
+
+// 이수모형 셀 편집 취소
+function cancelCurriculumCellEdit(cell) {
+    const originalContent = cell.getAttribute('data-original-content');
+    if (originalContent !== null) {
+        cell.innerHTML = originalContent;
+    }
+    cell.classList.remove('editing-cell');
+    cell.removeAttribute('data-original-content');
+}
+
+// 이수모형 셀 편집 비활성화
+function disableCurriculumCellEditing() {
+    const curriculumCells = document.querySelectorAll('#curriculumTable td.editable-cell');
+    curriculumCells.forEach(cell => {
+        cell.classList.remove('editable-cell');
+        cell.removeEventListener('click', handleCurriculumCellClick);
+    });
+    
+    // 편집 중인 셀들을 원래 상태로 복원
+    const editingCells = document.querySelectorAll('#curriculumTable .editing-cell');
+    editingCells.forEach(cell => {
+        const originalContent = cell.getAttribute('data-original-content');
+        if (originalContent !== null) {
+            cell.innerHTML = originalContent;
+            cell.classList.remove('editing-cell');
+            cell.removeAttribute('data-original-content');
+        }
+    });
+
     const tableConfig = {
-        startY: margin + 20,
+        startY: margin + 25,
+        head: headers.length > 0 ? headers : undefined,
+        body: tableData,
         styles: {
-            fontSize: 8,
-            cellPadding: 2,
-            lineColor: [0, 0, 0],
+            font: 'helvetica',
+            fontSize: 6,
+            cellPadding: 1.5,
+            lineColor: [200, 200, 200],
             lineWidth: 0.1,
-            textColor: [0, 0, 0]
+            textColor: [0, 0, 0],
+            overflow: 'linebreak',
+            cellWidth: 'auto',
+            minCellHeight: 6,
+            halign: 'left',
+            valign: 'middle'
         },
         headStyles: {
             fillColor: [44, 62, 80],
             textColor: [255, 255, 255],
-            fontSize: 9,
-            fontStyle: 'bold'
+            fontSize: 7,
+            fontStyle: 'bold',
+            halign: 'center',
+            valign: 'middle',
+            cellPadding: 2,
+            lineWidth: 0.1
+        },
+        bodyStyles: {
+            fontSize: 6,
+            valign: 'middle',
+            cellPadding: 1.5,
+            lineWidth: 0.05
         },
         alternateRowStyles: {
-            fillColor: [245, 245, 245]
+            fillColor: [248, 248, 248]
         },
-        columnStyles: {
-            0: { cellWidth: 25 }, // 과목명
-            1: { cellWidth: 15 }, // 학년
-            2: { cellWidth: 15 }, // 학기
-            3: { cellWidth: 15 }, // 구분
-            4: { cellWidth: 15 }, // 과목분류
-            5: { cellWidth: 15 }, // 학점
-            6: { cellWidth: 15 }, // 담당교수
-            7: { cellWidth: 15 }, // 수행평가기준
-        },
-        didDrawCell: function(data) {
-            // 셀 내용이 긴 경우 줄바꿈 처리
-            if (data.cell.text && data.cell.text.length > 20) {
-                const lines = doc.splitTextToSize(data.cell.text, data.cell.width - 4);
-                if (lines.length > 1) {
-                    data.cell.text = lines;
+        columnStyles: columnStyles,
+        theme: 'grid',
+        margin: { top: margin, right: margin, bottom: margin, left: margin },
+        tableWidth: 'auto',
+        showHead: 'everyPage',
+        pageBreak: 'auto',
+        rowPageBreak: 'avoid',
+        willDrawCell: function(data) {
+            // 셀 그리기 전 스타일 최적화
+            if (data.cell.text && data.cell.text.length > 0) {
+                let text = data.cell.text[0];
+                
+                // 긴 텍스트는 자동 줄바꿈 및 폰트 크기 조정
+                if (text && text.length > 40) {
+                    data.cell.styles.cellWidth = 'wrap';
+                    data.cell.styles.fontSize = 5;
+                } else if (text && text.length > 25) {
+                    data.cell.styles.fontSize = 5.5;
+                }
+                
+                // [Korean Text] 표시가 있는 셀 스타일
+                if (text && (text.includes('[K]') || text.includes('[Korean Text]'))) {
+                    data.cell.styles.textColor = [80, 80, 80];
+                    data.cell.styles.fontStyle = 'italic';
+                    // [K] 마커를 더 작게 표시
+                    if (text.includes('[K]')) {
+                        data.cell.styles.fontSize = Math.max(4, (data.cell.styles.fontSize || 6) - 1);
+                    }
+                }
+                
+                // 체크마크 처리 (○, ●, ◎)
+                if (text === '○' || text === '●' || text === '◎') {
+                    data.cell.styles.fontSize = 8;
+                    data.cell.styles.halign = 'center';
+                    data.cell.styles.fontStyle = 'normal';
+                }
+                
+                // 숫자만 있는 셀은 중앙 정렬
+                if (text && /^\d+(\.\d+)?$/.test(text)) {
+                    data.cell.styles.halign = 'center';
                 }
             }
+        },
+        didDrawCell: function(data) {
+            // 셀 그린 후 추가 처리
+            if (data.column.index === 0 && data.cell.section === 'body') {
+                // 번호 컬럼 강조
+                doc.setDrawColor(PDFExportConfig.table.borderColor[0], 
+                               PDFExportConfig.table.borderColor[1], 
+                               PDFExportConfig.table.borderColor[2]);
+                doc.setLineWidth(0.2);
+                doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height);
+            }
+        },
+        didDrawPage: function(data) {
+            // 페이지 번호 추가
+            doc.setFontSize(PDFExportConfig.font.size.small);
+            doc.setTextColor(128, 128, 128);
+            const pageNumber = doc.getCurrentPageInfo().pageNumber;
+            doc.text(`${pageNumber}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
         }
     };
     
-    // 테이블 그리기
-    doc.autoTable({
-        ...tableConfig,
-        body: tableData.slice(1), // 헤더 제외
-        head: [tableData[0]] // 첫 번째 행을 헤더로
-    });
+    // autoTable 플러그인 사용 (텍스트 렌더링)
+    if (typeof doc.autoTable === 'function') {
+        doc.autoTable(tableConfig);
+        
+        // 메타데이터 추가
+        doc.setProperties({
+            title: titleText,
+            subject: '수행평가 매트릭스',
+            author: 'UOSARCH',
+            keywords: '수행평가, 매트릭스, 교과목',
+            creator: 'UOSARCH 교과목 관리 시스템'
+        });
+    } else {
+        // autoTable이 없는 경우 수동으로 텍스트 기반 테이블 그리기
+        console.warn('autoTable 플러그인이 없습니다. 기본 테이블 렌더링을 사용합니다.');
+        drawManualTable(doc, headers, tableData, margin, contentWidth, pageHeight);
+    }
     
-    // 파일명에 현재 날짜 추가
-    const now = new Date();
-    const dateStr = now.getFullYear() + 
-                   String(now.getMonth() + 1).padStart(2, '0') + 
-                   String(now.getDate()).padStart(2, '0');
-    const filename = `수행평가매트릭스_${dateStr}.pdf`;
+    // 파일명 생성 (개선된 명명 규칙)
+    const filename = generatePDFFilename('수행평가매트릭스_벡터');
+    
+    // 최종 메타데이터 설정
+    doc.setProperties({
+        title: processKoreanText(titleText),
+        subject: '교과목 수행평가 매트릭스',
+        author: 'UOSARCH 교과목 관리 시스템',
+        keywords: '수행평가, 매트릭스, 교과목, UOSARCH',
+        creator: 'UOSARCH v2025'
+    });
     
     // PDF 저장
     doc.save(filename);
+    
+    // 성공 메시지 표시
+    showToast('벡터 PDF 내보내기 완료 - 한글은 [K] 또는 [Korean Text]로 표시됩니다.', 'warning');
+    console.log('⚠️ 벡터 PDF 생성 완료 (한글 미지원)');
 }
 
-
+// 수동 테이블 그리기 함수 (autoTable 없을 때 사용)
+function drawManualTable(doc, headers, tableData, margin, contentWidth, pageHeight) {
+    let y = margin + 15;
+    const fontSize = 6;
+    doc.setFontSize(fontSize);
+    doc.setFont('helvetica', 'normal');
+    
+    // 헤더 그리기
+    if (headers.length > 0) {
+        doc.setFont('helvetica', 'bold');
+        headers.forEach((headerRow) => {
+            let x = margin;
+            const cellHeight = 7;
+            
+            headerRow.forEach((cell) => {
+                const cellWidth = contentWidth / headerRow.length;
+                
+                // 셀 테두리
+                doc.setDrawColor(80, 80, 80);
+                doc.rect(x, y, cellWidth, cellHeight);
+                
+                // 헤더 배경
+                doc.setFillColor(245, 245, 245);
+                doc.rect(x, y, cellWidth, cellHeight, 'F');
+                
+                // 텍스트 추가
+                doc.setTextColor(0, 0, 0);
+                const text = cell.content || '';
+                const textWidth = doc.getTextWidth(text);
+                const textX = x + (cellWidth - textWidth) / 2;
+                doc.text(text, textX, y + cellHeight / 2 + 1, { baseline: 'middle' });
+                
+                x += cellWidth;
+            });
+            y += cellHeight;
+        });
+    }
+    
+    // 바디 그리기
+    doc.setFont('helvetica', 'normal');
+    tableData.forEach((row) => {
+        let x = margin;
+        const cellHeight = 6;
+        
+        // 페이지 넘김 체크
+        if (y > pageHeight - margin - 10) {
+            doc.addPage();
+            y = margin;
+            
+            // 새 페이지에 헤더 다시 그리기
+            if (headers.length > 0) {
+                doc.setFont('helvetica', 'bold');
+                headers.forEach((headerRow) => {
+                    let headerX = margin;
+                    const headerCellHeight = 7;
+                    headerRow.forEach((cell) => {
+                        const cellWidth = contentWidth / headerRow.length;
+                        doc.setDrawColor(80, 80, 80);
+                        doc.rect(headerX, y, cellWidth, headerCellHeight);
+                        doc.setFillColor(245, 245, 245);
+                        doc.rect(headerX, y, cellWidth, headerCellHeight, 'F');
+                        doc.setTextColor(0, 0, 0);
+                        const text = cell.content || '';
+                        const textWidth = doc.getTextWidth(text);
+                        const textX = headerX + (cellWidth - textWidth) / 2;
+                        doc.text(text, textX, y + headerCellHeight / 2 + 1, { baseline: 'middle' });
+                        headerX += cellWidth;
+                    });
+                    y += headerCellHeight;
+                });
+                doc.setFont('helvetica', 'normal');
+            }
+        }
+        
+        row.forEach((cell, cellIndex) => {
+            const cellWidth = contentWidth / row.length;
+            
+            // 셀 테두리
+            doc.setDrawColor(80, 80, 80);
+            doc.rect(x, y, cellWidth, cellHeight);
+            
+            // 텍스트 추가 (긴 텍스트 처리)
+            doc.setTextColor(0, 0, 0);
+            let cellText = cell.content || '';
+            
+            // 텍스트가 셀 너비를 초과하는 경우 줄바꿈
+            const maxWidth = cellWidth - 2;
+            const lines = doc.splitTextToSize(cellText, maxWidth);
+            
+            if (lines.length === 1) {
+                // 한 줄인 경우
+                const textY = y + cellHeight / 2 + 1;
+                if (cellIndex === 0 || cell.styles?.halign === 'center') {
+                    const textWidth = doc.getTextWidth(lines[0]);
+                    const textX = x + (cellWidth - textWidth) / 2;
+                    doc.text(lines[0], textX, textY, { baseline: 'middle' });
+                } else {
+                    doc.text(lines[0], x + 1, textY, { baseline: 'middle' });
+                }
+            } else {
+                // 여러 줄인 경우
+                let lineY = y + 2;
+                const lineHeight = (cellHeight - 2) / Math.min(lines.length, 3);
+                lines.slice(0, 3).forEach((line, i) => {
+                    if (i === 2 && lines.length > 3) {
+                        line = line.substring(0, line.length - 3) + '...';
+                    }
+                    doc.text(line, x + 1, lineY);
+                    lineY += lineHeight;
+                });
+            }
+            
+            x += cellWidth;
+        });
+        
+        y += cellHeight;
+    });
+}
 
 // 이수모형 제목 편집 가능 여부 설정
 function setCurriculumTitleEditable(editable) {
@@ -5459,7 +6104,7 @@ let currentMatrixVersion = '기본';
 
 
 // 토스트 메시지 함수
-function showToast(msg) {
+function showToast(msg, type = 'info') {
     let toast = document.getElementById('globalToast');
     if (!toast) {
         toast = document.createElement('div');
@@ -5468,7 +6113,6 @@ function showToast(msg) {
         toast.style.top = '50%';
         toast.style.left = '50%';
         toast.style.transform = 'translate(-50%, -50%)';
-        toast.style.background = 'rgba(40,40,40,0.95)';
         toast.style.color = '#fff';
         toast.style.padding = '18px 36px';
         toast.style.borderRadius = '10px';
@@ -5481,6 +6125,21 @@ function showToast(msg) {
         toast.style.textAlign = 'left';
         toast.style.lineHeight = '1.4';
         document.body.appendChild(toast);
+    }
+    
+    // 타입에 따른 스타일 설정
+    switch(type) {
+        case 'success':
+            toast.style.background = 'linear-gradient(135deg, #27ae60 0%, #2ecc71 100%)';
+            break;
+        case 'error':
+            toast.style.background = 'linear-gradient(135deg, #c0392b 0%, #e74c3c 100%)';
+            break;
+        case 'warning':
+            toast.style.background = 'linear-gradient(135deg, #d35400 0%, #e67e22 100%)';
+            break;
+        default: // info
+            toast.style.background = 'linear-gradient(135deg, #2c3e50 0%, #34495e 100%)';
     }
     
     // 긴 메시지의 경우 줄바꿈을 유지
@@ -7466,30 +8125,40 @@ function exportCurriculumToExcel() {
 
 /**
  * 이수모형 PDF 내보내기
+ * @param {string} mode - 'vector' 또는 'image' (기본값: 'image')
  */
-async function exportCurriculumToPDF() {
+async function exportCurriculumToPDF(mode = 'image') {
     const table = document.querySelector('.curriculum-table');
     if (!table) {
         alert('내보낼 테이블을 찾을 수 없습니다.');
         return;
     }
     
-    const curriculumTitle = document.getElementById('curriculumTitle');
-    const titleText = curriculumTitle ? curriculumTitle.textContent.trim() : '건축학전공 교과과정 이수모형';
-    const filename = generatePDFFilename('이수모형');
+    // 드롭다운 닫기
+    document.getElementById('pdfDropdownCurriculum').style.display = 'none';
     
-    try {
-        await convertElementToPDF(table, titleText, filename, {
-            subject: '건축학전공 이수모형',
-            keywords: '이수모형, 교과과정, 건축학, UOSARCH'
-        });
-    } catch (error) {
-        // 폴백: 벡터 기반 방식 시도
-        if (ensureJsPDF()) {
-            console.log('🔄 폴백: 벡터 기반 PDF 생성 시도...');
-            exportCurriculumToPDFVector();
-        } else {
-            alert('PDF 생성 중 오류가 발생했습니다.\n' + error.message);
+    if (mode === 'vector') {
+        // 벡터 기반 PDF 생성
+        exportCurriculumToPDFVector();
+    } else {
+        // 이미지 기반 PDF 생성
+        const curriculumTitle = document.getElementById('curriculumTitle');
+        const titleText = curriculumTitle ? curriculumTitle.textContent.trim() : '건축학전공 교과과정 이수모형';
+        const filename = generatePDFFilename('이수모형_이미지');
+        
+        try {
+            await convertElementToPDF(table, titleText, filename, {
+                subject: '건축학전공 이수모형',
+                keywords: '이수모형, 교과과정, 건축학, UOSARCH'
+            });
+        } catch (error) {
+            // 폴백: 벡터 기반 방식 시도
+            if (ensureJsPDF()) {
+                console.log('🔄 폴백: 벡터 기반 PDF 생성 시도...');
+                exportCurriculumToPDFVector();
+            } else {
+                alert('PDF 생성 중 오류가 발생했습니다.\n' + error.message);
+            }
         }
     }
 }
@@ -7513,22 +8182,46 @@ function exportCurriculumToPDFVector() {
         return;
     }
     
-    // jsPDF 인스턴스 생성 (가로 방향)
+    // jsPDF 인스턴스 생성 (가로 방향, A3 크기)
     const { jsPDF } = window;
-    const doc = new jsPDF('landscape', 'mm', 'a4');
+    const doc = new jsPDF('landscape', 'mm', PDFExportConfig.page.format);
+    
+    // 한글 텍스트 처리 함수
+    const processKoreanText = (text) => {
+        if (/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(text)) {
+            return text.replace(/[\u0000-\u001F]/g, '');
+        }
+        return text;
+    };
     
     // 페이지 크기 설정
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 15;
     
-    // 제목 추가
+    // 제목 추가 (개선된 스타일링)
     const curriculumTitle = document.getElementById('curriculumTitle');
     const titleText = curriculumTitle ? curriculumTitle.textContent.trim() : '건축학전공 교과과정 이수모형';
     
-    doc.setFontSize(16);
+    // 제목 배경
+    doc.setFillColor(PDFExportConfig.table.headerColor[0], 
+                     PDFExportConfig.table.headerColor[1], 
+                     PDFExportConfig.table.headerColor[2]);
+    doc.rect(margin, margin, pageWidth - (margin * 2), 15, 'F');
+    
+    // 제목 텍스트
+    doc.setFontSize(PDFExportConfig.font.size.title);
     doc.setFont('helvetica', 'bold');
-    doc.text(titleText, pageWidth / 2, margin + 10, { align: 'center' });
+    doc.setTextColor(255, 255, 255);
+    doc.text(processKoreanText(titleText), pageWidth / 2, margin + 10, { align: 'center' });
+    
+    // 날짜 정보
+    doc.setFontSize(PDFExportConfig.font.size.small);
+    doc.setTextColor(220, 220, 220);
+    const dateStr = new Date().toLocaleDateString('ko-KR');
+    doc.text(dateStr, pageWidth - margin - 5, margin + 10, { align: 'right' });
+    
+    doc.setTextColor(0, 0, 0);
     
     // 테이블 데이터 추출
     const tableData = [];
@@ -7550,33 +8243,67 @@ function exportCurriculumToPDFVector() {
         }
     });
     
-    // 테이블 스타일 설정
+    // 테이블 스타일 설정 (개선된 디자인)
     const tableConfig = {
-        startY: margin + 20,
+        startY: margin + 25,
         styles: {
-            fontSize: 7,
-            cellPadding: 2,
-            lineColor: [0, 0, 0],
+            fontSize: PDFExportConfig.font.size.body,
+            cellPadding: 3,
+            lineColor: PDFExportConfig.table.borderColor,
             lineWidth: 0.1,
-            textColor: [0, 0, 0]
+            textColor: [0, 0, 0],
+            overflow: 'linebreak',
+            cellWidth: 'auto',
+            minCellHeight: 10
         },
         headStyles: {
-            fillColor: [44, 62, 80],
+            fillColor: PDFExportConfig.table.headerColor,
             textColor: [255, 255, 255],
-            fontSize: 8,
-            fontStyle: 'bold'
+            fontSize: PDFExportConfig.font.size.header,
+            fontStyle: 'bold',
+            halign: 'center',
+            valign: 'middle'
         },
         alternateRowStyles: {
-            fillColor: [245, 245, 245]
+            fillColor: PDFExportConfig.table.alternateRow
         },
-        didDrawCell: function(data) {
-            // 셀 내용이 긴 경우 줄바꿈 처리
-            if (data.cell.text && data.cell.text.length > 15) {
-                const lines = doc.splitTextToSize(data.cell.text, data.cell.width - 4);
-                if (lines.length > 1) {
-                    data.cell.text = lines;
+        bodyStyles: {
+            valign: 'middle',
+            halign: 'center'
+        },
+        willDrawCell: function(data) {
+            // 셀 내용 처리 및 스타일 최적화
+            if (data.cell.text && data.cell.text.length > 0) {
+                let text = Array.isArray(data.cell.text) ? data.cell.text[0] : data.cell.text;
+                
+                // 한글 텍스트 처리
+                if (typeof text === 'string') {
+                    text = processKoreanText(text);
+                    data.cell.text = text;
+                }
+                
+                // 교과목 블록 스타일 적용
+                if (text.includes('학점') || text.includes('전공') || text.includes('필수')) {
+                    data.cell.styles.fontSize = PDFExportConfig.font.size.small;
+                    data.cell.styles.fontStyle = 'normal';
+                }
+                
+                // 긴 텍스트 줄바꿈
+                if (text.length > 20) {
+                    const lines = doc.splitTextToSize(text, data.cell.width - 4);
+                    if (lines.length > 1) {
+                        data.cell.text = lines;
+                        data.cell.styles.cellPadding = 2;
+                    }
                 }
             }
+        },
+        didDrawPage: function(data) {
+            // 페이지 번호 추가
+            doc.setFontSize(PDFExportConfig.font.size.small);
+            doc.setTextColor(128, 128, 128);
+            const pageNumber = doc.getCurrentPageInfo().pageNumber;
+            doc.text(`페이지 ${pageNumber}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
         }
     };
     
@@ -7587,18 +8314,42 @@ function exportCurriculumToPDFVector() {
         head: [tableData[0]] // 첫 번째 행을 헤더로
     });
     
-    // 파일명에 현재 날짜 추가
-    const now = new Date();
-    const dateStr = now.getFullYear() + 
-                   String(now.getMonth() + 1).padStart(2, '0') + 
-                   String(now.getDate()).padStart(2, '0');
-    const filename = `이수모형_${dateStr}.pdf`;
+    // 메타데이터 설정
+    doc.setProperties({
+        title: processKoreanText(titleText),
+        subject: '건축학전공 이수모형',
+        author: 'UOSARCH 교과목 관리 시스템',
+        keywords: '이수모형, 교과과정, 건축학, UOSARCH',
+        creator: 'UOSARCH v2025'
+    });
+    
+    // 파일명 생성
+    const filename = generatePDFFilename('이수모형_벡터');
     
     // PDF 저장
     doc.save(filename);
+    
+    // 성공 메시지
+    showToast('이수모형 PDF 내보내기가 완료되었습니다.', 'success');
 }
 
 // ===== 전체 버전 관리 함수들 =====
+
+// 버전 표시 업데이트 함수
+function updateVersionDisplay() {
+    const versionElement = document.getElementById('currentVersion');
+    if (versionElement) {
+        versionElement.textContent = currentVersion || '기본';
+    }
+    
+    // 매트릭스 버전 텍스트도 업데이트
+    const matrixVersionText = document.getElementById('matrixVersionText');
+    if (matrixVersionText) {
+        matrixVersionText.textContent = currentVersion || '기본';
+    }
+    
+    console.log('현재 버전:', currentVersion);
+}
 
 // 모든 버전 데이터 로드
 function loadAllVersions() {
@@ -17010,30 +17761,40 @@ function exportCommonValuesToExcel() {
 
 /**
  * 공통가치대응 PDF 내보내기
+ * @param {string} mode - 'vector' 또는 'image' (기본값: 'image')
  */
-async function exportCommonValuesToPDF() {
+async function exportCommonValuesToPDF(mode = 'image') {
     const table = document.querySelector('.common-values-table');
     if (!table) {
         alert('내보낼 테이블을 찾을 수 없습니다.');
         return;
     }
     
-    const commonValuesTitle = document.getElementById('commonValuesTitle');
-    const titleText = commonValuesTitle ? commonValuesTitle.textContent.trim() : '공통가치대응 매트릭스';
-    const filename = generatePDFFilename('공통가치대응');
+    // 드롭다운 닫기
+    document.getElementById('pdfDropdownCommonValues').style.display = 'none';
     
-    try {
-        await convertElementToPDF(table, titleText, filename, {
-            subject: '공통가치대응 매트릭스',
-            keywords: '공통가치, 매트릭스, 교과목, UOSARCH'
-        });
-    } catch (error) {
-        // 폴백: 벡터 기반 방식 시도
-        if (ensureJsPDF()) {
-            console.log('🔄 폴백: 벡터 기반 PDF 생성 시도...');
-            exportCommonValuesToPDFVector();
-        } else {
-            alert('PDF 생성 중 오류가 발생했습니다.\n' + error.message);
+    if (mode === 'vector') {
+        // 벡터 기반 PDF 생성
+        exportCommonValuesToPDFVector();
+    } else {
+        // 이미지 기반 PDF 생성
+        const commonValuesTitle = document.getElementById('commonValuesTitle');
+        const titleText = commonValuesTitle ? commonValuesTitle.textContent.trim() : '공통가치대응 매트릭스';
+        const filename = generatePDFFilename('공통가치대응_이미지');
+        
+        try {
+            await convertElementToPDF(table, titleText, filename, {
+                subject: '공통가치대응 매트릭스',
+                keywords: '공통가치, 매트릭스, 교과목, UOSARCH'
+            });
+        } catch (error) {
+            // 폴백: 벡터 기반 방식 시도
+            if (ensureJsPDF()) {
+                console.log('🔄 폴백: 벡터 기반 PDF 생성 시도...');
+                exportCommonValuesToPDFVector();
+            } else {
+                alert('PDF 생성 중 오류가 발생했습니다.\n' + error.message);
+            }
         }
     }
 }
@@ -17057,22 +17818,46 @@ function exportCommonValuesToPDFVector() {
         return;
     }
     
-    // jsPDF 인스턴스 생성 (가로 방향)
+    // 한글 텍스트 처리 함수
+    const processKoreanText = (text) => {
+        if (/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(text)) {
+            return text.replace(/[\u0000-\u001F]/g, '');
+        }
+        return text;
+    };
+    
+    // jsPDF 인스턴스 생성 (A3 가로)
     const { jsPDF } = window;
-    const doc = new jsPDF('landscape', 'mm', 'a4');
+    const doc = new jsPDF('landscape', 'mm', PDFExportConfig.page.format);
     
     // 페이지 크기 설정
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 15;
+    const margin = PDFExportConfig.page.margin;
     
-    // 제목 추가
+    // 제목 추가 (개선된 스타일링)
     const commonValuesTitle = document.getElementById('commonValuesTitle');
-    const titleText = commonValuesTitle ? commonValuesTitle.textContent.trim() : '공통가치대응';
+    const titleText = commonValuesTitle ? commonValuesTitle.textContent.trim() : '공통가치대응 매트릭스';
     
-    doc.setFontSize(16);
+    // 제목 배경
+    doc.setFillColor(PDFExportConfig.table.headerColor[0], 
+                     PDFExportConfig.table.headerColor[1], 
+                     PDFExportConfig.table.headerColor[2]);
+    doc.rect(margin, margin, pageWidth - (margin * 2), 15, 'F');
+    
+    // 제목 텍스트
+    doc.setFontSize(PDFExportConfig.font.size.title);
     doc.setFont('helvetica', 'bold');
-    doc.text(titleText, pageWidth / 2, margin + 10, { align: 'center' });
+    doc.setTextColor(255, 255, 255);
+    doc.text(processKoreanText(titleText), pageWidth / 2, margin + 10, { align: 'center' });
+    
+    // 날짜 정보
+    doc.setFontSize(PDFExportConfig.font.size.small);
+    doc.setTextColor(220, 220, 220);
+    const dateStr = new Date().toLocaleDateString('ko-KR');
+    doc.text(dateStr, pageWidth - margin - 5, margin + 10, { align: 'right' });
+    
+    doc.setTextColor(0, 0, 0);
     
     // 테이블 데이터 추출
     const tableData = [];
@@ -17085,7 +17870,7 @@ function exportCommonValuesToPDFVector() {
         cells.forEach(cell => {
             let text = cell.textContent || cell.innerText || '';
             // 줄바꿈 처리
-            text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            text = processKoreanText(text.replace(/\r\n/g, '\n').replace(/\r/g, '\n'));
             rowData.push(text);
         });
         
@@ -17094,58 +17879,94 @@ function exportCommonValuesToPDFVector() {
         }
     });
     
-    // 테이블 스타일 설정
+    // 테이블 스타일 설정 (개선된 디자인)
     const tableConfig = {
-        startY: margin + 20,
+        startY: margin + 25,
         styles: {
-            fontSize: 8,
+            fontSize: PDFExportConfig.font.size.body,
             cellPadding: 3,
-            lineColor: [0, 0, 0],
+            lineColor: PDFExportConfig.table.borderColor,
             lineWidth: 0.1,
-            textColor: [0, 0, 0]
+            textColor: [0, 0, 0],
+            overflow: 'linebreak',
+            cellWidth: 'auto',
+            minCellHeight: 10
         },
         headStyles: {
-            fillColor: [44, 62, 80],
+            fillColor: PDFExportConfig.table.headerColor,
             textColor: [255, 255, 255],
-            fontSize: 9,
-            fontStyle: 'bold'
+            fontSize: PDFExportConfig.font.size.header,
+            fontStyle: 'bold',
+            halign: 'center',
+            valign: 'middle'
         },
         alternateRowStyles: {
-            fillColor: [245, 245, 245]
+            fillColor: PDFExportConfig.table.alternateRow
         },
-        columnStyles: {
-            0: { cellWidth: 30 }, // 과목분류
-            1: { cellWidth: 50 }, // 가치1
-            2: { cellWidth: 50 }, // 가치2
-            3: { cellWidth: 50 }, // 가치3
+        bodyStyles: {
+            valign: 'middle',
+            halign: 'center'
         },
-        didDrawCell: function(data) {
-            // 셀 내용이 긴 경우 줄바꿈 처리
-            if (data.cell.text && data.cell.text.length > 25) {
-                const lines = doc.splitTextToSize(data.cell.text, data.cell.width - 4);
-                if (lines.length > 1) {
-                    data.cell.text = lines;
+        willDrawCell: function(data) {
+            // 셀 내용 처리
+            if (data.cell.text && data.cell.text.length > 0) {
+                let text = Array.isArray(data.cell.text) ? data.cell.text[0] : data.cell.text;
+                
+                // 한글 텍스트 처리
+                if (typeof text === 'string') {
+                    text = processKoreanText(text);
+                    data.cell.text = text;
+                }
+                
+                // 긴 텍스트 줄바꿈
+                if (text.length > 20) {
+                    const lines = doc.splitTextToSize(text, data.cell.width - 4);
+                    if (lines.length > 1) {
+                        data.cell.text = lines;
+                        data.cell.styles.cellPadding = 2;
+                    }
                 }
             }
+        },
+        didDrawPage: function(data) {
+            // 페이지 번호 추가
+            doc.setFontSize(PDFExportConfig.font.size.small);
+            doc.setTextColor(128, 128, 128);
+            const pageNumber = doc.getCurrentPageInfo().pageNumber;
+            doc.text(`페이지 ${pageNumber}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
         }
     };
     
     // 테이블 그리기
-    doc.autoTable({
-        ...tableConfig,
-        body: tableData.slice(1), // 헤더 제외
-        head: [tableData[0]] // 첫 번째 행을 헤더로
-    });
+    if (typeof doc.autoTable === 'function') {
+        doc.autoTable({
+            ...tableConfig,
+            body: tableData.slice(1), // 헤더 제외
+            head: [tableData[0]] // 첫 번째 행을 헤더로
+        });
+        
+        // 메타데이터 설정
+        doc.setProperties({
+            title: processKoreanText(titleText),
+            subject: '공통가치대응 매트릭스',
+            author: 'UOSARCH 교과목 관리 시스템',
+            keywords: '공통가치, 매트릭스, 교과목, UOSARCH',
+            creator: 'UOSARCH v2025'
+        });
+    } else {
+        console.warn('autoTable 플러그인이 없습니다.');
+        // 수동으로 테이블 그리기
+        drawManualTable(doc, [], tableData, margin, pageWidth - (margin * 2), pageHeight);
+    }
     
-    // 파일명에 현재 날짜 추가
-    const now = new Date();
-    const dateStr = now.getFullYear() + 
-                   String(now.getMonth() + 1).padStart(2, '0') + 
-                   String(now.getDate()).padStart(2, '0');
-    const filename = `공통가치대응_${dateStr}.pdf`;
+    // 파일명 생성
+    const filename = generatePDFFilename('공통가치대응_벡터');
     
     // PDF 저장
     doc.save(filename);
+    
+    // 성공 메시지
+    showToast('공통가치대응 PDF 내보내기가 완료되었습니다. (벡터)', 'success');
 }
 
 // 모든 버전 데이터를 파일로 내보내기 (다운로드)

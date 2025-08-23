@@ -56,6 +56,54 @@
         .curriculum-table td.no-bold {
             font-weight: normal !important;
         }
+        
+        /* PDF 드롭다운 스타일 */
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .dropdown-toggle::after {
+            content: "";
+            margin-left: 5px;
+        }
+        
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            background-color: white;
+            min-width: 200px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 1000;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-top: 2px;
+        }
+        
+        .dropdown-menu.show {
+            display: block;
+        }
+        
+        .dropdown-item {
+            color: black;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .dropdown-item:hover {
+            background-color: #f1f1f1;
+        }
+        
+        .dropdown-item:first-child {
+            border-radius: 4px 4px 0 0;
+        }
+        
+        .dropdown-item:last-child {
+            border-radius: 0 0 4px 4px;
+        }
     </style>
 </head>
 <body>
@@ -479,9 +527,20 @@
                 <button class="btn btn-secondary" onclick="exportToExcel()">
                     Excel 내보내기
                 </button>
-                <button class="btn btn-secondary" onclick="exportToPDF()">
-                    PDF 내보내기
-                </button>
+                <!-- PDF 내보내기 드롭다운 -->
+                <div class="dropdown" style="display: inline-block; position: relative;">
+                    <button class="btn btn-secondary dropdown-toggle" onclick="togglePDFDropdown('matrix')">
+                        PDF 내보내기 ▼
+                    </button>
+                    <div id="pdfDropdownMatrix" class="dropdown-menu" style="display: none; position: absolute; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 1000; min-width: 180px;">
+                        <a class="dropdown-item" onclick="exportToPDF()" style="display: block; padding: 10px 15px; cursor: pointer;">
+                            📷 PDF 내보내기 (고품질)
+                        </a>
+                        <a class="dropdown-item" onclick="exportToSVG()" style="display: block; padding: 10px 15px; cursor: pointer;">
+                            📊 SVG 내보내기 (벡터)
+                        </a>
+                    </div>
+                </div>
                 <!-- 수정모드 토글 버튼 -->
                 <button class="btn btn-edit-mode-matrix" id="editModeToggle" onclick="toggleEditMode()">
                     <span id="editModeText">일반모드</span>
@@ -706,9 +765,20 @@
                 <button class="btn btn-secondary" onclick="exportCurriculumToExcel()">
                     Excel 내보내기
                 </button>
-                <button class="btn btn-secondary" onclick="exportCurriculumToPDF()">
-                    PDF 내보내기
-                </button>
+                <!-- PDF 내보내기 드롭다운 -->
+                <div class="dropdown" style="display: inline-block; position: relative;">
+                    <button class="btn btn-secondary dropdown-toggle" onclick="togglePDFDropdown('curriculum')">
+                        PDF 내보내기 ▼
+                    </button>
+                    <div id="pdfDropdownCurriculum" class="dropdown-menu" style="display: none; position: absolute; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 1000; min-width: 180px;">
+                        <a class="dropdown-item" onclick="exportCurriculumToPDF('image')" style="display: block; padding: 10px 15px; cursor: pointer;">
+                            📷 이미지 PDF (고품질)
+                        </a>
+                        <a class="dropdown-item" onclick="exportCurriculumToPDF('vector')" style="display: block; padding: 10px 15px; cursor: pointer;">
+                            📐 벡터 PDF (텍스트 선택 가능)
+                        </a>
+                    </div>
+                </div>
 
                 <!-- 교과목 추가 버튼 (수정모드에서만 표시) -->
                 <button class="btn btn-add curriculum-add-btn" onclick="showModal()" style="display: none;">
@@ -813,9 +883,20 @@
                 <button class="btn btn-secondary" onclick="exportCommonValuesToExcel()">
                     Excel 내보내기
                 </button>
-                <button class="btn btn-secondary" onclick="exportCommonValuesToPDF()">
-                    PDF 내보내기
-                </button>
+                <!-- PDF 내보내기 드롭다운 -->
+                <div class="dropdown" style="display: inline-block; position: relative;">
+                    <button class="btn btn-secondary dropdown-toggle" onclick="togglePDFDropdown('commonValues')">
+                        PDF 내보내기 ▼
+                    </button>
+                    <div id="pdfDropdownCommonValues" class="dropdown-menu" style="display: none; position: absolute; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 1000; min-width: 180px;">
+                        <a class="dropdown-item" onclick="exportCommonValuesToPDF('image')" style="display: block; padding: 10px 15px; cursor: pointer;">
+                            📷 이미지 PDF (고했질)
+                        </a>
+                        <a class="dropdown-item" onclick="exportCommonValuesToPDF('vector')" style="display: block; padding: 10px 15px; cursor: pointer;">
+                            📐 벡터 PDF (텍스트 선택 가능)
+                        </a>
+                    </div>
+                </div>
 
                 <!-- 수정모드 토글 버튼 -->
                 <button class="btn btn-edit-mode-commonValues" id="editModeToggleCommonValues" onclick="toggleEditModeCommonValues()">
